@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 98%;
+    --foreground: 216 55% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 216 55% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 55% 13%;
+
+    --primary: 37 38% 61%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 30% 18%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 40 40% 94%;
+    --muted-foreground: 216 10% 40%;
+
+    --accent: 40 40% 94%;
+    --accent-foreground: 216 55% 13%;
+
+    --destructive: 0 72% 40%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 40 20% 88%;
+    --input: 40 20% 88%;
+    --ring: 37 38% 61%;
+
+    --radius: 0.5rem;
+    --radius-sm: calc(0.5rem - 4px);
+    --radius-lg: calc(0.5rem + 4px);
+    --radius-full: 9999px;
+
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+    --spacing-3xl: 64px;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.03), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+
+    --chart-1: 37 38% 61%;
+    --chart-2: 216 55% 13%;
+    --chart-3: 122 39% 34%;
+    --chart-4: 40 92% 76%;
+    --chart-5: 0 72% 40%;
+
+    --duration-fast: 150ms;
+    --duration-normal: 250ms;
+    --duration-slow: 400ms;
+  }
+
+  .dark {
+    --background: 216 55% 8%;
+    --foreground: 40 33% 95%;
+    --card: 216 45% 12%;
+    --card-foreground: 40 33% 95%;
+    --popover: 216 45% 12%;
+    --popover-foreground: 40 33% 95%;
+    --primary: 37 38% 61%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 30% 25%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 216 30% 16%;
+    --muted-foreground: 40 10% 60%;
+    --accent: 216 30% 16%;
+    --accent-foreground: 40 33% 95%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 216 30% 20%;
+    --input: 216 30% 20%;
+    --ring: 37 38% 61%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  [data-hydration-error] {
+    display: none !important;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}

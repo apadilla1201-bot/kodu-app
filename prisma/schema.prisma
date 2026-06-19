@@ -1,0 +1,452 @@
+// ============================================================================
+// KODU PROJECT CONTROLS AI — MULTI-TENANT PRISMA SCHEMA v2.0
+// Base: tu schema real de producción (Abacus/Next.js) + capa Company multi-tenant
+// Target: Supabase (PostgreSQL)
+// ----------------------------------------------------------------------------
+// QUÉ CAMBIÓ vs tu schema original:
+//   + Nuevo modelo Company (raíz del tenant — cada GC es una company)
+//   + User.companyId        → un usuario pertenece a una company
+//   + Project.companyId     → un proyecto pertenece a una company (no solo a un user)
+//   + Índices por companyId para aislamiento y rendimiento
+//   * TODO lo demás se mantiene 1:1 con tu modelo real (CO, PayApp, Budget, CPM)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── MULTI-TENANT ROOT ──────────────────────────────────────────────────────
+model Company {
+  id            String    @id @default(cuid())
+  name          String                              // "The Project Delivery Group LLC"
+  address       String?
+  phone         String?
+  website       String?
+  logoUrl       String?
+  // Branding tokens (tu sistema visual PDG: navy / gold / cream)
+  brandPrimary  String    @default("#1B365D")       // dark navy
+  brandAccent   String    @default("#D4A843")       // gold
+  brandCream    String    @default("#F7F6F2")
+  plan          String    @default("starter")       // starter | pro | enterprise
+  users         User[]
+  projects      Project[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model User {
+  id            String    @id @default(cuid())
+  companyId     String?                              // ← NUEVO: tenant link
+  company       Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("user")          // owner | pm | estimator | viewer
+  accounts      Account[]
+  sessions      Session[]
+  projects      Project[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([companyId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Project {
+  id              String           @id @default(cuid())
+  companyId       String?                            // ← NUEVO: tenant link
+  company         Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  projectNumber   String
+  projectName     String
+  client          String
+  location        String?
+  contractAmount  Float            @default(0)
+  startDate       DateTime?
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  changeOrders    ChangeOrder[]
+  rfis            RFI[]
+  payApplications PayApplication[]
+  budgets         Budget[]
+  schedules       Schedule[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([projectNumber])
+}
+
+model ChangeOrder {
+  id                  String             @id @default(cuid())
+  projectId           String
+  project             Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  corNumber           String
+  sequence            Int
+  date                DateTime           @default(now())
+  description         String
+  subcontractor       String?
+  status              String             @default("Pending")
+  approvalDate        DateTime?
+  csiCode             String?
+  subtotal            Float              @default(0)
+  overheadProfit      Float              @default(0)
+  generalLiability    Float              @default(0)
+  salesTax            Float              @default(0)
+  totalAmount         Float              @default(0)
+  reasonForChange     String?            @db.Text
+  reasonsParticular   String?            @db.Text
+  marketAnalysisNotes String?            @db.Text
+  pdfCloudPath        String?
+  pdfIsPublic         Boolean            @default(false)
+  subPdfCloudPath     String?
+  subPdfIsPublic      Boolean            @default(false)
+  notes               String?
+  lineItems           LineItem[]
+  marketComparisons   MarketComparison[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([corNumber])
+}
+
+model LineItem {
+  id            String      @id @default(cuid())
+  changeOrderId String
+  changeOrder   ChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  description   String
+  productCode   String?
+  quantity      Float       @default(1)
+  unit          String      @default("EA")
+  unitPrice     Float       @default(0)
+  total         Float       @default(0)
+  isMaterial    Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+
+  @@index([changeOrderId])
+}
+
+model RFI {
+  id                 String          @id @default(cuid())
+  projectId          String
+  project            Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rfiNumber          String
+  sequence           Int
+  subject            String
+  question           String          @db.Text
+  discipline         String?
+  drawingReference   String?
+  specReference      String?
+  priority           String          @default("Normal")
+  status             String          @default("Open")
+  submittedBy        String
+  submittedByRole    String?
+  assignedTo         String
+  assignedToRole     String?
+  dateSubmitted      DateTime        @default(now())
+  dateDue            DateTime?
+  daysToRespond      Int             @default(7)
+  responseText       String?         @db.Text
+  responseBy         String?
+  responseDate       DateTime?
+  costImpact         String          @default("TBD")
+  scheduleImpact     String          @default("TBD")
+  scheduleImpactDays Int?
+  notes              String?         @db.Text
+  attachments        RFIAttachment[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([rfiNumber])
+  @@index([assignedTo])
+}
+
+model RFIAttachment {
+  id               String   @id @default(cuid())
+  rfiId            String
+  rfi              RFI      @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  fileName         String
+  fileType         String?
+  cloudStoragePath String
+  isPublic         Boolean  @default(false)
+  attachmentType   String   @default("question")
+  createdAt        DateTime @default(now())
+
+  @@index([rfiId])
+}
+
+model PayApplication {
+  id                      String           @id @default(cuid())
+  projectId               String
+  project                 Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  applicationNumber       Int
+  applicationDate         DateTime
+  periodFrom              DateTime
+  periodTo                DateTime
+  status                  String           @default("Draft")
+  ownerName               String?
+  ownerAddress            String?
+  ownerCity               String?
+  architectName           String?
+  architectAddress        String?
+  architectCity           String?
+  contractDate            DateTime?
+  contractFor             String?
+  contractForm            String?
+  opPercent               Float            @default(0.06)
+  glPercent               Float            @default(0.015)
+  contingencyPercent      Float            @default(0.10)
+  retainagePercent        Float            @default(0.10)
+  retainageContPercent    Float            @default(0)
+  constructionSubtotal    Float            @default(0)
+  originalContractSum     Float            @default(0)
+  glInsuranceAmount       Float            @default(0)
+  advancePayments         Float            @default(0)
+  advancePaymentsLabel    String?
+  directPayments          Float            @default(0)
+  directPaymentsDeduction Float            @default(0)
+  directPaymentsLabel     String?
+  previousCertificates    Float            @default(0)
+  g702NetChange           Float?
+  g702ContractSumToDate   Float?
+  g702TotalCompleted      Float?
+  g702Retainage           Float?
+  g702TotalEarned         Float?
+  g702CurrentPaymentDue   Float?
+  g702BalanceToFinish     Float?
+  contractorPrinted       String?
+  contractorTitle         String?
+  ownerPrinted            String?
+  notes                   String?          @db.Text
+  lineItems               PayAppLineItem[]
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  @@unique([projectId, applicationNumber])
+  @@index([projectId])
+  @@index([status])
+}
+
+model PayAppLineItem {
+  id                String         @id @default(cuid())
+  payApplicationId  String
+  payApplication    PayApplication @relation(fields: [payApplicationId], references: [id], onDelete: Cascade)
+  sortOrder         Int            @default(0)
+  itemNumber        String         @default("")
+  sectionCode       String         @default("")
+  sectionTitle      String         @default("")
+  description       String
+  subVendor         String         @default("")
+  scheduledValue    Float          @default(0)
+  budgetRealloc     Float          @default(0)
+  previousChanges   Float          @default(0)
+  currentChanges    Float          @default(0)
+  previousCompleted Float          @default(0)
+  thisCompleted     Float          @default(0)
+  retainage         Float          @default(0)
+  isSection         Boolean        @default(false)
+  isBelowLine       Boolean        @default(false)
+  isFee             Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+
+  @@index([payApplicationId])
+  @@index([sortOrder])
+}
+
+model Budget {
+  id                   String             @id @default(cuid())
+  projectId            String
+  project              Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version              String             @default("1.0")
+  budgetDate           DateTime           @default(now())
+  totalACSF            Float?
+  sfRate               Float?
+  constructionSubtotal Float              @default(0)
+  furnishingsSubtotal  Float              @default(0)
+  subTotalAll          Float              @default(0)
+  opPercent            Float              @default(0.08)
+  glPercent            Float              @default(0.02)
+  contingencyPercent   Float              @default(0.10)
+  opAmount             Float              @default(0)
+  glAmount             Float              @default(0)
+  contingencyAmount    Float              @default(0)
+  grandTotal           Float              @default(0)
+  exclusions           String?            @db.Text
+  assumptions          String?            @db.Text
+  notes                String?            @db.Text
+  status               String             @default("Active")
+  lineItems            BudgetLineItem[]
+  detailItems          BudgetDetailItem[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([projectId])
+}
+
+model BudgetLineItem {
+  id             String   @id @default(cuid())
+  budgetId       String
+  budget         Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  sortOrder      Int      @default(0)
+  divisionCode   String   @default("")
+  itemNumber     String   @default("")
+  description    String
+  subVendor      String   @default("")
+  scheduledValue Float    @default(0)
+  currentChanges Float    @default(0)
+  revisedValue   Float    @default(0)
+  percentTotal   Float    @default(0)
+  isSection      Boolean  @default(false)
+  isSubtotal     Boolean  @default(false)
+  isFee          Boolean  @default(false)
+  isBelowLine    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([budgetId])
+  @@index([sortOrder])
+}
+
+model BudgetDetailItem {
+  id             String   @id @default(cuid())
+  budgetId       String
+  budget         Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  sheetName      String
+  sortOrder      Int      @default(0)
+  status         String   @default("")
+  itemCode       String   @default("")
+  description    String
+  quantity       Float    @default(0)
+  unit           String   @default("")
+  laborUnit      Float    @default(0)
+  laborTotal     Float    @default(0)
+  materialUnit   Float    @default(0)
+  materialTotal  Float    @default(0)
+  equipmentUnit  Float    @default(0)
+  equipmentTotal Float    @default(0)
+  subUnit        Float    @default(0)
+  subTotal       Float    @default(0)
+  totalUnitCost  Float    @default(0)
+  totalCost      Float    @default(0)
+  isHeader       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([budgetId])
+  @@index([sheetName])
+}
+
+model MarketComparison {
+  id              String      @id @default(cuid())
+  changeOrderId   String
+  changeOrder     ChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  itemDescription String
+  subQuote        Float       @default(0)
+  marketLow       Float?      @default(0)
+  marketHigh      Float?      @default(0)
+  marketAverage   Float       @default(0)
+  variancePercent Float       @default(0)
+  assessment      String?
+  source          String?
+  createdAt       DateTime    @default(now())
+
+  @@index([changeOrderId])
+}
+
+// ─── CPM Schedule Module ────────────────────────────────────────────────────
+model Schedule {
+  id            String             @id @default(cuid())
+  projectId     String
+  project       Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revision      String             @default("Rev.1")
+  dataDate      DateTime           @default(now())
+  projectStart  DateTime?
+  projectFinish DateTime?
+  tcoDate       DateTime?
+  notes         String?            @db.Text
+  status        String             @default("Active")
+  activities    ScheduleActivity[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+}
+
+model ScheduleActivity {
+  id                String    @id @default(cuid())
+  scheduleId        String
+  schedule          Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  sortOrder         Int       @default(0)
+  activityId        String    @default("")
+  activityName      String
+  activityType      String    @default("task")
+  originalDuration  Int       @default(0)
+  remainingDuration Int       @default(0)
+  percentComplete   Float     @default(0)
+  startDate         DateTime?
+  finishDate        DateTime?
+  actualStart       DateTime?
+  actualFinish      DateTime?
+  status            String    @default("pend")
+  isCritical        Boolean   @default(false)
+  isMilestone       Boolean   @default(false)
+  notes             String?   @db.Text
+  wbsCode           String    @default("")
+  predecessors      String?
+  successors        String?
+  calendarDays      Boolean   @default(false)
+  floatDays         Int       @default(0)
+  costLoaded        Float     @default(0)
+  resourceName      String    @default("")
+  isLookAhead       Boolean   @default(false)
+  parentActivityId  String?
+  createdAt         DateTime  @default(now())
+
+  @@index([scheduleId])
+  @@index([sortOrder])
+  @@index([isCritical])
+  @@index([status])
+}
