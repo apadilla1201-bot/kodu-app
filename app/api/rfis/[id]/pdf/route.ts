@@ -339,6 +339,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     });
   } catch (error: any) {
     console.error('RFI PDF error:', error);
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to generate PDF', details: error?.message ?? String(error) },
+      { status: 500 }
+    );
   }
 }

@@ -30,16 +30,43 @@ const CHROMIUM_PACK_URL =
   process.env.CHROMIUM_PACK_URL ??
   'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar';
 
+/**
+ * Vercel Fluid Compute does not expose AWS Lambda env vars. Without them,
+ * @sparticuz/chromium-min skips AL2023 libs and Chromium fails (libnss3.so).
+ */
+function prepareServerlessChromiumEnv(): void {
+  if (!process.env.VERCEL) return;
+
+  process.env.HOME ??= '/tmp';
+
+  const hasLambdaRuntime =
+    process.env.AWS_LAMBDA_JS_RUNTIME?.includes('20.x') ||
+    process.env.AWS_LAMBDA_JS_RUNTIME?.includes('22.x') ||
+    process.env.AWS_EXECUTION_ENV?.includes('20.x') ||
+    process.env.AWS_EXECUTION_ENV?.includes('22.x');
+
+  if (!hasLambdaRuntime) {
+    process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs22.x';
+  }
+}
+
 async function launchPdfBrowser() {
   if (process.env.VERCEL) {
+    prepareServerlessChromiumEnv();
+
     const chromium = (await import('@sparticuz/chromium-min')).default;
+    const { setupLambdaEnvironment } = await import('@sparticuz/chromium-min/build/helper');
     const puppeteer = await import('puppeteer-core');
+
     chromium.setGraphicsMode = false;
 
+    const executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+    setupLambdaEnvironment('/tmp/al2023/lib');
+
     return puppeteer.launch({
-      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security', '--disable-dev-shm-usage'],
+      args: chromium.args,
       defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
+      executablePath,
       headless: chromium.headless,
     });
   }
