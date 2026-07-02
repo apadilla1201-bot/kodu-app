@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
 import { htmlToPdf } from '@/lib/pdf';
+import { GC_ADDRESS_HTML, GC_NAME_UPPER } from '@/lib/gc-branding';
 
 function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -140,9 +141,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     <div class="header-left">
       <img src="${logoUrl}" alt="PDG Logo" />
       <div class="company">
-        THE PROJECT DELIVERY GROUP, LLC<br/>
-        7255 NE 4th Ave., Unit 110-2<br/>
-        Miami, FL 33138
+        ${GC_NAME_UPPER}<br/>
+        ${GC_ADDRESS_HTML}
       </div>
     </div>
     <div class="header-right">
@@ -241,7 +241,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   <!-- Footer -->
   <div class="footer">
     <span>© Kodu GC · Confidential</span>
-    <span>THE PROJECT DELIVERY GROUP, LLC</span>
+    <span>${GC_NAME_UPPER}</span>
     <span>Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
   </div>
 

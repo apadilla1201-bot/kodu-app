@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { htmlToPdf } from '@/lib/pdf';
+import { GC_ADDRESS_FULL, GC_LICENSE, GC_NAME } from '@/lib/gc-branding';
 
 function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -133,7 +134,7 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
   <div class="header">
     <div class="header-left">
       <h1>APPLICATION AND CERTIFICATE FOR PAYMENT</h1>
-      <p>AIA Document G702 — PDG Construction Group, Inc.</p>
+      <p>AIA Document G702 — ${esc(GC_NAME)}</p>
     </div>
     <div class="header-right">
       <div class="app-no">PA #${pa.applicationNumber}</div>
@@ -142,13 +143,13 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
     </div>
   </div>
   <div class="gold-bar">
-    <span>PDG Construction Group, Inc. — 4360 NW 128th St, Opa-locka, FL 33054</span>
-    <span>License: CGC1530498</span>
+    <span>${esc(GC_NAME)} — ${esc(GC_ADDRESS_FULL)}</span>
+    <span>License: ${GC_LICENSE}</span>
   </div>
 
   <div class="info-grid">
     <div class="info-cell"><div class="info-label">TO (Owner)</div>${esc(pa.ownerName || '')}<br/>${esc(pa.ownerAddress || '')}<br/>${esc(pa.ownerCity || '')}</div>
-    <div class="info-cell right"><div class="info-label">FROM (Contractor)</div>PDG Construction Group, Inc.<br/>Attn: ${esc(pa.contractorPrinted || 'Pedro Dominguez')}<br/>4360 NW 128th St, Opa-locka, FL 33054</div>
+    <div class="info-cell right"><div class="info-label">FROM (Contractor)</div>${esc(GC_NAME)}<br/>Attn: ${esc(pa.contractorPrinted || 'Pedro Dominguez')}<br/>${esc(GC_ADDRESS_FULL)}</div>
     <div class="info-cell"><div class="info-label">Project</div>${esc(pa.contractFor || project?.projectName || '')}</div>
     <div class="info-cell right"><div class="info-label">Architect</div>${esc(pa.architectName || '')}<br/>${esc(pa.architectAddress || '')}<br/>${esc(pa.architectCity || '')}</div>
     <div class="info-cell"><div class="info-label">Contract Date</div>${fmtDate(pa.contractDate)}</div>
@@ -209,7 +210,7 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
   </div>
 
   <div class="footer">
-    PDG Construction Group, Inc. &bull; ${esc(project?.projectNumber || '')} — ${esc(project?.projectName || '')} &bull; PA #${pa.applicationNumber} &bull; Generated ${new Date().toLocaleDateString('en-US')}
+    ${esc(GC_NAME)} &bull; ${esc(project?.projectNumber || '')} — ${esc(project?.projectName || '')} &bull; PA #${pa.applicationNumber} &bull; Generated ${new Date().toLocaleDateString('en-US')}
   </div>
 </div>
 </body></html>`;
@@ -358,7 +359,7 @@ function buildG703Html(pa: any, project: any, lines: LineItem[]): string {
   <div class="header">
     <div>
       <h1>CONTINUATION SHEET — AIA G703</h1>
-      <div class="sub">PDG Construction Group, Inc. — ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')}</div>
+      <div class="sub">${esc(GC_NAME)} — ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')}</div>
     </div>
     <div class="right">
       <div class="app-no">PA #${pa.applicationNumber}</div>
@@ -398,7 +399,7 @@ function buildG703Html(pa: any, project: any, lines: LineItem[]): string {
   </table>
 
   <div class="footer">
-    PDG Construction Group, Inc. &bull; PA #${pa.applicationNumber} &bull; ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')} &bull; Generated ${new Date().toLocaleDateString('en-US')}
+    ${esc(GC_NAME)} &bull; PA #${pa.applicationNumber} &bull; ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')} &bull; Generated ${new Date().toLocaleDateString('en-US')}
   </div>
 </div>
 </body></html>`;

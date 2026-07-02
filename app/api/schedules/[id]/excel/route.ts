@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import ExcelJS from 'exceljs';
+import { GC_NAME_UPPER } from '@/lib/gc-branding';
 
 function fmtShort(d: Date | string | null) {
   if (!d) return '';
@@ -391,7 +392,7 @@ export async function POST(
 
     // ── Footer ──
     const ftrRow = legendRow + 1;
-    ws.getCell(ftrRow, 1).value = `© Kodu GC · Confidential — THE PROJECT DELIVERY GROUP, LLC`;
+    ws.getCell(ftrRow, 1).value = `© Kodu GC · Confidential — ${GC_NAME_UPPER}`;
     ws.getCell(ftrRow, 1).font = { italic: true, size: 7, color: { argb: 'FF888888' } };
 
     // Generate buffer

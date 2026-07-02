@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
+import { GC_ADDRESS_FULL, GC_NAME, GC_NAME_UPPER } from '@/lib/gc-branding';
 
 function esc(s: string) {
   return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -318,7 +319,7 @@ export async function POST(
 
   <div class="p1-hero">
     <div class="project-title">${esc(projTitle)}</div>
-    <div class="company">PROJECT DELIVERY GROUP</div>
+    <div class="company">${esc(GC_NAME_UPPER)}</div>
     <div class="owner-line">${esc(client)}  |  Project #${esc(schedule.project.projectNumber || '')}  |  ${esc(schedule.project.location || '')}</div>
   </div>
 
@@ -362,7 +363,7 @@ export async function POST(
   ${criticalChainHtml}
 
   <div class="p1-footer">
-    <span class="left">THE PROJECT DELIVERY GROUP, LLC  |  7255 NE 4th Ave., Miami, FL 33138</span>
+    <span class="left">${GC_NAME_UPPER}  |  ${esc(GC_ADDRESS_FULL)}</span>
     <span>Page 1 of 2  |  CONFIDENTIAL</span>
   </div>
 </div>
@@ -419,7 +420,7 @@ export async function POST(
   </div>
 
   <div class="p2-footer">
-    <span>THE PROJECT DELIVERY GROUP, LLC  |  Prepared by: A. Padilla, Senior PM  |  ${esc(fmtMonShort(schedule.dataDate))}</span>
+    <span>${GC_NAME_UPPER}  |  Prepared by: A. Padilla, Senior PM  |  ${esc(fmtMonShort(schedule.dataDate))}</span>
     <span>Page 2 of 2  |  CONFIDENTIAL</span>
   </div>
 </div>

@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
+import { GC_ADDRESS_FULL, GC_NAME, GC_NAME_UPPER } from '@/lib/gc-branding';
 
 /* ── Formatters ────────────────────────────────────────── */
 const fmtK = (v: number) => {
@@ -445,7 +446,7 @@ export async function POST(
   <div style="position:absolute;bottom:28px;left:50px;right:50px;height:1px;background:#ddd"></div>
 
   <div class="ftr">
-    <div>THE PROJECT DELIVERY GROUP, LLC | 7255 NE 4th Ave., Miami, FL 33138</div>
+    <div>${GC_NAME_UPPER} | ${GC_ADDRESS_FULL}</div>
     <div>Page 1 of 2</div>
     <div>CONFIDENTIAL</div>
   </div>
@@ -549,7 +550,7 @@ export async function POST(
   <div style="position:absolute;bottom:28px;left:50px;right:50px;height:1px;background:#ddd"></div>
 
   <div class="ftr">
-    <div>THE PROJECT DELIVERY GROUP, LLC | Prepared by PDG Construction Management | Data Date: ${dataDateShort}</div>
+    <div>${GC_NAME_UPPER} | Prepared by ${GC_NAME} | Data Date: ${dataDateShort}</div>
     <div>Page 2 of 2</div>
     <div>CONFIDENTIAL</div>
   </div>
