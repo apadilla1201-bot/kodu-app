@@ -19,7 +19,7 @@ Esta es la app migrada desde Abacus DeepAgent a un stack independiente y vendibl
 ## Setup local
 
 ```bash
-# 1. Instalar dependencias
+# 1. Instalar dependencia
 npm install
 
 # 2. Configurar entorno
