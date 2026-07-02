@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "app/api/generate-pdf/[id]/route.ts": { "maxDuration": 60, "memory": 1024 },
+    "app/api/rfis/[id]/pdf/route.ts": { "maxDuration": 60, "memory": 1024 },
+    "app/api/pay-apps/[id]/pdf/route.ts": { "maxDuration": 60, "memory": 1024 },
+    "app/api/schedules/[id]/pdf/route.ts": { "maxDuration": 60, "memory": 1024 },
+    "app/api/schedules/[id]/lookahead/pdf/route.ts": { "maxDuration": 60, "memory": 1024 },
+    "app/api/projects/[id]/owner-executive/pdf/route.ts": { "maxDuration": 60, "memory": 1024 }
+  }
+}

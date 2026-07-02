@@ -13,16 +13,17 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: {
         activities: { orderBy: { sortOrder: 'asc' } },
-        project: { select: { userId: true, projectName: true, projectNumber: true } },
+        project: { select: { projectName: true, projectNumber: true } },
       },
     });
 
-    if (!schedule || schedule.project.userId !== session.user.id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -111,13 +112,13 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
-      include: { project: { select: { userId: true } } },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
     });
 
-    if (!schedule || schedule.project.userId !== session.user.id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

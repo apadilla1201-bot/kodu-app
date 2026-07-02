@@ -8,15 +8,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const budget = await prisma.budget.findUnique({
-    where: { id: params.id },
+  const companyId = (session?.user as any)?.companyId ?? '';
+
+  const budget = await prisma.budget.findFirst({
+    where: { id: params.id, project: { companyId } },
     include: {
-      project: { select: { projectName: true, projectNumber: true, userId: true } },
+      project: { select: { projectName: true, projectNumber: true } },
       lineItems: { orderBy: { sortOrder: 'asc' } },
       detailItems: { orderBy: [{ sheetName: 'asc' }, { sortOrder: 'asc' }] },
     },
   });
-  if (!budget || budget.project.userId !== session.user.id) {
+  if (!budget) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   return NextResponse.json(budget);
@@ -26,11 +28,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const budget = await prisma.budget.findUnique({
-    where: { id: params.id },
-    include: { project: { select: { userId: true } } },
+  const companyId = (session?.user as any)?.companyId ?? '';
+
+  const budget = await prisma.budget.findFirst({
+    where: { id: params.id, project: { companyId } },
   });
-  if (!budget || budget.project.userId !== session.user.id) {
+  if (!budget) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
@@ -51,11 +54,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const budget = await prisma.budget.findUnique({
-    where: { id: params.id },
-    include: { project: { select: { userId: true } } },
+  const companyId = (session?.user as any)?.companyId ?? '';
+
+  const budget = await prisma.budget.findFirst({
+    where: { id: params.id, project: { companyId } },
   });
-  if (!budget || budget.project.userId !== session.user.id) {
+  if (!budget) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

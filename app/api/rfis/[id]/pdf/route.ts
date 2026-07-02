@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
+import { htmlToPdf } from '@/lib/pdf';
 
 function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -41,17 +42,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const rfi = await prisma.rFI.findUnique({
-      where: { id: params?.id ?? '' },
+    const rfi = await prisma.rFI.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
       include: {
         project: true,
         attachments: true,
       },
     });
 
-    if (!rfi || rfi?.project?.userId !== userId) {
+    if (!rfi) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -248,132 +249,94 @@ export async function POST(request: Request, { params }: { params: { id: string 
 </body>
 </html>`;
 
-    // Generate PDF via HTML2PDF API
-    const createResponse = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        html_content: htmlContent,
-        pdf_options: {
-          format: 'Letter',
-          margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
-          print_background: true,
-        },
-      }),
-    });
+    // Generate PDF locally (Puppeteer) — no longer depends on Abacus
+    const pdfBuffer = await htmlToPdf(htmlContent);
+    const generatedPdfBytes = pdfBuffer;
 
-    const createResult = await createResponse.json();
-    const request_id = createResult?.request_id;
-    if (!request_id) {
-      console.error('HTML2PDF create failed:', JSON.stringify(createResult));
-      return NextResponse.json({ error: 'No request ID returned' }, { status: 500 });
-    }
+    // Merge question + response attachments (fotos, planos, PDFs) into the final PDF
+    const mergeableAttachments = (rfi.attachments ?? []).filter(a => a.cloudStoragePath);
+    const failedAttachments: string[] = [];
+    let mergedAttachmentCount = 0;
 
-    // Poll for completion
-    let attempts = 0;
-    const maxAttempts = 90;
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const statusResponse = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-      });
-      const statusResult = await statusResponse.json();
-      const status = statusResult?.status ?? 'FAILED';
-      const result = statusResult?.result ?? null;
+    let finalPdfBytes: Uint8Array;
+    if (mergeableAttachments.length > 0) {
+      const mergedPdf = await PDFDocument.create();
 
-      if (status === 'SUCCESS') {
-        if (result?.result) {
-          const generatedPdfBytes = Buffer.from(result.result, 'base64');
+      const rfiDoc = await PDFDocument.load(generatedPdfBytes);
+      const rfiPages = await mergedPdf.copyPages(rfiDoc, rfiDoc.getPageIndices());
+      rfiPages.forEach(page => mergedPdf.addPage(page));
 
-          // Merge ALL question attachments (sub's documents) into the final PDF
-          const mergeableAttachments = questionAttachments.filter(a => a.cloudStoragePath);
+      for (const att of mergeableAttachments) {
+        try {
+          console.log('Downloading RFI attachment:', att.fileName, att.cloudStoragePath);
+          const attBuffer = await downloadFileBuffer(att.cloudStoragePath);
+          const fname = (att.fileName ?? '').toLowerCase();
+          const ftype = (att.fileType ?? '').toLowerCase();
+          const isPdf = fname.endsWith('.pdf') || ftype.includes('pdf');
+          const isImage = /\.(png|jpg|jpeg|gif|webp|bmp|tiff?)$/i.test(fname) || ftype.startsWith('image/');
 
-          let finalPdfBytes: Uint8Array;
-          if (mergeableAttachments.length > 0) {
-            try {
-              const mergedPdf = await PDFDocument.create();
-
-              // Copy generated RFI cover pages
-              const rfiDoc = await PDFDocument.load(generatedPdfBytes);
-              const rfiPages = await mergedPdf.copyPages(rfiDoc, rfiDoc.getPageIndices());
-              rfiPages.forEach(page => mergedPdf.addPage(page));
-
-              // Append each question attachment
-              for (const att of mergeableAttachments) {
-                try {
-                  console.log('Downloading RFI attachment:', att.fileName, att.cloudStoragePath);
-                  const attBuffer = await downloadFileBuffer(att.cloudStoragePath);
-                  const fname = (att.fileName ?? '').toLowerCase();
-                  const ftype = (att.fileType ?? '').toLowerCase();
-                  const isPdf = fname.endsWith('.pdf') || ftype.includes('pdf');
-                  const isImage = /\.(png|jpg|jpeg|gif|webp|bmp|tiff?)$/i.test(fname) || ftype.startsWith('image/');
-
-                  if (isPdf) {
-                    const attDoc = await PDFDocument.load(attBuffer, { ignoreEncryption: true });
-                    const attPages = await mergedPdf.copyPages(attDoc, attDoc.getPageIndices());
-                    attPages.forEach(page => mergedPdf.addPage(page));
-                    console.log(`Merged ${attPages.length} PDF pages from ${att.fileName}`);
-                  } else if (isImage) {
-                    // Embed image as a full page
-                    let img;
-                    if (fname.endsWith('.png') || ftype.includes('png')) {
-                      img = await mergedPdf.embedPng(attBuffer);
-                    } else {
-                      img = await mergedPdf.embedJpg(attBuffer);
-                    }
-                    const { width, height } = img.scale(1);
-                    // Fit to letter size (612x792) maintaining aspect ratio
-                    const maxW = 572; const maxH = 752; // letter with 20pt margin
-                    const scale = Math.min(maxW / width, maxH / height, 1);
-                    const imgW = width * scale;
-                    const imgH = height * scale;
-                    const page = mergedPdf.addPage([612, 792]);
-                    page.drawImage(img, {
-                      x: (612 - imgW) / 2,
-                      y: (792 - imgH) / 2,
-                      width: imgW,
-                      height: imgH,
-                    });
-                    console.log(`Embedded image ${att.fileName} as page`);
-                  } else {
-                    console.log(`Skipping non-PDF/image attachment: ${att.fileName} (${ftype})`);
-                  }
-                } catch (attErr: any) {
-                  console.error(`Failed to merge attachment ${att.fileName}:`, attErr?.message);
-                  // Skip this attachment, continue with others
-                }
-              }
-
-              finalPdfBytes = await mergedPdf.save();
-              console.log(`RFI PDF merged: ${rfiPages.length} RFI pages + ${mergeableAttachments.length} attachment(s)`);
-            } catch (mergeErr: any) {
-              console.error('Failed to merge attachments, returning RFI-only PDF:', mergeErr?.message);
-              finalPdfBytes = generatedPdfBytes;
+          if (isPdf) {
+            const attDoc = await PDFDocument.load(attBuffer, { ignoreEncryption: true });
+            const attPages = await mergedPdf.copyPages(attDoc, attDoc.getPageIndices());
+            attPages.forEach(page => mergedPdf.addPage(page));
+            mergedAttachmentCount += 1;
+            console.log(`Merged ${attPages.length} PDF pages from ${att.fileName}`);
+          } else if (isImage) {
+            let img;
+            if (fname.endsWith('.png') || ftype.includes('png')) {
+              img = await mergedPdf.embedPng(attBuffer);
+            } else {
+              img = await mergedPdf.embedJpg(attBuffer);
             }
+            const { width, height } = img.scale(1);
+            const maxW = 572; const maxH = 752;
+            const scale = Math.min(maxW / width, maxH / height, 1);
+            const imgW = width * scale;
+            const imgH = height * scale;
+            const page = mergedPdf.addPage([612, 792]);
+            page.drawImage(img, {
+              x: (612 - imgW) / 2,
+              y: (792 - imgH) / 2,
+              width: imgW,
+              height: imgH,
+            });
+            mergedAttachmentCount += 1;
+            console.log(`Embedded image ${att.fileName} as page`);
           } else {
-            finalPdfBytes = generatedPdfBytes;
+            console.log(`Skipping non-PDF/image attachment: ${att.fileName} (${ftype})`);
+            failedAttachments.push(att.fileName ?? 'archivo desconocido');
           }
-
-          const safeSubject = (rfi.subject ?? '').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
-          return new NextResponse(Buffer.from(finalPdfBytes), {
-            headers: {
-              'Content-Type': 'application/pdf',
-              'Content-Disposition': `attachment; filename="RFI_${esc(rfi.rfiNumber)}_${safeSubject}.pdf"`,
-            },
-          });
+        } catch (attErr: any) {
+          console.error(`Failed to merge attachment ${att.fileName}:`, attErr?.message);
+          failedAttachments.push(att.fileName ?? 'archivo desconocido');
         }
-        return NextResponse.json({ error: 'PDF generated but no data' }, { status: 500 });
-      } else if (status === 'FAILED') {
-        console.error('HTML2PDF failed:', JSON.stringify(result));
-        return NextResponse.json({ error: result?.error ?? 'PDF generation failed' }, { status: 500 });
       }
-      attempts++;
+
+      if (failedAttachments.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'No se pudieron anexar algunos archivos al PDF del RFI. ' +
+              'Vuelve a subir las fotos o planos y guarda antes de generar el PDF.',
+            failedFiles: failedAttachments,
+          },
+          { status: 500 }
+        );
+      }
+
+      finalPdfBytes = await mergedPdf.save();
+      console.log(`RFI PDF merged: ${rfiPages.length} RFI pages + ${mergedAttachmentCount} attachment(s)`);
+    } else {
+      finalPdfBytes = generatedPdfBytes;
     }
 
-    return NextResponse.json({ error: 'PDF generation timed out' }, { status: 500 });
+    const safeSubject = (rfi.subject ?? '').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+    return new NextResponse(Buffer.from(finalPdfBytes), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="RFI_${esc(rfi.rfiNumber)}_${safeSubject}.pdf"`,
+      },
+    });
   } catch (error: any) {
     console.error('RFI PDF error:', error);
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });

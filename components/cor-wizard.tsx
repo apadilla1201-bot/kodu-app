@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { uploadFileToStorage } from '@/lib/upload-client';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -246,21 +247,9 @@ export function CORWizard({ projects, initialProjectId }: { projects: ProjectOpt
       let subPdfCloudPath = '';
       let subPdfIsPublic = false;
       if (selectedFile) {
-        const presignRes = await fetch('/api/upload/presigned', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: selectedFile.name, contentType: selectedFile.type, isPublic: false }),
-        });
-        const presignData = await presignRes.json();
-        if (presignData?.uploadUrl) {
-          const uploadHeaders: Record<string, string> = { 'Content-Type': selectedFile.type };
-          const signedHeaders = new URL(presignData.uploadUrl)?.searchParams?.get?.('X-Amz-SignedHeaders') ?? '';
-          if (signedHeaders?.includes?.('content-disposition')) {
-            uploadHeaders['Content-Disposition'] = 'attachment';
-          }
-          await fetch(presignData.uploadUrl, { method: 'PUT', headers: uploadHeaders, body: selectedFile });
-          subPdfCloudPath = presignData?.cloud_storage_path ?? '';
-        }
+        const uploaded = await uploadFileToStorage(selectedFile);
+        subPdfCloudPath = uploaded.cloud_storage_path;
+        subPdfIsPublic = uploaded.isPublic;
       }
 
       // 2. Create COR

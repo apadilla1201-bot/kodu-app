@@ -9,6 +9,7 @@ import {
   Paperclip, Upload, X, Download, MessageSquare, CalendarDays, User,
   Building2, MapPin, FileText,
 } from 'lucide-react';
+import { uploadFileToStorage, downloadStorageFile } from '@/lib/upload-client';
 
 
 interface Attachment {
@@ -109,7 +110,10 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
     setPdfLoading(true);
     try {
       const res = await fetch(`/api/rfis/${rfi.id}/pdf`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to generate PDF');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'No se pudo generar el PDF');
+      }
       const blob = await res.blob();
       const fname = `RFI_${rfi.rfiNumber}_${(rfi.subject ?? '').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30)}.pdf`;
       const reader = new FileReader();
@@ -122,9 +126,9 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
         document.body.removeChild(a);
       };
       reader.readAsDataURL(blob);
-      toast({ title: 'PDF Generated', description: 'RFI PDF downloaded successfully' });
-    } catch {
-      toast({ title: 'Error', description: 'Failed to generate PDF', variant: 'destructive' });
+      toast({ title: 'PDF generado', description: 'El PDF del RFI se descargó correctamente' });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'No se pudo generar el PDF', variant: 'destructive' });
     } finally {
       setPdfLoading(false);
     }
@@ -159,19 +163,13 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
   const handleDownload = async (att: Attachment) => {
     setDownloadingFile(att.id);
     try {
-      const res = await fetch(`/api/upload/presigned?download=true&path=${encodeURIComponent(att.cloudStoragePath)}`);
-      const data = await res.json();
-      const url = data?.url ?? data?.downloadUrl ?? '';
-      if (url) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = att.fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
+      await downloadStorageFile(att.cloudStoragePath, att.fileName);
     } catch {
-      toast({ title: 'Error', description: 'Failed to download file', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: 'No se pudo descargar el archivo. Vuelve a subirlo si es un RFI antiguo.',
+        variant: 'destructive',
+      });
     } finally {
       setDownloadingFile(null);
     }
@@ -186,23 +184,12 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
     try {
       const attachments = [];
       for (const file of responseFiles) {
-        const presignRes = await fetch('/api/upload/presigned', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: file.name, contentType: file.type, isPublic: false }),
-        });
-        const presignData = await presignRes.json();
-        const uploadHeaders: Record<string, string> = { 'Content-Type': file.type };
-        const url = presignData.uploadUrl ?? '';
-        if (url.includes('content-disposition')) {
-          uploadHeaders['Content-Disposition'] = 'attachment';
-        }
-        await fetch(url, { method: 'PUT', headers: uploadHeaders, body: file });
+        const uploaded = await uploadFileToStorage(file);
         attachments.push({
           fileName: file.name,
           fileType: file.type,
-          cloudStoragePath: presignData.cloud_storage_path ?? '',
-          isPublic: false,
+          cloudStoragePath: uploaded.cloud_storage_path,
+          isPublic: uploaded.isPublic,
         });
       }
 

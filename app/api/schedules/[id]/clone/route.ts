@@ -13,19 +13,20 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
     const body = await request.json();
     const { revision, dataDate, notes } = body;
 
-    const source = await prisma.schedule.findUnique({
-      where: { id: params.id },
+    const source = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: {
         activities: { orderBy: { sortOrder: 'asc' } },
-        project: { select: { userId: true, projectName: true } },
+        project: { select: { projectName: true } },
       },
     });
 
-    if (!source || source.project.userId !== session.user.id) {
+    if (!source) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

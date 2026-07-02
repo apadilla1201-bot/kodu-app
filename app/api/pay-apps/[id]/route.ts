@@ -9,14 +9,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const pa = await prisma.payApplication.findUnique({
-      where: { id: params.id },
+    const pa = await prisma.payApplication.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: { project: true, lineItems: { orderBy: { sortOrder: 'asc' } } },
     });
 
-    if (!pa || pa.project?.userId !== userId) {
+    if (!pa) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -31,13 +31,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const pa = await prisma.payApplication.findUnique({
-      where: { id: params.id },
+    const pa = await prisma.payApplication.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: { project: true },
     });
-    if (!pa || pa.project?.userId !== userId) {
+    if (!pa) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -93,13 +93,13 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const pa = await prisma.payApplication.findUnique({
-      where: { id: params.id },
+    const pa = await prisma.payApplication.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: { project: true },
     });
-    if (!pa || pa.project?.userId !== userId) {
+    if (!pa) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

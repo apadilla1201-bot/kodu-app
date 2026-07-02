@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
+import { htmlToPdf } from '@/lib/pdf';
 
 function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -31,10 +32,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const cor = await prisma.changeOrder.findUnique({
-      where: { id: params?.id ?? '' },
+    const cor = await prisma.changeOrder.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
       include: {
         project: true,
         lineItems: true,
@@ -42,7 +43,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       },
     });
 
-    if (!cor || cor?.project?.userId !== userId) {
+    if (!cor) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -453,100 +454,55 @@ ${corRequestHtml}
 </html>
 `;
 
-    // Generate PDF via HTML2PDF API
-    const createResponse = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        html_content: htmlContent,
-        pdf_options: {
-          format: 'Letter',
-          margin: { top: '12mm', right: '10mm', bottom: '12mm', left: '10mm' },
-          print_background: true,
-        },
-        base_url: baseUrl,
-      }),
-    });
+    // Generate PDF locally (Puppeteer) — no longer depends on Abacus
+    const pdfBuffer = await htmlToPdf(htmlContent);
+    let finalPdfBytes: Uint8Array;
+    const generatedPdfBytes = pdfBuffer;
 
-    if (!createResponse.ok) {
-      const err = await createResponse.json().catch(() => ({}));
-      console.error('PDF create error:', err);
-      return NextResponse.json({ error: 'Failed to initiate PDF generation' }, { status: 500 });
-    }
+    // Merge subcontractor PDF as last pages if available
+    if (cor?.subPdfCloudPath) {
+      try {
+        console.log('Downloading sub PDF from:', cor.subPdfCloudPath);
+        const subPdfBuffer = await downloadFileBuffer(cor.subPdfCloudPath);
 
-    const { request_id } = await createResponse.json();
-    if (!request_id) {
-      return NextResponse.json({ error: 'No request ID returned' }, { status: 500 });
-    }
+        const mergedPdf = await PDFDocument.create();
 
-    // Poll for completion
-    let attempts = 0;
-    const maxAttempts = 120;
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const statusResponse = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-      });
-      const statusResult = await statusResponse.json();
-      const status = statusResult?.status ?? 'FAILED';
-      const result = statusResult?.result ?? null;
+        const corDoc = await PDFDocument.load(generatedPdfBytes);
+        const corPages = await mergedPdf.copyPages(corDoc, corDoc.getPageIndices());
+        corPages.forEach(page => mergedPdf.addPage(page));
 
-      if (status === 'SUCCESS') {
-        if (result?.result) {
-          let finalPdfBytes: Uint8Array;
-          const generatedPdfBytes = Buffer.from(result.result, 'base64');
+        const subDoc = await PDFDocument.load(subPdfBuffer);
+        const subPages = await mergedPdf.copyPages(subDoc, subDoc.getPageIndices());
+        subPages.forEach(page => mergedPdf.addPage(page));
 
-          // Merge subcontractor PDF as last pages if available
-          if (cor?.subPdfCloudPath) {
-            try {
-              console.log('Downloading sub PDF from:', cor.subPdfCloudPath);
-              const subPdfBuffer = await downloadFileBuffer(cor.subPdfCloudPath);
-              
-              const mergedPdf = await PDFDocument.create();
-              
-              // Copy generated COR pages
-              const corDoc = await PDFDocument.load(generatedPdfBytes);
-              const corPages = await mergedPdf.copyPages(corDoc, corDoc.getPageIndices());
-              corPages.forEach(page => mergedPdf.addPage(page));
-              
-              // Copy subcontractor PDF pages at the end
-              const subDoc = await PDFDocument.load(subPdfBuffer);
-              const subPages = await mergedPdf.copyPages(subDoc, subDoc.getPageIndices());
-              subPages.forEach(page => mergedPdf.addPage(page));
-              
-              finalPdfBytes = await mergedPdf.save();
-              console.log(`Merged PDF: ${corPages.length} COR pages + ${subPages.length} sub pages`);
-            } catch (mergeErr: any) {
-              console.error('Failed to merge sub PDF, returning COR-only PDF:', mergeErr?.message);
-              finalPdfBytes = generatedPdfBytes;
-            }
-          } else {
-            finalPdfBytes = generatedPdfBytes;
-          }
-
-          // Sanitize filename for Safari compatibility
-          const safeCorNum = (corNum ?? 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
-          const safeDesc = (cor?.description ?? '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_').substring(0, 30);
-          const filename = `COR_${safeCorNum}${safeDesc ? '_' + safeDesc : ''}.pdf`;
-          return new NextResponse(Buffer.from(finalPdfBytes), {
-            headers: {
-              'Content-Type': 'application/pdf',
-              'Content-Disposition': `attachment; filename="${filename}"`,
-              'Content-Length': String(finalPdfBytes.length),
-            },
-          });
-        }
-        return NextResponse.json({ error: 'PDF generated but no data' }, { status: 500 });
-      } else if (status === 'FAILED') {
-        return NextResponse.json({ error: result?.error ?? 'PDF generation failed' }, { status: 500 });
+        finalPdfBytes = await mergedPdf.save();
+        console.log(`Merged PDF: ${corPages.length} COR pages + ${subPages.length} sub pages`);
+      } catch (mergeErr: any) {
+        console.error('Failed to merge sub PDF:', mergeErr?.message);
+        return NextResponse.json(
+          {
+            error:
+              'No se pudo anexar el PDF del subcontratista. ' +
+              'Vuelve a subir la cotización del sub en el COR y guarda antes de generar el PDF.',
+            details: mergeErr?.message ?? 'download failed',
+          },
+          { status: 500 }
+        );
       }
-      attempts++;
+    } else {
+      finalPdfBytes = generatedPdfBytes;
     }
 
-    return NextResponse.json({ error: 'PDF generation timed out' }, { status: 500 });
+    const safeCorNum = (corNum ?? 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeDesc = (cor?.description ?? '').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_').substring(0, 30);
+    const filename = `COR_${safeCorNum}${safeDesc ? '_' + safeDesc : ''}.pdf`;
+    return new NextResponse(Buffer.from(finalPdfBytes), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': String(finalPdfBytes.length),
+      },
+    });
   } catch (error: any) {
     console.error('Generate PDF error:', error);
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });

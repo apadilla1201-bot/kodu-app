@@ -9,18 +9,18 @@ import { CORDetailContent } from '@/components/cor-detail-content';
 export default async function CORDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
-  const userId = (session.user as any)?.id ?? '';
+  const companyId = (session?.user as any)?.companyId ?? '';
 
-  const cor = await prisma.changeOrder.findUnique({
-    where: { id: params?.id ?? '' },
+  const cor = await prisma.changeOrder.findFirst({
+    where: { id: params?.id ?? '', project: { companyId } },
     include: {
-      project: { select: { id: true, projectNumber: true, projectName: true, client: true, location: true, userId: true } },
+      project: { select: { id: true, projectNumber: true, projectName: true, client: true, location: true } },
       lineItems: true,
       marketComparisons: true,
     },
   });
 
-  if (!cor || cor?.project?.userId !== userId) notFound();
+  if (!cor) notFound();
 
   const serialized = {
     id: cor?.id ?? '',

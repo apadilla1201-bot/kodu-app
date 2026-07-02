@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { htmlToPdf } from '@/lib/pdf';
 
 /* ── Helpers ──────────────────────────────────────────────── */
 function esc(s: string) {
@@ -64,6 +65,7 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
     // Accept optional filter from body
     let filterType = 'all';
@@ -76,15 +78,15 @@ export async function POST(
       if (body.dateTo) dateTo = new Date(body.dateTo);
     } catch { /* no body is fine */ }
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: {
         activities: { orderBy: { sortOrder: 'asc' } },
-        project: { select: { projectName: true, projectNumber: true, userId: true } },
+        project: { select: { projectName: true, projectNumber: true } },
       },
     });
 
-    if (!schedule || schedule.project.userId !== session.user.id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -373,65 +375,21 @@ export async function POST(
 
 </body></html>`;
 
-    // ── Generate PDF via HTML2PDF API ─────────────────────────
-    const createRes = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        html_content: html,
-        pdf_options: {
-          landscape: true,
-          format: 'Tabloid',
-          margin: { top: '4mm', right: '3mm', bottom: '4mm', left: '3mm' },
-          print_background: true,
-          scale: 0.85,
-        },
-        base_url: process.env.NEXTAUTH_URL || '',
-      }),
+    // ── Generate PDF locally ─────────────────────────
+    const pdfBuf = await htmlToPdf(html, {
+      format: 'Tabloid',
+      landscape: true,
+      margin: { top: '4mm', right: '3mm', bottom: '4mm', left: '3mm' },
+      scale: 0.85,
     });
-
-    if (!createRes.ok) {
-      console.error('HTML2PDF create failed:', await createRes.text());
-      return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
-    }
-
-    const { request_id } = await createRes.json();
-    if (!request_id) {
-      return NextResponse.json({ error: 'No request_id' }, { status: 500 });
-    }
-
-    // Poll for completion
-    let attempts = 0;
-    while (attempts < 120) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const statusRes = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-      });
-      const statusResult = await statusRes.json();
-      const status = statusResult?.status || 'FAILED';
-      const result = statusResult?.result || null;
-
-      if (status === 'SUCCESS' && result?.result) {
-        const pdfBuf = Buffer.from(result.result, 'base64');
-        const projNum = schedule.project.projectNumber || 'CPM';
-        const rev = schedule.revision || '';
-        return new NextResponse(pdfBuf, {
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="CPM_${projNum}_${rev}.pdf"`,
-          },
-        });
-      } else if (status === 'FAILED') {
-        console.error('PDF generation failed:', result);
-        return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
-      }
-      attempts++;
-    }
-
-    return NextResponse.json({ error: 'PDF timeout' }, { status: 500 });
+    const projNum = schedule.project.projectNumber || 'CPM';
+    const rev = schedule.revision || '';
+    return new NextResponse(pdfBuf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="CPM_${projNum}_${rev}.pdf"`,
+      },
+    });
   } catch (err) {
     console.error('Schedule PDF error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

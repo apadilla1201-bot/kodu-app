@@ -17,11 +17,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    const co = await prisma.changeOrder.findUnique({
-      where: { id: params?.id ?? '' },
-      include: { project: { select: { userId: true } } },
+    const companyId = (session.user as any)?.companyId ?? '';
+
+    const co = await prisma.changeOrder.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
     });
-    if (!co || co?.project?.userId !== (session.user as any)?.id) {
+    if (!co) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

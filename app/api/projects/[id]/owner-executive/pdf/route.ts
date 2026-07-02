@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { htmlToPdf } from '@/lib/pdf';
 
 /* ── Formatters ────────────────────────────────────────── */
 const fmtK = (v: number) => {
@@ -73,10 +74,10 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const project = await prisma.project.findUnique({
-      where: { id: params.id },
+    const project = await prisma.project.findFirst({
+      where: { id: params.id, companyId },
       include: {
         schedules: {
           include: { activities: { where: { isLookAhead: false }, orderBy: { sortOrder: 'asc' } } },
@@ -90,7 +91,7 @@ export async function POST(
       },
     });
 
-    if (!project || project.userId !== userId)
+    if (!project)
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const payApps = project.payApplications;
@@ -556,56 +557,18 @@ export async function POST(
 
 </body></html>`;
 
-    /* ── Generate PDF ──────────────────────────────────── */
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-    const createResponse = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        html_content: htmlContent,
-        pdf_options: {
-          width: '11in',
-          height: '8.5in',
-          margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
-          print_background: true,
-          landscape: false,
-        },
-        base_url: baseUrl,
-      }),
+    /* ── Generate PDF locally ──────────────────────────── */
+    const pdfBytes = await htmlToPdf(htmlContent, {
+      width: '11in',
+      height: '8.5in',
+      margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
     });
-
-    if (!createResponse.ok) {
-      console.error('PDF create error:', await createResponse.text());
-      return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
-    }
-
-    const { request_id } = await createResponse.json();
-    if (!request_id) return NextResponse.json({ error: 'No request ID' }, { status: 500 });
-
-    let attempts = 0;
-    while (attempts < 60) {
-      await new Promise(r => setTimeout(r, 1500));
-      const statusRes = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-      });
-      const statusResult = await statusRes.json();
-      if (statusResult?.status === 'SUCCESS' && statusResult?.result?.result) {
-        const pdfBytes = Buffer.from(statusResult.result.result, 'base64');
-        return new NextResponse(pdfBytes, {
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="Owner_Equity_Report_${project.projectNumber}.pdf"`,
-          },
-        });
-      }
-      if (statusResult?.status === 'FAILED') break;
-      attempts++;
-    }
-
-    return NextResponse.json({ error: 'PDF generation timed out' }, { status: 500 });
+    return new NextResponse(pdfBytes, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="Owner_Equity_Report_${project.projectNumber}.pdf"`,
+      },
+    });
   } catch (error: any) {
     console.error('Owner executive PDF error:', error);
     return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });

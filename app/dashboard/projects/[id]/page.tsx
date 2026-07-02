@@ -9,10 +9,10 @@ import { ProjectDetailContent } from '@/components/project-detail-content';
 export default async function ProjectDetailPage({ params, searchParams }: { params: { id: string }; searchParams: { tab?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
-  const userId = (session.user as any)?.id ?? '';
+  const companyId = (session?.user as any)?.companyId ?? '';
 
   const project = await prisma.project.findFirst({
-    where: { id: params?.id ?? '', userId },
+    where: { id: params?.id ?? '', companyId },
     include: {
       changeOrders: {
         include: { lineItems: true },

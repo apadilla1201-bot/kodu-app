@@ -21,10 +21,10 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const project = await prisma.project.findUnique({
-      where: { id: params.id },
+    const project = await prisma.project.findFirst({
+      where: { id: params.id, companyId },
       include: {
         schedules: {
           where: { status: 'Active' },
@@ -44,7 +44,7 @@ export async function GET(
       },
     });
 
-    if (!project || project.userId !== userId) {
+    if (!project) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

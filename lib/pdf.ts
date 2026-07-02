@@ -16,13 +16,21 @@
  * En local (desarrollo) usa el Chrome instalado; en Vercel usa @sparticuz/chromium.
  */
 
-export async function htmlToPdf(html: string): Promise<Buffer> {
+export type HtmlToPdfOptions = {
+  format?: 'Letter' | 'Legal' | 'Tabloid' | 'A4';
+  landscape?: boolean;
+  margin?: { top?: string; right?: string; bottom?: string; left?: string };
+  scale?: number;
+  width?: string;
+  height?: string;
+};
+
+export async function htmlToPdf(html: string, options: HtmlToPdfOptions = {}): Promise<Buffer> {
   const isProd = process.env.NODE_ENV === 'production';
 
   let browser: any;
 
   if (isProd) {
-    // Vercel / serverless: usar chromium empaquetado
     const chromium = (await import('@sparticuz/chromium')).default;
     const puppeteer = await import('puppeteer-core');
     browser = await puppeteer.launch({
@@ -31,24 +39,56 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
       headless: true,
     });
   } else {
-    // Local: usar puppeteer completo (instala su propio Chrome)
     const puppeteer = await import('puppeteer-core');
+    const chromePaths = [
+      process.env.CHROME_PATH,
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    ].filter(Boolean) as string[];
+
+    let executablePath: string | undefined;
+    const fs = await import('fs');
+    for (const p of chromePaths) {
+      if (fs.existsSync(p)) {
+        executablePath = p;
+        break;
+      }
+    }
+    if (!executablePath) {
+      throw new Error(
+        'Chrome no encontrado. Instala Google Chrome o define CHROME_PATH en .env.local'
+      );
+    }
+
     browser = await puppeteer.launch({
       headless: true,
-      executablePath:
-        process.env.CHROME_PATH ||
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // ajustar en Windows/Linux
+      executablePath,
     });
   }
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdf = await page.pdf({
-      format: 'Letter',
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    const pdfOptions: Record<string, unknown> = {
       printBackground: true,
-      margin: { top: '0.5in', bottom: '0.5in', left: '0.5in', right: '0.5in' },
-    });
+      margin: options.margin ?? { top: '0.5in', bottom: '0.5in', left: '0.5in', right: '0.5in' },
+    };
+
+    if (options.width && options.height) {
+      pdfOptions.width = options.width;
+      pdfOptions.height = options.height;
+    } else {
+      pdfOptions.format = options.format ?? 'Letter';
+      pdfOptions.landscape = options.landscape ?? false;
+    }
+
+    if (options.scale) pdfOptions.scale = options.scale;
+
+    const pdf = await page.pdf(pdfOptions);
     return Buffer.from(pdf);
   } finally {
     await browser.close();

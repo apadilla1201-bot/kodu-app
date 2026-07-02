@@ -11,9 +11,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
     const project = await prisma.project.findFirst({
-      where: { id: params?.id ?? '', userId },
+      where: { id: params?.id ?? '', companyId },
       include: {
         changeOrders: { orderBy: { sequence: 'asc' } },
       },

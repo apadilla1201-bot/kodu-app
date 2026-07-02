@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { uploadFileToStorage, downloadStorageFile } from '@/lib/upload-client';
 import {
   ArrowLeft, Download, FileText, CheckCircle2, Clock, XCircle,
   Loader2, Hash, Calendar, Building2, User, DollarSign,
@@ -260,20 +261,8 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
     if (!newPdfFile) return null;
     setUploadingPdf(true);
     try {
-      const presignRes = await fetch('/api/upload/presigned', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName: newPdfFile.name, contentType: 'application/pdf', isPublic: false }),
-      });
-      if (!presignRes.ok) throw new Error('Failed to get upload URL');
-      const { uploadUrl, cloud_storage_path } = await presignRes.json();
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: newPdfFile,
-        headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment' },
-      });
-      if (!uploadRes.ok) throw new Error('Upload failed');
-      return { path: cloud_storage_path, isPublic: false };
+      const uploaded = await uploadFileToStorage(newPdfFile);
+      return { path: uploaded.cloud_storage_path, isPublic: uploaded.isPublic };
     } catch (err: any) {
       console.error('PDF upload error:', err);
       toast.error('Error al subir el PDF: ' + (err?.message ?? ''));
@@ -287,14 +276,10 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
     const pdfPath = cor?.subPdfCloudPath;
     if (!pdfPath) return;
     try {
-      const res = await fetch(`/api/upload/presigned?path=${encodeURIComponent(pdfPath)}`);
-      if (!res.ok) throw new Error('Failed to get URL');
-      const { url } = await res.json();
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Sub_PDF_${cor?.corNumber ?? 'unknown'}.pdf`;
-      a.click();
-    } catch { toast.error('Error al descargar el PDF'); }
+      await downloadStorageFile(pdfPath, `Sub_PDF_${cor?.corNumber ?? 'unknown'}.pdf`);
+    } catch {
+      toast.error('No se pudo descargar el PDF. Vuelve a subir la cotización del subcontratista.');
+    }
   };
 
   const handleSave = async () => {

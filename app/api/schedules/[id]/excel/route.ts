@@ -44,6 +44,7 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
     let filterType = 'all';
     let dateFrom: Date | null = null;
@@ -55,15 +56,15 @@ export async function POST(
       if (body.dateTo) dateTo = new Date(body.dateTo);
     } catch {}
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: {
         activities: { orderBy: { sortOrder: 'asc' } },
-        project: { select: { projectName: true, projectNumber: true, userId: true } },
+        project: { select: { projectName: true, projectNumber: true } },
       },
     });
 
-    if (!schedule || schedule.project.userId !== session.user.id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

@@ -10,17 +10,17 @@ import { PayAppDetailContent } from '@/components/pay-app-detail-content';
 export default async function PayAppDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
-  const userId = (session.user as any)?.id ?? '';
+  const companyId = (session?.user as any)?.companyId ?? '';
 
-  const pa = await prisma.payApplication.findUnique({
-    where: { id: params.id },
+  const pa = await prisma.payApplication.findFirst({
+    where: { id: params.id, project: { companyId } },
     include: {
       project: true,
       lineItems: { orderBy: { sortOrder: 'asc' } },
     },
   });
 
-  if (!pa || pa.project?.userId !== userId) notFound();
+  if (!pa) notFound();
 
   const serialized = {
     ...pa,

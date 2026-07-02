@@ -12,14 +12,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const cor = await prisma.changeOrder.findUnique({
-      where: { id: params?.id ?? '' },
+    const cor = await prisma.changeOrder.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
       include: { project: true, lineItems: true, marketComparisons: true },
     });
 
-    if (!cor || cor?.project?.userId !== userId) {
+    if (!cor) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -36,14 +36,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const cor = await prisma.changeOrder.findUnique({
-      where: { id: params?.id ?? '' },
+    const cor = await prisma.changeOrder.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
       include: { project: true, lineItems: true },
     });
 
-    if (!cor || cor?.project?.userId !== userId) {
+    if (!cor) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

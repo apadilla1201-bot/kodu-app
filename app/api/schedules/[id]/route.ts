@@ -9,16 +9,17 @@ export async function GET(request: Request, { params }: { params: { id: string }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: {
-        project: { select: { projectName: true, projectNumber: true, userId: true, id: true } },
+        project: { select: { projectName: true, projectNumber: true, id: true } },
         activities: { orderBy: { sortOrder: 'asc' } },
       },
     });
 
-    if (!schedule || schedule.project.userId !== (session.user as any).id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -33,12 +34,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
-      include: { project: { select: { userId: true } } },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
     });
-    if (!schedule || schedule.project.userId !== (session.user as any).id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -101,12 +102,12 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
-      include: { project: { select: { userId: true } } },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
     });
-    if (!schedule || schedule.project.userId !== (session.user as any).id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 

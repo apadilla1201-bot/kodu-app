@@ -9,18 +9,18 @@ import { BudgetDetailContent } from '@/components/budget-detail-content';
 export default async function BudgetDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
-  const userId = (session.user as any)?.id ?? '';
+  const companyId = (session?.user as any)?.companyId ?? '';
 
-  const budget = await prisma.budget.findUnique({
-    where: { id: params?.id ?? '' },
+  const budget = await prisma.budget.findFirst({
+    where: { id: params?.id ?? '', project: { companyId } },
     include: {
-      project: { select: { id: true, projectName: true, projectNumber: true, userId: true } },
+      project: { select: { id: true, projectName: true, projectNumber: true } },
       lineItems: { orderBy: { sortOrder: 'asc' } },
       detailItems: { orderBy: [{ sheetName: 'asc' }, { sortOrder: 'asc' }] },
     },
   });
 
-  if (!budget || budget.project.userId !== userId) notFound();
+  if (!budget) notFound();
 
   const serialized = {
     ...budget,

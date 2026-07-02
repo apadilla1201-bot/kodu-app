@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
+import { htmlToPdf } from '@/lib/pdf';
 
 function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -425,7 +426,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ error: 'Pay application not found' }, { status: 404 });
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const lines: LineItem[] = pa.lineItems.map((li: any) => ({
       sortOrder: li.sortOrder,
       itemNumber: li.itemNumber || '',
@@ -453,64 +453,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
       htmlPages.push(buildG703Html(pa, pa.project, lines));
     }
 
-    // Generate PDFs
+    // Generate PDFs locally
     const pdfBuffers: Buffer[] = [];
     for (const html of htmlPages) {
       const isLandscape = html.includes('landscape');
-      const createResponse = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deployment_token: process.env.ABACUSAI_API_KEY,
-          html_content: html,
-          pdf_options: {
-            format: 'Letter',
-            landscape: isLandscape,
-            margin: isLandscape
-              ? { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' }
-              : { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-            print_background: true,
-          },
-          base_url: baseUrl,
-        }),
+      const pdfBuffer = await htmlToPdf(html, {
+        format: 'Letter',
+        landscape: isLandscape,
+        margin: isLandscape
+          ? { top: '8mm', right: '8mm', bottom: '8mm', left: '8mm' }
+          : { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
       });
-
-      if (!createResponse.ok) {
-        console.error('PDF create error:', await createResponse.text());
-        return NextResponse.json({ error: 'Failed to initiate PDF generation' }, { status: 500 });
-      }
-
-      const { request_id } = await createResponse.json();
-      if (!request_id) {
-        return NextResponse.json({ error: 'No request ID returned' }, { status: 500 });
-      }
-
-      // Poll for completion
-      let attempts = 0;
-      let pdfGenerated = false;
-      while (attempts < 120) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const statusResponse = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-        });
-        const statusResult = await statusResponse.json();
-        const status = statusResult?.status ?? 'FAILED';
-        const result = statusResult?.result ?? null;
-
-        if (status === 'SUCCESS' && result?.result) {
-          pdfBuffers.push(Buffer.from(result.result, 'base64'));
-          pdfGenerated = true;
-          break;
-        } else if (status === 'FAILED') {
-          return NextResponse.json({ error: result?.error ?? 'PDF generation failed' }, { status: 500 });
-        }
-        attempts++;
-      }
-      if (!pdfGenerated) {
-        return NextResponse.json({ error: 'PDF generation timed out' }, { status: 500 });
-      }
+      pdfBuffers.push(pdfBuffer);
     }
 
     // Merge if multiple pages

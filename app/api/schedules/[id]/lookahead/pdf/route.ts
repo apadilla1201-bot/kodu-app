@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { htmlToPdf } from '@/lib/pdf';
 
 function esc(s: string) {
   return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -67,16 +68,17 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
 
-    const schedule = await prisma.schedule.findUnique({
-      where: { id: params.id },
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
       include: {
         activities: { orderBy: { sortOrder: 'asc' } },
-        project: { select: { projectName: true, projectNumber: true, client: true, location: true, userId: true } },
+        project: { select: { projectName: true, projectNumber: true, client: true, location: true } },
       },
     });
 
-    if (!schedule || schedule.project.userId !== session.user.id) {
+    if (!schedule) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -424,65 +426,22 @@ export async function POST(
 
 </body></html>`;
 
-    // ── Generate PDF via HTML2PDF API ──
-    const createRes = await fetch('https://apps.abacus.ai/api/createConvertHtmlToPdfRequest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
-        html_content: html,
-        pdf_options: {
-          format: 'Letter',
-          margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
-          print_background: true,
-          scale: 1,
-        },
-        base_url: process.env.NEXTAUTH_URL || '',
-      }),
+    // ── Generate PDF locally ──
+    const pdfBuf = await htmlToPdf(html, {
+      format: 'Letter',
+      margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
     });
-
-    if (!createRes.ok) {
-      console.error('HTML2PDF create failed:', await createRes.text());
-      return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
-    }
-
-    const { request_id } = await createRes.json();
-    if (!request_id) return NextResponse.json({ error: 'No request_id' }, { status: 500 });
-
-    // Poll for completion
-    let attempts = 0;
-    while (attempts < 120) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const statusRes = await fetch('https://apps.abacus.ai/api/getConvertHtmlToPdfStatus', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request_id, deployment_token: process.env.ABACUSAI_API_KEY }),
-      });
-      const statusResult = await statusRes.json();
-      const st = statusResult?.status || 'FAILED';
-      const result = statusResult?.result || null;
-
-      if (st === 'SUCCESS' && result?.result) {
-        const pdfBuf = Buffer.from(result.result, 'base64');
-        const projNum = schedule.project.projectNumber || 'LA';
-        const rev = schedule.revision || '';
-        const dateStr = windowStart.toISOString().slice(5,10).replace('-','');
-        const safeName = `${dateStr}_${projNum}_Executive_LookAhead_${rev}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
-        return new NextResponse(pdfBuf, {
-          headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Length': String(pdfBuf.length),
-            'Content-Disposition': `attachment; filename="${safeName}"`,
-          },
-        });
-      } else if (st === 'FAILED') {
-        console.error('Look-Ahead PDF failed:', result);
-        return NextResponse.json({ error: 'PDF generation failed' }, { status: 500 });
-      }
-      attempts++;
-    }
-
-    return NextResponse.json({ error: 'PDF timeout' }, { status: 500 });
+    const projNum = schedule.project.projectNumber || 'LA';
+    const rev = schedule.revision || '';
+    const dateStr = windowStart.toISOString().slice(5, 10).replace('-', '');
+    const safeName = `${dateStr}_${projNum}_Executive_LookAhead_${rev}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return new NextResponse(pdfBuf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(pdfBuf.length),
+        'Content-Disposition': `attachment; filename="${safeName}"`,
+      },
+    });
   } catch (err) {
     console.error('Look-ahead PDF error:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

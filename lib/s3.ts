@@ -1,6 +1,15 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createS3Client, getBucketConfig } from "./aws-config";
+import {
+  buildLocalStoragePath,
+  buildLocalUploadUrl,
+  isLocalStoragePath,
+  isS3Configured,
+  localFileExists,
+  localFilePath,
+  readLocalFile,
+} from "./storage";
 
 const s3Client = createS3Client();
 
@@ -9,6 +18,14 @@ export async function generatePresignedUploadUrl(
   contentType: string,
   isPublic: boolean = false
 ): Promise<{ uploadUrl: string; cloud_storage_path: string }> {
+  if (!isS3Configured()) {
+    const cloud_storage_path = buildLocalStoragePath(fileName);
+    return {
+      uploadUrl: buildLocalUploadUrl(cloud_storage_path),
+      cloud_storage_path,
+    };
+  }
+
   const { bucketName, folderPrefix } = getBucketConfig();
   const cloud_storage_path = isPublic
     ? `${folderPrefix}public/uploads/${Date.now()}-${fileName}`
@@ -29,9 +46,18 @@ export async function getFileUrl(
   cloud_storage_path: string,
   isPublic: boolean = false
 ): Promise<string> {
+  if (isLocalStoragePath(cloud_storage_path) && await localFileExists(cloud_storage_path)) {
+    const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    return `${base}/api/upload/local?path=${encodeURIComponent(cloud_storage_path)}`;
+  }
+
   const { bucketName } = getBucketConfig();
+  if (!bucketName) {
+    throw new Error("Almacenamiento no configurado para este archivo");
+  }
+
   if (isPublic) {
-    const region = process.env.AWS_REGION ?? "us-east-1";
+    const region = process.env.AWS_REGION?.trim() || "us-east-1";
     return `https://${bucketName}.s3.${region}.amazonaws.com/${cloud_storage_path}`;
   }
   const command = new GetObjectCommand({
@@ -43,6 +69,16 @@ export async function getFileUrl(
 }
 
 export async function deleteFile(cloud_storage_path: string): Promise<void> {
+  if (isLocalStoragePath(cloud_storage_path)) {
+    const fs = await import("fs/promises");
+    try {
+      await fs.unlink(localFilePath(cloud_storage_path));
+    } catch {
+      // ignore missing local files
+    }
+    return;
+  }
+
   const { bucketName } = getBucketConfig();
   const command = new DeleteObjectCommand({
     Bucket: bucketName,
@@ -85,13 +121,27 @@ export async function getPresignedUrlForPart(
 }
 
 export async function downloadFileBuffer(cloud_storage_path: string): Promise<Buffer> {
+  if (isLocalStoragePath(cloud_storage_path)) {
+    if (await localFileExists(cloud_storage_path)) {
+      return readLocalFile(cloud_storage_path);
+    }
+    throw new Error(`Archivo local no encontrado: ${cloud_storage_path}`);
+  }
+
   const { bucketName } = getBucketConfig();
+  if (!bucketName) {
+    throw new Error(
+      "Este archivo está en almacenamiento antiguo (Abacus/AWS) y AWS no está configurado. " +
+      "Vuelve a subir el PDF del subcontratista en el COR."
+    );
+  }
+
   const command = new GetObjectCommand({
     Bucket: bucketName,
     Key: cloud_storage_path,
   });
   const response = await s3Client.send(command);
-  const stream = response.Body as any;
+  const stream = response.Body as AsyncIterable<Uint8Array>;
   const chunks: Uint8Array[] = [];
   for await (const chunk of stream) {
     chunks.push(chunk);

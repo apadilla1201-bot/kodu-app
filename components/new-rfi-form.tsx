@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   FileQuestion, Upload, X, Paperclip, ArrowLeft, Send, AlertTriangle,
 } from 'lucide-react';
+import { uploadFileToStorage } from '@/lib/upload-client';
 
 interface ProjectData {
   id: string;
@@ -67,26 +68,12 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
   };
 
   const uploadFile = async (file: File) => {
-    const presignRes = await fetch('/api/upload/presigned', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: file.name, contentType: file.type, isPublic: false }),
-    });
-    const presignData = await presignRes.json();
-    if (!presignRes.ok) throw new Error('Failed to get upload URL');
-
-    const uploadHeaders: Record<string, string> = { 'Content-Type': file.type };
-    const url = presignData.uploadUrl ?? '';
-    if (url.includes('content-disposition')) {
-      uploadHeaders['Content-Disposition'] = 'attachment';
-    }
-    await fetch(url, { method: 'PUT', headers: uploadHeaders, body: file });
-
+    const uploaded = await uploadFileToStorage(file);
     return {
       fileName: file.name,
       fileType: file.type,
-      cloudStoragePath: presignData.cloud_storage_path ?? '',
-      isPublic: false,
+      cloudStoragePath: uploaded.cloud_storage_path,
+      isPublic: uploaded.isPublic,
       attachmentType: 'question',
     };
   };

@@ -10,17 +10,17 @@ import { RFIDetailContent } from '@/components/rfi-detail-content';
 export default async function RFIDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
-  const userId = (session.user as any)?.id ?? '';
+  const companyId = (session?.user as any)?.companyId ?? '';
 
-  const rfi = await prisma.rFI.findUnique({
-    where: { id: params?.id ?? '' },
+  const rfi = await prisma.rFI.findFirst({
+    where: { id: params?.id ?? '', project: { companyId } },
     include: {
       project: true,
       attachments: true,
     },
   });
 
-  if (!rfi || rfi?.project?.userId !== userId) {
+  if (!rfi) {
     notFound();
   }
 

@@ -11,17 +11,17 @@ export async function GET(request: Request, { params }: { params: { id: string }
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const rfi = await prisma.rFI.findUnique({
-      where: { id: params?.id ?? '' },
+    const rfi = await prisma.rFI.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
       include: {
         project: true,
         attachments: true,
       },
     });
 
-    if (!rfi || rfi?.project?.userId !== userId) {
+    if (!rfi) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
@@ -38,14 +38,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
 
-    const rfi = await prisma.rFI.findUnique({
-      where: { id: params?.id ?? '' },
+    const rfi = await prisma.rFI.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
       include: { project: true },
     });
 
-    if (!rfi || rfi?.project?.userId !== userId) {
+    if (!rfi) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
