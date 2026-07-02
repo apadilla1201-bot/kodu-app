@@ -10,6 +10,7 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   images: { unoptimized: true },
+  serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium-min'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.output.filename = 'static/chunks/[name]-[contenthash:8].js';

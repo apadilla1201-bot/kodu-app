@@ -25,20 +25,26 @@ export type HtmlToPdfOptions = {
   height?: string;
 };
 
-export async function htmlToPdf(html: string, options: HtmlToPdfOptions = {}): Promise<Buffer> {
-  const isProd = process.env.NODE_ENV === 'production';
+/** Chromium pack for Vercel (must match puppeteer-core / @sparticuz/chromium-min version). */
+const CHROMIUM_PACK_URL =
+  process.env.CHROMIUM_PACK_URL ??
+  'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar';
 
-  let browser: any;
-
-  if (isProd) {
-    const chromium = (await import('@sparticuz/chromium')).default;
+async function launchPdfBrowser() {
+  if (process.env.VERCEL) {
+    const chromium = (await import('@sparticuz/chromium-min')).default;
     const puppeteer = await import('puppeteer-core');
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      executablePath: await chromium.executablePath(),
-      headless: true,
+    chromium.setGraphicsMode = false;
+
+    return puppeteer.launch({
+      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security', '--disable-dev-shm-usage'],
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(CHROMIUM_PACK_URL),
+      headless: chromium.headless,
     });
-  } else {
+  }
+
+  {
     const puppeteer = await import('puppeteer-core');
     const chromePaths = [
       process.env.CHROME_PATH,
@@ -63,11 +69,15 @@ export async function htmlToPdf(html: string, options: HtmlToPdfOptions = {}): P
       );
     }
 
-    browser = await puppeteer.launch({
+    return puppeteer.launch({
       headless: true,
       executablePath,
     });
   }
+}
+
+export async function htmlToPdf(html: string, options: HtmlToPdfOptions = {}): Promise<Buffer> {
+  const browser = await launchPdfBrowser();
 
   try {
     const page = await browser.newPage();

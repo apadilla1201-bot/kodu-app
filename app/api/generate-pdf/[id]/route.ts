@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -505,6 +506,9 @@ ${corRequestHtml}
     });
   } catch (error: any) {
     console.error('Generate PDF error:', error);
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to generate PDF', details: error?.message ?? String(error) },
+      { status: 500 }
+    );
   }
 }
