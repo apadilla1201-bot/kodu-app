@@ -4,6 +4,11 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
+
+function submittalNotifyEmail(...candidates: (string | null | undefined)[]) {
+  return resolveEmailAddress(...candidates, process.env.SUBMITTAL_NOTIFY_EMAIL);
+}
 
 export async function GET(request: Request) {
   try {
@@ -42,7 +47,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       projectId, title, description, submittalType, specSection, subcontractor,
-      priority, status, requiredDate, submittedBy, notes, attachments,
+      priority, status, requiredDate, submittedBy, notes, attachments, notifyEmail,
     } = body ?? {};
 
     if (!projectId || !title) {
@@ -88,6 +93,27 @@ export async function POST(request: Request) {
       },
       include: { project: true, attachments: true },
     });
+
+    if (submittal.status === 'Submitted') {
+      try {
+        const to = submittalNotifyEmail(notifyEmail, session.user?.email);
+        if (to) {
+          await sendSubmittalEmail({
+            to,
+            event: 'submitted',
+            submittalId: submittal.id,
+            submittalNumber: submittal.submittalNumber,
+            title: submittal.title,
+            projectName: project.projectName,
+            projectNumber: project.projectNumber,
+            subcontractor: submittal.subcontractor,
+            submittedBy: submittal.submittedBy,
+          });
+        }
+      } catch (emailErr) {
+        console.error('Submittal submitted email error:', emailErr);
+      }
+    }
 
     return NextResponse.json(submittal, { status: 201 });
   } catch (error: any) {

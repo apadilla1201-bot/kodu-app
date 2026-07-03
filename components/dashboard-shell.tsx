@@ -13,6 +13,7 @@ import {
   FileQuestion,
   Receipt,
   FileStack,
+  BarChart3,
   Menu,
   X,
   LogOut,
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/dashboard/projects', label: 'Projects', icon: FolderKanban },
   { href: '/dashboard/rfis', label: 'RFI Log', icon: FileQuestion },
   { href: '/dashboard/submittals', label: 'Submittals', icon: FileStack },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/import', label: 'Import Excel', icon: FileSpreadsheet },
 ];
 

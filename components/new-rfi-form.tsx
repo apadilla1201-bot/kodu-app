@@ -43,6 +43,7 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
     submittedBy: 'Augusto Padilla',
     submittedByRole: 'Project Manager',
     assignedTo: '',
+    assignedToEmail: '',
     assignedToRole: '',
     daysToRespond: '7',
     costImpact: 'TBD',
@@ -257,6 +258,16 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
                 value={form.assignedTo}
                 onChange={(e) => update('assignedTo', e.target.value)}
                 placeholder="Name of the person who must respond"
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/40"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assigned To Email</label>
+              <input
+                type="email"
+                value={form.assignedToEmail}
+                onChange={(e) => update('assignedToEmail', e.target.value)}
+                placeholder="architect@example.com"
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/40"
               />
             </div>

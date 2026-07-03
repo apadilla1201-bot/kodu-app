@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { resolveEmailAddress, sendRfiAnsweredEmail } from '@/lib/email';
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -23,7 +24,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const body = await request.json();
-    const { responseText, responseBy, costImpact, scheduleImpact, attachments } = body ?? {};
+    const { responseText, responseBy, costImpact, scheduleImpact, attachments, notifyEmail } = body ?? {};
 
     if (!responseText) {
       return NextResponse.json({ error: 'Response text is required' }, { status: 400 });
@@ -61,40 +62,23 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     // Send email notification for RFI response
     try {
-      const appUrl = process.env.NEXTAUTH_URL || '';
-      const htmlBody = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-          <div style="background:#2E7D32;padding:16px 20px;border-radius:8px 8px 0 0;">
-            <h2 style="color:#fff;margin:0;">RFI Answered</h2>
-          </div>
-          <div style="background:#f9fafb;padding:20px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
-            <p><strong>RFI #:</strong> ${rfi.rfiNumber}</p>
-            <p><strong>Subject:</strong> ${rfi.subject}</p>
-            <p><strong>Responded By:</strong> ${responseBy || 'Augusto Padilla'}</p>
-            <div style="background:white;padding:15px;border-radius:4px;border-left:4px solid #2E7D32;margin:12px 0;">
-              <p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Response</p>
-              <p style="margin:4px 0 0 0;">${String(responseText).substring(0, 500)}</p>
-            </div>
-            <p><strong>Cost Impact:</strong> ${costImpact || rfi.costImpact}</p>
-            <p><strong>Schedule Impact:</strong> ${scheduleImpact || rfi.scheduleImpact}</p>
-          </div>
-        </div>
-      `;
-      await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deployment_token: process.env.ABACUSAI_API_KEY,
-          app_id: process.env.WEB_APP_ID,
-          notification_id: process.env.NOTIF_ID_RFI_ANSWERED,
-          subject: `RFI ${rfi.rfiNumber} Answered — ${rfi.subject.substring(0, 60)}`,
-          body: htmlBody,
-          is_html: true,
-          recipient_email: 'apadilla1201@gmail.com',
-          sender_email: `noreply@${new URL(appUrl).hostname}`,
-          sender_alias: 'PDG RFI Manager',
-        }),
-      });
+      const recipient = resolveEmailAddress(
+        notifyEmail,
+        rfi.submittedBy,
+        session.user?.email,
+      );
+      if (recipient) {
+        await sendRfiAnsweredEmail({
+          to: recipient,
+          rfiId: rfi.id,
+          rfiNumber: rfi.rfiNumber,
+          subject: rfi.subject,
+          responseText: String(responseText),
+          responseBy: responseBy ? String(responseBy) : (session.user?.name || 'Project Manager'),
+          costImpact: String(costImpact || rfi.costImpact || 'TBD'),
+          scheduleImpact: String(scheduleImpact || rfi.scheduleImpact || 'TBD'),
+        });
+      }
     } catch (emailErr) {
       console.error('RFI response notification error:', emailErr);
     }

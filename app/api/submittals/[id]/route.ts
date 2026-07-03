@@ -4,6 +4,11 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
+
+function submittalNotifyEmail(...candidates: (string | null | undefined)[]) {
+  return resolveEmailAddress(...candidates, process.env.SUBMITTAL_NOTIFY_EMAIL);
+}
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
@@ -54,12 +59,52 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       data.reviewedDate = new Date();
       data.reviewedBy = body.reviewedBy ?? session.user?.name ?? null;
     }
+    if (body.status === 'Rejected') {
+      data.reviewedDate = new Date();
+      data.reviewedBy = body.reviewedBy ?? session.user?.name ?? null;
+    }
+    if (body.status === 'Under Review' && existing.status === 'Submitted') {
+      data.reviewedBy = body.reviewedBy ?? session.user?.name ?? null;
+    }
 
     const updated = await prisma.submittal.update({
       where: { id: params.id },
       data,
       include: { project: true, attachments: true },
     });
+
+    const statusChanged = body.status && body.status !== existing.status;
+    if (statusChanged) {
+      const eventMap: Record<string, 'submitted' | 'under_review' | 'approved' | 'revise' | 'rejected'> = {
+        Submitted: 'submitted',
+        'Under Review': 'under_review',
+        Approved: 'approved',
+        'Revise and Resubmit': 'revise',
+        Rejected: 'rejected',
+      };
+      const event = eventMap[body.status];
+      if (event) {
+        try {
+          const to = submittalNotifyEmail(body.notifyEmail, existing.submittedBy, session.user?.email);
+          if (to) {
+            await sendSubmittalEmail({
+              to,
+              event,
+              submittalId: updated.id,
+              submittalNumber: updated.submittalNumber,
+              title: updated.title,
+              projectName: updated.project.projectName,
+              projectNumber: updated.project.projectNumber,
+              subcontractor: updated.subcontractor,
+              submittedBy: updated.submittedBy,
+              reviewedBy: updated.reviewedBy,
+            });
+          }
+        } catch (emailErr) {
+          console.error('Submittal status email error:', emailErr);
+        }
+      }
+    }
 
     return NextResponse.json(updated);
   } catch (error: any) {

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { resolveEmailAddress, sendRfiAssignedEmail } from '@/lib/email';
 
 export async function GET(request: Request) {
   try {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       projectId, subject, question, discipline, drawingReference, specReference,
-      priority, submittedBy, submittedByRole, assignedTo, assignedToRole,
+      priority,       submittedBy, submittedByRole, assignedTo, assignedToRole, assignedToEmail,
       daysToRespond, costImpact, scheduleImpact, scheduleImpactDays, notes,
       attachments,
     } = body ?? {};
@@ -116,43 +117,26 @@ export async function POST(request: Request) {
 
     // Send email notification for RFI assignment
     try {
-      const appUrl = process.env.NEXTAUTH_URL || '';
-      const appName = appUrl ? new URL(appUrl).hostname.split('.')[0] : 'PDG COR Manager';
-      const htmlBody = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-          <div style="background:#0F1B33;padding:16px 20px;border-radius:8px 8px 0 0;">
-            <h2 style="color:#C9A96E;margin:0;">New RFI Assigned</h2>
-          </div>
-          <div style="background:#f9fafb;padding:20px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
-            <p><strong>RFI #:</strong> ${rfi.rfiNumber}</p>
-            <p><strong>Project:</strong> ${project.projectName} (#${project.projectNumber})</p>
-            <p><strong>Subject:</strong> ${String(subject)}</p>
-            <p><strong>Priority:</strong> ${priority || 'Normal'}</p>
-            <p><strong>Assigned To:</strong> ${String(assignedTo || '')}</p>
-            <p><strong>Submitted By:</strong> ${String(submittedBy || 'Augusto Padilla')}</p>
-            <p><strong>Due Date:</strong> ${dateDue.toLocaleDateString('en-US')}</p>
-            <div style="background:white;padding:15px;border-radius:4px;border-left:4px solid #C9A96E;margin:12px 0;">
-              <p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Question</p>
-              <p style="margin:4px 0 0 0;">${String(question).substring(0, 500)}</p>
-            </div>
-          </div>
-        </div>
-      `;
-      await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deployment_token: process.env.ABACUSAI_API_KEY,
-          app_id: process.env.WEB_APP_ID,
-          notification_id: process.env.NOTIF_ID_RFI_ASSIGNED,
-          subject: `RFI ${rfi.rfiNumber} Assigned — ${String(subject).substring(0, 60)}`,
-          body: htmlBody,
-          is_html: true,
-          recipient_email: 'apadilla1201@gmail.com',
-          sender_email: `noreply@${new URL(appUrl).hostname}`,
-          sender_alias: 'PDG RFI Manager',
-        }),
-      });
+      const recipient = resolveEmailAddress(
+        assignedToEmail,
+        assignedTo,
+        session.user?.email,
+      );
+      if (recipient) {
+        await sendRfiAssignedEmail({
+          to: recipient,
+          rfiId: rfi.id,
+          rfiNumber: rfi.rfiNumber,
+          projectName: project.projectName,
+          projectNumber: project.projectNumber,
+          subject: String(subject),
+          question: String(question),
+          assignedTo: String(assignedTo || ''),
+          submittedBy: String(submittedBy || session.user?.name || 'Project Manager'),
+          dueDate: dateDue,
+          priority: priority || 'Normal',
+        });
+      }
     } catch (emailErr) {
       console.error('RFI notification email error:', emailErr);
     }
