@@ -109,6 +109,7 @@ model Project {
   payApplications PayApplication[]
   budgets         Budget[]
   schedules       Schedule[]
+  submittals      Submittal[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -217,6 +218,47 @@ model RFIAttachment {
   createdAt        DateTime @default(now())
 
   @@index([rfiId])
+}
+
+model Submittal {
+  id              String               @id @default(cuid())
+  projectId       String
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submittalNumber String
+  sequence        Int
+  title           String
+  description     String?              @db.Text
+  submittalType   String               @default("Shop Drawing")
+  specSection     String?
+  subcontractor   String?
+  priority        String               @default("Normal")
+  status          String               @default("Draft")
+  requiredDate    DateTime?
+  submittedBy     String?
+  submittedDate   DateTime?
+  reviewedBy      String?
+  reviewedDate    DateTime?
+  notes           String?              @db.Text
+  attachments     SubmittalAttachment[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([submittalNumber])
+}
+
+model SubmittalAttachment {
+  id               String    @id @default(cuid())
+  submittalId      String
+  submittal        Submittal @relation(fields: [submittalId], references: [id], onDelete: Cascade)
+  fileName         String
+  fileType         String?
+  cloudStoragePath String
+  isPublic         Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+
+  @@index([submittalId])
 }
 
 model PayApplication {
