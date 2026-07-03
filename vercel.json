@@ -1,6 +1,9 @@
 {
   "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "prisma generate && npm run build",
+  "github": {
+    "silent": true
+  },
   "functions": {
     "app/api/generate-pdf/[id]/route.ts": { "maxDuration": 60, "memory": 1024 },
     "app/api/rfis/[id]/pdf/route.ts": { "maxDuration": 60, "memory": 1024 },
