@@ -22,6 +22,9 @@ export default async function ProjectDetailPage({ params, searchParams }: { para
         include: { attachments: true },
         orderBy: { createdAt: 'desc' },
       },
+      submittals: {
+        orderBy: { createdAt: 'desc' },
+      },
       payApplications: {
         include: { lineItems: { orderBy: { sortOrder: 'asc' } } },
         orderBy: { applicationNumber: 'desc' },
@@ -82,6 +85,17 @@ export default async function ProjectDetailPage({ params, searchParams }: { para
       dateDue: rfi.dateDue ? new Date(rfi.dateDue).toISOString() : null,
       costImpact: rfi.costImpact ?? 'None',
       scheduleImpact: rfi.scheduleImpact ?? 'None',
+    })),
+    submittals: (project.submittals ?? []).map((s: any) => ({
+      id: s.id,
+      submittalNumber: s.submittalNumber ?? '',
+      title: s.title ?? '',
+      status: s.status ?? 'Draft',
+      priority: s.priority ?? 'Normal',
+      submittalType: s.submittalType ?? 'Shop Drawing',
+      subcontractor: s.subcontractor ?? null,
+      requiredDate: s.requiredDate ? new Date(s.requiredDate).toISOString() : null,
+      submittedDate: s.submittedDate ? new Date(s.submittedDate).toISOString() : null,
     })),
     payApplications: (project.payApplications ?? []).map((pa: any) => ({
       id: pa.id,

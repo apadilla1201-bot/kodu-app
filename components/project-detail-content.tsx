@@ -9,7 +9,7 @@ import {
   ArrowLeft, Plus, Search, FileText, CheckCircle2, Clock, XCircle,
   DollarSign, Download, Building2, MapPin, Hash,
   FileQuestion, Receipt, LayoutDashboard, AlertTriangle, MessageSquare,
-  Calendar, ChevronRight, Wallet, CalendarDays, BarChart3, Upload, ArrowUpDown, Trash2, Loader2, FileBarChart,
+  Calendar, ChevronRight, Wallet, CalendarDays, BarChart3, Upload, ArrowUpDown, Trash2, Loader2, FileBarChart, FileStack,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -33,6 +33,12 @@ interface RFIItem {
   priority: string; submittedBy: string; assignedTo: string;
   dateSubmitted: string; dateDue: string | null;
   costImpact: string; scheduleImpact: string;
+}
+
+interface SubmittalItem {
+  id: string; submittalNumber: string; title: string; status: string;
+  priority: string; submittalType: string; subcontractor: string | null;
+  requiredDate: string | null; submittedDate: string | null;
 }
 
 interface PayApp {
@@ -69,7 +75,7 @@ interface ProjectDetail {
   id: string; projectNumber: string; projectName: string;
   client: string; location: string | null; contractAmount: number;
   startDate: string | null; changeOrders: ChangeOrder[];
-  rfis: RFIItem[]; payApplications: PayApp[];
+  rfis: RFIItem[]; submittals: SubmittalItem[]; payApplications: PayApp[];
   budgets: BudgetSummary[];
   schedules: ScheduleSummary[];
 }
@@ -102,6 +108,15 @@ const paStatusColors: Record<string, string> = {
   Approved: 'bg-[#2E7D32]/10 text-[#2E7D32]',
 };
 
+const submittalStatusConfig: Record<string, { color: string; bg: string }> = {
+  Draft: { color: 'text-gray-700', bg: 'bg-gray-100' },
+  Submitted: { color: 'text-blue-700', bg: 'bg-blue-100' },
+  'Under Review': { color: 'text-amber-700', bg: 'bg-amber-100' },
+  Approved: { color: 'text-green-700', bg: 'bg-green-100' },
+  'Revise and Resubmit': { color: 'text-orange-700', bg: 'bg-orange-100' },
+  Rejected: { color: 'text-red-700', bg: 'bg-red-100' },
+};
+
 function fmtMoney(n: number): string {
   return `$${(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -122,6 +137,7 @@ const tabs = [
   { key: 'schedule', label: 'Schedule', icon: CalendarDays },
   { key: 'cors', label: 'Change Orders', icon: FileText },
   { key: 'rfis', label: 'RFIs', icon: FileQuestion },
+  { key: 'submittals', label: 'Submittals', icon: FileStack },
   { key: 'pay-apps', label: 'Pay Applications', icon: Receipt },
   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
 ];
@@ -233,6 +249,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
 
   const cors = project?.changeOrders ?? [];
   const rfis = project?.rfis ?? [];
+  const submittals = project?.submittals ?? [];
   const payApps = project?.payApplications ?? [];
   const budgets = project?.budgets ?? [];
   const schedules = project?.schedules ?? [];
@@ -306,6 +323,16 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
       return matchSearch && matchStatus;
     });
   }, [rfis, search, statusFilter]);
+
+  const filteredSubmittals = useMemo(() => {
+    return submittals.filter((s) => {
+      const q = search.toLowerCase();
+      const matchSearch = !search || s.submittalNumber.toLowerCase().includes(q) ||
+        s.title.toLowerCase().includes(q) || (s.subcontractor ?? '').toLowerCase().includes(q);
+      const matchStatus = statusFilter === 'All' || s.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [submittals, search, statusFilter]);
 
   // Pay App helpers
   const calcPATotal = (lineItems: any[]) => (lineItems ?? []).filter((li: any) => !li.isSection)
@@ -382,6 +409,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
           let count = 0;
           if (tab.key === 'cors') count = cors.length;
           if (tab.key === 'rfis') count = rfis.length;
+          if (tab.key === 'submittals') count = submittals.length;
           if (tab.key === 'pay-apps') count = payApps.length;
           if (tab.key === 'schedule') count = activeSchedule ? activeSchedule.activities.length : 0;
           return (
@@ -462,6 +490,33 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                   </Link>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Submittals Summary */}
+          <div className="bg-card rounded-xl p-5 shadow-[var(--shadow-sm)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold flex items-center gap-2"><FileStack className="w-4 h-4 text-[#C9A96E]" /> Submittals</h3>
+              <button onClick={() => switchTab('submittals')} className="text-xs text-[#C9A96E] hover:underline flex items-center gap-1">View All <ChevronRight className="w-3 h-3" /></button>
+            </div>
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <div className="text-center"><p className="text-xl font-bold font-mono">{submittals.length}</p><p className="text-xs text-muted-foreground">Total</p></div>
+              <div className="text-center"><p className="text-xl font-bold font-mono text-blue-600">{submittals.filter(s => s.status === 'Submitted').length}</p><p className="text-xs text-muted-foreground">Submitted</p></div>
+              <div className="text-center"><p className="text-xl font-bold font-mono text-amber-600">{submittals.filter(s => s.status === 'Under Review').length}</p><p className="text-xs text-muted-foreground">In Review</p></div>
+              <div className="text-center"><p className="text-xl font-bold font-mono text-green-600">{submittals.filter(s => s.status === 'Approved').length}</p><p className="text-xs text-muted-foreground">Approved</p></div>
+            </div>
+            {submittals.length > 0 ? (
+              <div className="mt-3 space-y-1">
+                {submittals.slice(0, 5).map((s) => (
+                  <Link key={s.id} href={`/dashboard/submittals/${s.id}`} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 text-sm">
+                    <span className="font-mono text-[#C9A96E] text-xs">{s.submittalNumber}</span>
+                    <span className="truncate mx-2 flex-1 text-xs text-muted-foreground">{s.title}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${submittalStatusConfig[s.status]?.bg ?? 'bg-gray-100'} ${submittalStatusConfig[s.status]?.color ?? ''}`}>{s.status}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <Link href={`/dashboard/submittals/new?projectId=${project.id}`} className="text-sm text-[#C9A96E] hover:underline">+ Crear primer submittal</Link>
             )}
           </div>
 
@@ -715,6 +770,69 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                             ) : <span className="text-muted-foreground">—</span>}
                           </td>
                           <td className="px-4 py-3"><Link href={`/dashboard/rfis/${rfi.id}`} className="text-[#C9A96E] hover:text-[#B8975D]"><ChevronRight className="w-4 h-4" /></Link></td>
+                        </motion.tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBMITTALS TAB */}
+      {activeTab === 'submittals' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search submittals..."
+                className="w-full pl-10 pr-4 py-2 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50" />
+            </div>
+            <div className="flex gap-1 bg-card border border-border rounded-lg p-0.5 flex-wrap">
+              {['All', 'Draft', 'Submitted', 'Under Review', 'Approved', 'Revise and Resubmit', 'Rejected'].map(s => (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${statusFilter === s ? 'bg-[#C9A96E] text-white' : 'text-muted-foreground hover:text-foreground'}`}>{s}</button>
+              ))}
+            </div>
+            <Link href={`/dashboard/submittals/new?projectId=${project.id}`}
+              className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+              <Plus className="w-4 h-4" /> New Submittal
+            </Link>
+          </div>
+
+          <div className="bg-card rounded-xl shadow-[var(--shadow-sm)] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#FEF3C7]/40">
+                    <th className="text-left px-4 py-3 font-semibold text-[#0F1B33] text-xs uppercase tracking-wider">Submittal #</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#0F1B33] text-xs uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#0F1B33] text-xs uppercase tracking-wider">Type</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#0F1B33] text-xs uppercase tracking-wider">Title</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#0F1B33] text-xs uppercase tracking-wider">Subcontractor</th>
+                    <th className="text-left px-4 py-3 font-semibold text-[#0F1B33] text-xs uppercase tracking-wider">Required</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredSubmittals.length === 0 ? (
+                    <tr><td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                      <FileStack className="w-8 h-8 mx-auto mb-2 opacity-30" />No submittals found
+                    </td></tr>
+                  ) : (
+                    filteredSubmittals.map((s, i) => {
+                      const sc = submittalStatusConfig[s.status] ?? submittalStatusConfig.Draft;
+                      return (
+                        <motion.tr key={s.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }} className="hover:bg-muted/50">
+                          <td className="px-4 py-3"><Link href={`/dashboard/submittals/${s.id}`} className="font-mono text-[#C9A96E] hover:underline font-medium">{s.submittalNumber}</Link></td>
+                          <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded font-medium ${sc.bg} ${sc.color}`}>{s.status}</span></td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{s.submittalType}</td>
+                          <td className="px-4 py-3 max-w-[220px] truncate" title={s.title}>{s.title}</td>
+                          <td className="px-4 py-3 text-xs">{s.subcontractor || '—'}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(s.requiredDate)}</td>
+                          <td className="px-4 py-3"><Link href={`/dashboard/submittals/${s.id}`} className="text-[#C9A96E] hover:text-[#B8975D]"><ChevronRight className="w-4 h-4" /></Link></td>
                         </motion.tr>
                       );
                     })
