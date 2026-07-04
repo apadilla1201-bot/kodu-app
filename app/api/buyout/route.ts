@@ -10,6 +10,9 @@ import {
   computeDelta,
   computeRemaining,
   computeRemainingPct,
+  isBuyoutKpiLine,
+  sumPayAppCompleted,
+  sumPayAppRevised,
 } from '@/lib/buyout';
 
 export async function GET(request: Request) {
@@ -40,6 +43,7 @@ export async function GET(request: Request) {
     });
 
     let totalInvested = 0;
+    let contractBudget = 0;
     let investedFromPa: {
       applicationNumber: number;
       g702TotalCompleted: number | null;
@@ -47,14 +51,20 @@ export async function GET(request: Request) {
     } | null = null;
 
     if (latestPa) {
-      const fromLines = latestPa.lineItems.reduce(
-        (s, li) => s + (li.previousCompleted || 0) + (li.thisCompleted || 0),
-        0
-      );
+      const paLines = latestPa.lineItems;
+      const paRevisedSum = sumPayAppRevised(paLines);
+      const paCompletedSum = sumPayAppCompleted(paLines);
+
+      contractBudget =
+        latestPa.g702ContractSumToDate != null && latestPa.g702ContractSumToDate > 0
+          ? latestPa.g702ContractSumToDate
+          : paRevisedSum;
+
       totalInvested =
         latestPa.g702TotalCompleted != null && latestPa.g702TotalCompleted > 0
           ? latestPa.g702TotalCompleted
-          : fromLines;
+          : paCompletedSum;
+
       investedFromPa = {
         applicationNumber: latestPa.applicationNumber,
         g702TotalCompleted: latestPa.g702TotalCompleted,
@@ -62,15 +72,20 @@ export async function GET(request: Request) {
       };
     }
 
-    const lineItems = items.filter((i) => i.lineType !== 'Division');
-    const totalProposal = lineItems.reduce((s, i) => s + (i.proposalAmount || 0), 0);
-    const totalContracted = lineItems.reduce((s, i) => s + (i.contractedValue || 0), 0);
-    const totalBudget = lineItems.reduce((s, i) => s + (i.totalValueBudget || 0), 0);
-    // Fallback only if project has no pay apps yet
-    const excelInvested = lineItems.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
-    if (!investedFromPa) totalInvested = excelInvested;
+    const kpiLines = items.filter((i) => isBuyoutKpiLine(i.lineType));
+    const procurementProposal = kpiLines.reduce((s, i) => s + (i.proposalAmount || 0), 0);
+    const procurementContracted = kpiLines.reduce((s, i) => s + (i.contractedValue || 0), 0);
+    const procurementBudget = kpiLines.reduce((s, i) => s + (i.totalValueBudget || 0), 0);
+    const excelInvested = kpiLines.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
 
+    if (!investedFromPa) {
+      contractBudget = procurementBudget;
+      totalInvested = excelInvested;
+    }
+
+    const totalBudget = contractBudget;
     const totalRemaining = computeRemaining(totalBudget, totalInvested);
+    const lineItems = kpiLines;
 
     // Scale division invested so chart totals match PA executed amount
     const scale =
@@ -97,18 +112,24 @@ export async function GET(request: Request) {
 
     const summary = {
       totalLines: lineItems.length,
-      totalProposal,
-      totalContracted,
+      totalProposal: procurementProposal,
+      totalContracted: procurementContracted,
       totalBudget,
       totalInvested,
       totalRemaining,
       remainingPct: computeRemainingPct(totalBudget, totalInvested),
-      delta: computeDelta(totalBudget, totalProposal),
+      delta: computeDelta(procurementBudget, procurementProposal),
+      procurementBudget,
+      procurementProposal,
+      procurementContracted,
       alertCount: alerts.length,
       highAlerts: alerts.filter((a) => a.severity === 'high').length,
       investedSource: investedFromPa
         ? `PA #${investedFromPa.applicationNumber}`
         : 'Buyout lines (no pay app)',
+      budgetSource: investedFromPa
+        ? `PA #${investedFromPa.applicationNumber} contract`
+        : 'Buyout log',
       latestPayAppNumber: investedFromPa?.applicationNumber ?? null,
       contractSumToDate: investedFromPa?.g702ContractSumToDate ?? null,
     };

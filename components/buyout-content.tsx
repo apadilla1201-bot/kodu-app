@@ -47,9 +47,13 @@ interface Summary {
   totalRemaining: number;
   remainingPct: number;
   delta: number;
+  procurementBudget?: number;
+  procurementProposal?: number;
+  procurementContracted?: number;
   alertCount: number;
   highAlerts: number;
   investedSource?: string;
+  budgetSource?: string;
   latestPayAppNumber?: number | null;
   contractSumToDate?: number | null;
 }
@@ -339,9 +343,13 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
 
       {summary && (
         <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-          <Kpi label="Proposal" value={fmtMoney(summary.totalProposal)} />
-          <Kpi label="Contracted" value={fmtMoney(summary.totalContracted)} />
-          <Kpi label="Total Budget" value={fmtMoney(summary.totalBudget)} sub={`Delta ${fmtMoney(summary.delta)}`} />
+          <Kpi
+            label="Contract Budget"
+            value={fmtMoney(summary.totalBudget)}
+            sub={summary.budgetSource || 'Pay App contract sum'}
+          />
+          <Kpi label="Buyout Proposal" value={fmtMoney(summary.totalProposal)} sub="Full procurement log" />
+          <Kpi label="Buyout Contracted" value={fmtMoney(summary.totalContracted)} sub={`Log budget ${fmtMoney(summary.procurementBudget ?? summary.totalBudget)}`} />
           <Kpi
             label="Cash Invested"
             value={fmtMoney(summary.totalInvested)}
@@ -354,11 +362,7 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
           <Kpi
             label="Remaining"
             value={fmtMoney(summary.totalRemaining)}
-            sub={`${(summary.remainingPct * 100).toFixed(0)}% spent${
-              summary.contractSumToDate
-                ? ` · PA contract ${fmtMoney(summary.contractSumToDate)}`
-                : ''
-            }`}
+            sub={`${(summary.remainingPct * 100).toFixed(0)}% of contract spent`}
           />
           <Kpi label="Alerts" value={String(summary.alertCount)} sub={`${summary.highAlerts} high`} warn={summary.highAlerts > 0} />
         </div>

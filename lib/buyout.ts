@@ -42,6 +42,66 @@ export function computeDelta(totalBudget: number, proposalAmount: number): numbe
   return totalBudget - proposalAmount;
 }
 
+/** G703 revised scheduled value for one line. */
+export function revisedScheduled(line: {
+  scheduledValue?: number | null;
+  budgetRealloc?: number | null;
+  previousChanges?: number | null;
+  currentChanges?: number | null;
+}): number {
+  return (
+    (line.scheduledValue ?? 0) +
+    (line.budgetRealloc ?? 0) +
+    (line.previousChanges ?? 0) +
+    (line.currentChanges ?? 0)
+  );
+}
+
+export function isPayAppWorkLine(line: {
+  isSection?: boolean | null;
+  isFee?: boolean | null;
+  isBelowLine?: boolean | null;
+}): boolean {
+  return !line.isSection && !line.isFee && !line.isBelowLine;
+}
+
+/** Sum G703 revised values (construction work lines only). */
+export function sumPayAppRevised(
+  lines: Array<{
+    scheduledValue?: number | null;
+    budgetRealloc?: number | null;
+    previousChanges?: number | null;
+    currentChanges?: number | null;
+    isSection?: boolean | null;
+    isFee?: boolean | null;
+    isBelowLine?: boolean | null;
+  }>,
+): number {
+  return lines
+    .filter(isPayAppWorkLine)
+    .reduce((s, li) => s + revisedScheduled(li), 0);
+}
+
+/** Sum G703 completed-to-date (previous + this period). */
+export function sumPayAppCompleted(
+  lines: Array<{
+    previousCompleted?: number | null;
+    thisCompleted?: number | null;
+    isSection?: boolean | null;
+    isFee?: boolean | null;
+    isBelowLine?: boolean | null;
+  }>,
+): number {
+  return lines
+    .filter(isPayAppWorkLine)
+    .reduce((s, li) => s + (li.previousCompleted ?? 0) + (li.thisCompleted ?? 0), 0);
+}
+
+/** Buyout log lines that roll up to KPI totals (exclude division headers). */
+export function isBuyoutKpiLine(lineType: string): boolean {
+  return lineType !== 'Division';
+}
+
 /** Infer status from subcontractor notes + dates (matches Arena Madness spreadsheet language). */
 export function inferStatus(row: {
   subcontractor?: string | null;
