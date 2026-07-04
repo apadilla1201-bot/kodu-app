@@ -1,6 +1,7 @@
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createS3Client, getBucketConfig } from "./aws-config";
+import { appBaseUrl } from "./app-url";
 import {
   buildLocalStoragePath,
   buildLocalUploadUrl,
@@ -47,8 +48,7 @@ export async function getFileUrl(
   isPublic: boolean = false
 ): Promise<string> {
   if (isLocalStoragePath(cloud_storage_path) && await localFileExists(cloud_storage_path)) {
-    const base = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-    return `${base}/api/upload/local?path=${encodeURIComponent(cloud_storage_path)}`;
+    return `${appBaseUrl()}/api/upload/local?path=${encodeURIComponent(cloud_storage_path)}`;
   }
 
   const { bucketName } = getBucketConfig();

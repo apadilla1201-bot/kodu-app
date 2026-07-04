@@ -171,6 +171,13 @@ export async function POST(request: Request) {
     return NextResponse.json(rfi, { status: 201 });
   } catch (error: any) {
     console.error('POST /api/rfis error:', error);
-    return NextResponse.json({ error: 'Failed to create RFI' }, { status: 500 });
+    const msg = String(error?.message ?? '');
+    if (msg.includes('submittedByEmail') || msg.includes('ballInCourt') || msg.includes('ProjectContact')) {
+      return NextResponse.json({
+        error: 'Database needs an update. Run scripts/migrate-rfi-directory.ts or contact support.',
+        detail: msg,
+      }, { status: 500 });
+    }
+    return NextResponse.json({ error: 'Failed to create RFI', detail: msg || undefined }, { status: 500 });
   }
 }

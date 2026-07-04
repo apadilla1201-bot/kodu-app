@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { appBaseUrl } from '@/lib/app-url';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -21,10 +22,6 @@ export function collectEmails(...candidates: (string | null | undefined)[]): str
     if (trimmed && EMAIL_RE.test(trimmed) && !out.includes(trimmed)) out.push(trimmed);
   }
   return out;
-}
-
-export function appBaseUrl(): string {
-  return (process.env.NEXTAUTH_URL || 'https://app.kodupm.com').replace(/\/$/, '');
 }
 
 function emailFrom(): string {

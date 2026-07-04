@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { appBaseUrl } from '@/lib/app-url';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
@@ -53,8 +54,7 @@ export function buildLocalStoragePath(fileName: string): string {
 }
 
 export function buildLocalUploadUrl(storagePath: string): string {
-  const base = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-  return `${base}/api/upload/put?key=${encodeURIComponent(storagePath)}`;
+  return `${appBaseUrl()}/api/upload/put?key=${encodeURIComponent(storagePath)}`;
 }
 
 const MIME_BY_EXT: Record<string, string> = {

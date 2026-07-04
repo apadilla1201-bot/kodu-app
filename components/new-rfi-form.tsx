@@ -172,12 +172,13 @@ export function NewRFIForm({
       const res = await fetch('/api/rfis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ ...form, daysToRespond: parseInt(form.daysToRespond) || 7, attachments }),
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || 'Failed to create RFI');
+        throw new Error(err?.error || `Failed to create RFI (${res.status})`);
       }
 
       const rfi = await res.json();

@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
-  AlertTriangle, ClipboardList, DollarSign, RefreshCw, Upload, Mail, Search, Save, Loader2,
+  AlertTriangle, ClipboardList, DollarSign, RefreshCw, Upload, Mail, Search, Save, Loader2, Sparkles,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BUYOUT_STATUSES } from '@/lib/buyout';
@@ -104,6 +104,7 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
   const [importing, setImporting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [savingId, setSavingId] = useState('');
   const [emailing, setEmailing] = useState(false);
 
@@ -182,6 +183,32 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
     }
   };
 
+  const handleGenerate = async () => {
+    if (!projectId) return;
+    if (items.length > 0 && !window.confirm('Replace current buyout lines with rows from Budget / Pay App?')) return;
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/buyout/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectId, replace: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Generate failed');
+      const src = data.source === 'pay_app' ? `PA #${data.payAppNumber}` : 'Budget';
+      toast({
+        title: `Generated ${data.imported} lines from ${src}`,
+        description: data.cpmRevision ? `CPM ${data.cpmRevision} dates matched on ${data.cpmActivitiesMatched} lines` : undefined,
+      });
+      await load();
+    } catch (e: any) {
+      toast({ title: e?.message ?? 'Generate failed', variant: 'destructive' });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const sendAlertsEmail = async () => {
     setEmailing(true);
     try {
@@ -232,6 +259,14 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
           </select>
           <button onClick={load} className="px-3 py-2 border border-border rounded-lg text-sm flex items-center gap-1 hover:bg-muted">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={generating || !projectId}
+            className="px-3 py-2 border border-[#C9A96E] text-[#0F1B33] rounded-lg text-sm font-medium flex items-center gap-1 hover:bg-[#C9A96E]/10 disabled:opacity-50"
+          >
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            From Budget
           </button>
           <label className="px-3 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-medium flex items-center gap-1 cursor-pointer hover:opacity-90">
             {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
