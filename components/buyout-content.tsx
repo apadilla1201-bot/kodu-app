@@ -107,6 +107,7 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
   const [generating, setGenerating] = useState(false);
   const [savingId, setSavingId] = useState('');
   const [emailing, setEmailing] = useState(false);
+  const [genMeta, setGenMeta] = useState<{ source: string; lines: number; cpm?: string; matched?: number } | null>(null);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -128,6 +129,7 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
   }, [projectId, toast]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setGenMeta(null); }, [projectId]);
 
   const filtered = useMemo(() => {
     return items.filter((i) => {
@@ -196,10 +198,18 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Generate failed');
-      const src = data.source === 'pay_app' ? `PA #${data.payAppNumber}` : 'Budget';
+      const src = data.source === 'pay_app' ? `Pay App #${data.payAppNumber}` : 'Project Budget';
+      setGenMeta({
+        source: src,
+        lines: data.imported,
+        cpm: data.cpmRevision || undefined,
+        matched: data.cpmActivitiesMatched,
+      });
       toast({
-        title: `Generated ${data.imported} lines from ${src}`,
-        description: data.cpmRevision ? `CPM ${data.cpmRevision} dates matched on ${data.cpmActivitiesMatched} lines` : undefined,
+        title: `Generated ${data.imported} buyout lines from ${src}`,
+        description: data.cpmRevision
+          ? `CPM ${data.cpmRevision}: ${data.cpmActivitiesMatched} lines matched to schedule dates`
+          : 'Fill in procurement dates and status manually',
       });
       await load();
     } catch (e: any) {
@@ -242,7 +252,8 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
             <ClipboardList className="w-6 h-6 text-[#C9A96E]" /> Buyout / Contract Tracking
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Procurement, owner approvals, sub on-site dates, and cash flow — one matrix per project
+            Procurement, owner approvals, sub on-site dates, and cash flow — one matrix per project.
+            Use <strong>From Budget</strong> to auto-build lines from the latest Pay App G703 (or Budget) + CPM dates.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -298,7 +309,32 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
         <p className="text-sm text-muted-foreground">
           Project <span className="font-semibold text-foreground">#{projectMeta.projectNumber} {projectMeta.projectName}</span>
           {' · '}{items.length} lines
+          {genMeta && (
+            <span className="text-[#C9A96E]">
+              {' · '}Source: {genMeta.source}
+              {genMeta.cpm ? ` + ${genMeta.cpm}` : ''}
+              {genMeta.matched != null ? ` (${genMeta.matched} CPM dates)` : ''}
+            </span>
+          )}
         </p>
+      )}
+
+      {!loading && items.length === 0 && projectId && (
+        <div className="bg-[#C9A96E]/10 border border-[#C9A96E]/30 rounded-xl p-5 text-sm">
+          <p className="font-semibold text-foreground mb-1">No buyout log yet for this project</p>
+          <p className="text-muted-foreground mb-3">
+            Click <strong>From Budget</strong> to create rows from your Pay Application (same line items as G703).
+            Cash Invested will track the latest Pay App executed total. Then edit dates, status, and subs manually.
+          </p>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-medium inline-flex items-center gap-2"
+          >
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Generate from Budget / Pay App
+          </button>
+        </div>
       )}
 
       {summary && (

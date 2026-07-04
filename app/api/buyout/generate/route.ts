@@ -93,6 +93,8 @@ export async function POST(request: Request) {
         activityName: a.activityName,
         finishDate: a.finishDate,
         startDate: a.startDate,
+        wbsCode: a.wbsCode,
+        resourceName: a.resourceName,
       }));
 
     const generated = generateBuyoutFromBudgetLines(budgetLines, cpmActivities);
