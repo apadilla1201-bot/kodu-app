@@ -36,6 +36,13 @@ export function NewSubmittalForm({
     priority: 'Normal',
     requiredDate: '',
     submittedBy: 'Augusto Padilla',
+    assignedTo: '',
+    assignedToEmail: '',
+    assignedToRole: 'Architect',
+    reviewerEmail: '',
+    subcontractorEmail: '',
+    superintendentName: '',
+    superintendentEmail: '',
     notes: '',
   });
 
@@ -154,6 +161,30 @@ export function NewSubmittalForm({
           <div>
             <label className="text-sm font-medium">Enviado por</label>
             <input value={form.submittedBy} onChange={(e) => update('submittedBy', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Asignado a (revisor)</label>
+            <input value={form.assignedTo} onChange={(e) => update('assignedTo', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" placeholder="Arquitecto / Ingeniero" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Email asignado (To)</label>
+            <input type="email" value={form.assignedToEmail} onChange={(e) => update('assignedToEmail', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Email revisor (CC)</label>
+            <input type="email" value={form.reviewerEmail} onChange={(e) => update('reviewerEmail', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Email subcontratista (CC)</label>
+            <input type="email" value={form.subcontractorEmail} onChange={(e) => update('subcontractorEmail', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Superintendent (CC)</label>
+            <input value={form.superintendentName} onChange={(e) => update('superintendentName', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" placeholder="Nombre" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Email superintendent</label>
+            <input type="email" value={form.superintendentEmail} onChange={(e) => update('superintendentEmail', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" />
           </div>
         </div>
 

@@ -140,12 +140,45 @@ function divisionLabel(code: string): string {
   return name ? `DIV ${code} — ${name}` : `DIV ${code}`;
 }
 
+/** Common construction trade aliases for CPM ↔ G703 matching. */
+const TRADE_ALIASES: Record<string, string[]> = {
+  demolition: ['demo', 'abatement', 'selective', 'hazmat'],
+  concrete: ['rebar', 'formwork', 'footing', 'slab', 'foundation'],
+  masonry: ['block', 'brick', 'cmu'],
+  steel: ['structural', 'misc metals', 'miscellaneous metals', 'iron'],
+  carpentry: ['framing', 'rough carpentry', 'millwork', 'casework'],
+  roofing: ['roof', 'waterproofing', 'membrane'],
+  glazing: ['glass', 'curtain wall', 'storefront'],
+  drywall: ['gypsum', 'metal stud', 'framing'],
+  painting: ['paint', 'coating', 'wallcovering'],
+  flooring: ['tile', 'carpet', 'epoxy', 'resilient'],
+  hvac: ['mechanical', 'duct', 'air handling', 'vav'],
+  plumbing: ['piping', 'domestic water', 'sanitary'],
+  electrical: ['lighting', 'power', 'low voltage', 'fire alarm'],
+  landscaping: ['site work', 'sitework', 'paving', 'asphalt'],
+  elevator: ['conveying', 'lift'],
+};
+
+function expandTradeTokens(desc: string, subVendor?: string | null): string[] {
+  const base = [...tokens(desc), ...tokens(subVendor || '')];
+  const expanded = new Set(base);
+  for (const t of base) {
+    for (const [key, aliases] of Object.entries(TRADE_ALIASES)) {
+      if (t.includes(key) || aliases.some((a) => t.includes(a))) {
+        expanded.add(key);
+        aliases.forEach((a) => expanded.add(a));
+      }
+    }
+  }
+  return [...expanded];
+}
+
 function findCpmMatch(
   description: string,
   subVendor: string | null | undefined,
   activities: CpmActivity[],
 ): CpmActivity | null {
-  const descTokens = tokens(description);
+  const descTokens = expandTradeTokens(description, subVendor);
   const subTokens = tokens(subVendor || '');
   if (descTokens.length === 0 && subTokens.length === 0) return null;
 
@@ -156,20 +189,22 @@ function findCpmMatch(
     const actTokens = tokens(a.activityName);
     const resTokens = tokens(a.resourceName || '');
     const wbsTokens = tokens(a.wbsCode || '');
-    const pool = [...actTokens, ...resTokens, ...wbsTokens];
+    const pool = [...actTokens, ...resTokens, ...wbsTokens, ...expandTradeTokens(a.activityName, a.resourceName)];
 
     let score = 0;
     for (const t of descTokens) {
       if (pool.some((p) => p === t || p.includes(t) || t.includes(p))) score += 3;
     }
     for (const t of subTokens) {
-      if (resTokens.some((p) => p === t || p.includes(t))) score += 5;
-      if (actTokens.some((p) => p.includes(t))) score += 2;
+      if (resTokens.some((p) => p === t || p.includes(t) || t.includes(p))) score += 6;
+      if (actTokens.some((p) => p.includes(t) || t.includes(p))) score += 3;
     }
 
     const dNorm = norm(description);
     const aNorm = norm(a.activityName);
+    const rNorm = norm(a.resourceName || '');
     if (dNorm && aNorm && (aNorm.includes(dNorm) || dNorm.includes(aNorm))) score += 8;
+    if (subVendor && rNorm && (rNorm.includes(norm(subVendor)) || norm(subVendor).includes(rNorm))) score += 10;
 
     if (score > bestScore) {
       bestScore = score;

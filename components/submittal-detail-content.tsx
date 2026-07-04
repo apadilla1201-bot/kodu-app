@@ -22,6 +22,9 @@ interface SubmittalData {
   reviewedBy: string | null;
   reviewedDate: string | null;
   notes: string | null;
+  ballInCourt?: string | null;
+  ballInCourtRole?: string | null;
+  assignedTo?: string | null;
   project: {
     id: string;
     projectNumber: string;
@@ -89,6 +92,16 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
         </span>
       </div>
 
+      {submittal.ballInCourt && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <p className="text-xs uppercase text-amber-700 font-medium">Ball in Court</p>
+          <p className="font-semibold text-amber-900">
+            {submittal.ballInCourt}
+            {submittal.ballInCourtRole ? ` (${submittal.ballInCourtRole})` : ''}
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
           ['Tipo', submittal.submittalType],
@@ -97,6 +110,7 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
           ['Subcontratista', submittal.subcontractor ?? '—'],
           ['Requerido', fmtDate(submittal.requiredDate)],
           ['Enviado por', submittal.submittedBy ?? '—'],
+          ['Asignado a', submittal.assignedTo ?? '—'],
           ['Fecha envío', fmtDate(submittal.submittedDate)],
           ['Cliente', submittal.project.client],
         ].map(([label, value]) => (

@@ -33,6 +33,16 @@ async function inspectProjectNumber(num: string) {
   const buyoutCount = await p.buyoutItem.count({ where: { projectId: proj.id } });
   console.log('Existing buyout rows:', buyoutCount);
 
+  if (pa) {
+    const buyoutItems = await p.buyoutItem.findMany({ where: { projectId: proj.id } });
+    const trades = buyoutItems.filter((i) => i.lineType !== 'Division');
+    const buyoutBudget = trades.reduce((s, i) => s + i.totalValueBudget, 0);
+    const buyoutInvested = trades.reduce((s, i) => s + i.cashFlowInvested, 0);
+    console.log('Buyout vs PA:');
+    console.log('  Budget total:', buyoutBudget.toLocaleString(), '| PA contract:', (pa.g702ContractSumToDate ?? 0).toLocaleString());
+    console.log('  Cash invested:', buyoutInvested.toLocaleString(), '| PA completed:', (pa.g702TotalCompleted ?? 0).toLocaleString());
+  }
+
   const sourceLines = pa?.lineItems?.length
     ? pa.lineItems.map((li) => ({
         sortOrder: li.sortOrder,

@@ -4,11 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
-
-function submittalNotifyEmail(...candidates: (string | null | undefined)[]) {
-  return resolveEmailAddress(...candidates, process.env.SUBMITTAL_NOTIFY_EMAIL);
-}
+import { collectEmails, resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
@@ -45,6 +41,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const fields = [
       'title', 'description', 'submittalType', 'specSection', 'subcontractor',
       'priority', 'status', 'submittedBy', 'reviewedBy', 'notes',
+      'assignedTo', 'assignedToRole', 'ballInCourt', 'ballInCourtRole',
     ];
     for (const f of fields) {
       if (body[f] !== undefined) data[f] = body[f];
@@ -54,17 +51,25 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
     if (body.status === 'Submitted' && existing.status === 'Draft') {
       data.submittedDate = new Date();
+      data.ballInCourt = (body.assignedTo as string) || existing.assignedTo || 'Architect';
+      data.ballInCourtRole = (body.assignedToRole as string) || existing.assignedToRole || 'Architect';
     }
     if (body.status === 'Approved' || body.status === 'Revise and Resubmit') {
       data.reviewedDate = new Date();
       data.reviewedBy = body.reviewedBy ?? session.user?.name ?? null;
+      data.ballInCourt = existing.subcontractor || existing.submittedBy || 'Subcontractor';
+      data.ballInCourtRole = body.status === 'Approved' ? 'Subcontractor' : 'Subcontractor';
     }
     if (body.status === 'Rejected') {
       data.reviewedDate = new Date();
       data.reviewedBy = body.reviewedBy ?? session.user?.name ?? null;
+      data.ballInCourt = existing.subcontractor || existing.submittedBy;
+      data.ballInCourtRole = 'Subcontractor';
     }
     if (body.status === 'Under Review' && existing.status === 'Submitted') {
       data.reviewedBy = body.reviewedBy ?? session.user?.name ?? null;
+      data.ballInCourt = body.reviewedBy ?? session.user?.name ?? existing.assignedTo;
+      data.ballInCourtRole = 'Reviewer';
     }
 
     const updated = await prisma.submittal.update({
@@ -85,10 +90,29 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const event = eventMap[body.status];
       if (event) {
         try {
-          const to = submittalNotifyEmail(body.notifyEmail, existing.submittedBy, session.user?.email);
-          if (to) {
+          const sub = updated as typeof updated & {
+            submittedByEmail?: string | null;
+            assignedToEmail?: string | null;
+            reviewerEmail?: string | null;
+            subcontractorEmail?: string | null;
+            superintendentEmail?: string | null;
+          };
+          const toList =
+            event === 'submitted' || event === 'under_review'
+              ? collectEmails(sub.assignedToEmail, sub.reviewerEmail)
+              : collectEmails(sub.subcontractorEmail, sub.submittedByEmail, existing.submittedBy);
+          const ccList = collectEmails(
+            sub.submittedByEmail,
+            sub.superintendentEmail,
+            session.user?.email,
+          ).filter((e) => !toList.includes(e));
+          const primaryTo = toList.length ? toList : collectEmails(sub.submittedByEmail, session.user?.email);
+
+          if (primaryTo.length) {
             await sendSubmittalEmail({
-              to,
+              to: primaryTo,
+              cc: ccList,
+              replyTo: sub.submittedByEmail || undefined,
               event,
               submittalId: updated.id,
               submittalNumber: updated.submittalNumber,
@@ -98,6 +122,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
               subcontractor: updated.subcontractor,
               submittedBy: updated.submittedBy,
               reviewedBy: updated.reviewedBy,
+              assignedTo: updated.assignedTo,
+              ballInCourt: updated.ballInCourt,
             });
           }
         } catch (emailErr) {

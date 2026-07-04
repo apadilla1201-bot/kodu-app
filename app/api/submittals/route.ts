@@ -4,11 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
-
-function submittalNotifyEmail(...candidates: (string | null | undefined)[]) {
-  return resolveEmailAddress(...candidates, process.env.SUBMITTAL_NOTIFY_EMAIL);
-}
+import { collectEmails, resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
 
 export async function GET(request: Request) {
   try {
@@ -47,7 +43,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       projectId, title, description, submittalType, specSection, subcontractor,
-      priority, status, requiredDate, submittedBy, notes, attachments, notifyEmail,
+      priority, status, requiredDate, submittedBy, submittedByEmail, notes, attachments,
+      assignedTo, assignedToRole, assignedToEmail, reviewerEmail,
+      subcontractorEmail, superintendentName, superintendentEmail,
     } = body ?? {};
 
     if (!projectId || !title) {
@@ -64,6 +62,11 @@ export async function POST(request: Request) {
     const nextSeq = (last?.sequence ?? 0) + 1;
     const submittalNumber = `${project.projectNumber}-SUB-${String(nextSeq).padStart(3, '0')}`;
 
+    const pmEmail = resolveEmailAddress(submittedByEmail, session.user?.email);
+    const assigneeName = assignedTo ? String(assignedTo) : null;
+    const assigneeEmail = resolveEmailAddress(assignedToEmail, assignedTo);
+    const isSubmitted = status === 'Submitted';
+
     const submittal = await prisma.submittal.create({
       data: {
         projectId,
@@ -78,7 +81,17 @@ export async function POST(request: Request) {
         status: status ?? 'Draft',
         requiredDate: requiredDate ? new Date(requiredDate) : null,
         submittedBy: submittedBy ?? session.user?.name ?? null,
-        submittedDate: status === 'Submitted' ? new Date() : null,
+        submittedByEmail: pmEmail,
+        submittedDate: isSubmitted ? new Date() : null,
+        assignedTo: assigneeName,
+        assignedToRole: assignedToRole ? String(assignedToRole) : null,
+        assignedToEmail: assigneeEmail,
+        reviewerEmail: resolveEmailAddress(reviewerEmail),
+        subcontractorEmail: resolveEmailAddress(subcontractorEmail, subcontractor),
+        superintendentName: superintendentName ? String(superintendentName) : null,
+        superintendentEmail: resolveEmailAddress(superintendentEmail),
+        ballInCourt: assigneeName || (isSubmitted ? 'Architect' : null),
+        ballInCourtRole: assignedToRole ? String(assignedToRole) : (isSubmitted ? 'Architect' : null),
         notes: notes ?? null,
         attachments: attachments?.length
           ? {
@@ -96,10 +109,21 @@ export async function POST(request: Request) {
 
     if (submittal.status === 'Submitted') {
       try {
-        const to = submittalNotifyEmail(notifyEmail, session.user?.email);
-        if (to) {
+        const toList = collectEmails(assigneeEmail);
+        const ccList = collectEmails(
+          pmEmail,
+          reviewerEmail,
+          subcontractorEmail,
+          superintendentEmail,
+          session.user?.email,
+        ).filter((e) => !toList.includes(e));
+        const primaryTo = toList.length ? toList : collectEmails(pmEmail, session.user?.email);
+
+        if (primaryTo.length) {
           await sendSubmittalEmail({
-            to,
+            to: primaryTo,
+            cc: ccList,
+            replyTo: pmEmail || undefined,
             event: 'submitted',
             submittalId: submittal.id,
             submittalNumber: submittal.submittalNumber,
@@ -108,6 +132,8 @@ export async function POST(request: Request) {
             projectNumber: project.projectNumber,
             subcontractor: submittal.subcontractor,
             submittedBy: submittal.submittedBy,
+            assignedTo: assigneeName,
+            ballInCourt: submittal.ballInCourt,
           });
         }
       } catch (emailErr) {

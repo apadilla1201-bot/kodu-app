@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { collectEmails, resolveEmailAddress, sendRfiAssignedEmail } from '@/lib/email';
+import { appBaseUrl } from '@/lib/app-url';
+import { randomBytes } from 'crypto';
 
 export async function GET(request: Request) {
   try {
@@ -85,6 +87,8 @@ export async function POST(request: Request) {
     const assigneeName = String(assignedTo || '');
     const assigneeEmail = resolveEmailAddress(assignedToEmail, assignedTo);
 
+    const externalToken = randomBytes(24).toString('hex');
+
     const rfi = await prisma.rFI.create({
       data: {
         projectId,
@@ -109,6 +113,7 @@ export async function POST(request: Request) {
         requestingSubEmail: resolveEmailAddress(requestingSubEmail),
         ballInCourt: assigneeName || null,
         ballInCourtRole: assignedToRole ? String(assignedToRole) : null,
+        externalToken,
         daysToRespond: days,
         dateDue,
         costImpact: costImpact || 'TBD',
@@ -162,6 +167,7 @@ export async function POST(request: Request) {
           ballInCourt: assigneeName,
           superintendent: superintendentName ? String(superintendentName) : undefined,
           requestingSub: requestingSubName ? String(requestingSubName) : undefined,
+          externalRespondUrl: `${appBaseUrl()}/respond/rfi/${externalToken}`,
         });
       }
     } catch (emailErr) {

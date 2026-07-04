@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { generateBuyoutFromBudgetLines } from '@/lib/buyout-generate';
+import { buyoutItemToMergeable, mergeExcelIntoGenerated, type MergeableBuyoutRow } from '@/lib/buyout-merge';
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +16,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const projectId = String(body?.projectId || '');
     const replace = body?.replace !== false;
+    const mergeExisting = body?.mergeExisting === true;
 
     if (!projectId) {
       return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
@@ -22,6 +24,15 @@ export async function POST(request: Request) {
 
     const project = await prisma.project.findFirst({ where: { id: projectId, companyId } });
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+
+    let excelSnapshot: ReturnType<typeof buyoutItemToMergeable>[] = [];
+    if (mergeExisting) {
+      const existing = await prisma.buyoutItem.findMany({
+        where: { projectId },
+        orderBy: { sortOrder: 'asc' },
+      });
+      excelSnapshot = existing.map(buyoutItemToMergeable);
+    }
 
     // Prefer latest Pay App G703 (same lines as executed budget)
     const latestPa = await prisma.payApplication.findFirst({
@@ -102,12 +113,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No buyout lines could be generated from budget data' }, { status: 400 });
     }
 
+    let finalRows: MergeableBuyoutRow[] = generated;
+    let mergedCount = 0;
+    let excelOnlyCount = 0;
+    if (mergeExisting && excelSnapshot.length > 0) {
+      const merged = mergeExcelIntoGenerated(generated, excelSnapshot);
+      finalRows = merged.rows;
+      mergedCount = merged.mergedCount;
+      excelOnlyCount = merged.excelOnlyCount;
+    }
+
     if (replace) {
       await prisma.buyoutItem.deleteMany({ where: { projectId } });
     }
 
     await prisma.buyoutItem.createMany({
-      data: generated.map((row) => ({
+      data: finalRows.map((row) => ({
         projectId,
         sortOrder: row.sortOrder,
         lineType: row.lineType,
@@ -123,19 +144,27 @@ export async function POST(request: Request) {
         totalByChapter: row.totalByChapter,
         cashFlowInvested: row.cashFlowInvested,
         subcontractor: row.subcontractor,
+        targetContractDate: row.targetContractDate ?? null,
+        actualContractDate: row.actualContractDate ?? null,
         dateSubOnSite: row.dateSubOnSite,
+        finalOwnerApprovalDate: row.finalOwnerApprovalDate ?? null,
+        finalSubmissionApprovalDate: row.finalSubmissionApprovalDate ?? null,
         forecastContractDate: row.forecastContractDate,
+        forecastBidDate: row.forecastBidDate ?? null,
+        awardDate: row.awardDate ?? null,
         notes: row.notes,
       })),
     });
 
     return NextResponse.json({
       ok: true,
-      imported: generated.length,
+      imported: finalRows.length,
       source,
       payAppNumber: latestPa?.applicationNumber ?? null,
       cpmRevision: schedule?.revision ?? null,
-      cpmActivitiesMatched: generated.filter((r) => r.dateSubOnSite).length,
+      cpmActivitiesMatched: finalRows.filter((r) => r.dateSubOnSite).length,
+      mergedFromExcel: mergedCount,
+      excelOnlyAppended: excelOnlyCount,
     });
   } catch (error: any) {
     console.error('POST /api/buyout/generate error:', error);

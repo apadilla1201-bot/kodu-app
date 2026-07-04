@@ -113,8 +113,12 @@ export async function sendRfiAssignedEmail(opts: {
   ballInCourt?: string;
   superintendent?: string;
   requestingSub?: string;
+  externalRespondUrl?: string;
 }) {
   const link = `${appBaseUrl()}/dashboard/rfis/${opts.rfiId}`;
+  const externalLink = opts.externalRespondUrl
+    ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond Without Login</a></p>`
+    : '';
   const html = wrapEmail(
     '#0F1B33',
     'New RFI Assigned',
@@ -135,6 +139,7 @@ export async function sendRfiAssignedEmail(opts: {
         <p style="margin:4px 0 0 0;">${opts.question.substring(0, 800)}</p>
       </div>
       <p><a href="${link}" style="display:inline-block;background:#0F1B33;color:#C9A96E;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View RFI in Kodu</a></p>
+      ${externalLink}
     `,
   );
   return sendEmail({
@@ -184,7 +189,9 @@ export async function sendRfiAnsweredEmail(opts: {
 }
 
 export async function sendSubmittalEmail(opts: {
-  to: string;
+  to: string | string[];
+  cc?: string | string[];
+  replyTo?: string;
   event: 'submitted' | 'approved' | 'revise' | 'rejected' | 'under_review';
   submittalNumber: string;
   title: string;
@@ -193,6 +200,8 @@ export async function sendSubmittalEmail(opts: {
   subcontractor?: string | null;
   submittedBy?: string | null;
   reviewedBy?: string | null;
+  assignedTo?: string | null;
+  ballInCourt?: string | null;
   submittalId: string;
 }) {
   const titles: Record<typeof opts.event, { bg: string; label: string; color: string }> = {
@@ -212,6 +221,8 @@ export async function sendSubmittalEmail(opts: {
       <p><strong>Submittal #:</strong> ${opts.submittalNumber}</p>
       <p><strong>Project:</strong> ${opts.projectName} (#${opts.projectNumber})</p>
       <p><strong>Title:</strong> ${opts.title}</p>
+      ${opts.ballInCourt ? `<p><strong>Ball in Court:</strong> ${opts.ballInCourt}</p>` : ''}
+      ${opts.assignedTo ? `<p><strong>Assigned To:</strong> ${opts.assignedTo}</p>` : ''}
       ${opts.subcontractor ? `<p><strong>Subcontractor:</strong> ${opts.subcontractor}</p>` : ''}
       ${opts.submittedBy ? `<p><strong>Submitted By:</strong> ${opts.submittedBy}</p>` : ''}
       ${opts.reviewedBy ? `<p><strong>Reviewed By:</strong> ${opts.reviewedBy}</p>` : ''}
@@ -220,6 +231,8 @@ export async function sendSubmittalEmail(opts: {
   );
   return sendEmail({
     to: opts.to,
+    cc: opts.cc,
+    replyTo: opts.replyTo,
     subject: `${opts.submittalNumber} — ${t.label}`,
     html,
   });

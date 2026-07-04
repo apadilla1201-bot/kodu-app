@@ -214,6 +214,7 @@ model RFI {
   requestingSubEmail String?
   ballInCourt        String?         // name of who must act now
   ballInCourtRole    String?
+  externalToken      String?         @unique // magic link for external response (no login)
   dateSubmitted      DateTime        @default(now())
   dateDue            DateTime?
   daysToRespond      Int             @default(7)
@@ -263,7 +264,17 @@ model Submittal {
   status          String               @default("Draft")
   requiredDate    DateTime?
   submittedBy     String?
+  submittedByEmail String?
   submittedDate   DateTime?
+  assignedTo      String?
+  assignedToRole  String?
+  assignedToEmail String?
+  reviewerEmail   String?
+  subcontractorEmail String?
+  superintendentName String?
+  superintendentEmail String?
+  ballInCourt     String?
+  ballInCourtRole String?
   reviewedBy      String?
   reviewedDate    DateTime?
   notes           String?              @db.Text

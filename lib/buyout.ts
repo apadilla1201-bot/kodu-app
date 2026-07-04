@@ -187,7 +187,15 @@ export function buildAlerts(
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   for (const item of items) {
-    if (item.lineType === 'Division') continue;
+    if (item.lineType === 'Division' || item.lineType === 'COR' || item.lineType === 'GC') continue;
+
+    const isActiveProcurement =
+      item.status !== 'Not Started' ||
+      item.contractedValue > 0 ||
+      !!item.awardDate ||
+      (item.proposalAmount > 0 && !!item.trade.trim());
+
+    if (!isActiveProcurement) continue;
 
     if (item.status === 'Design Pending') {
       alerts.push({
@@ -197,12 +205,19 @@ export function buildAlerts(
         message: 'Design pending — cannot bid or award',
         severity: 'medium',
       });
+      continue;
     }
 
     const ownerDate = item.finalOwnerApprovalDate ? new Date(item.finalOwnerApprovalDate) : null;
+    const needsOwnerApproval =
+      item.status === 'Pending Owner Approval' ||
+      item.status === 'Bidding' ||
+      (item.proposalAmount > 0 && !item.awardDate && item.contractedValue === 0);
+
     if (
       ownerDate &&
       ownerDate < today &&
+      needsOwnerApproval &&
       !item.awardDate &&
       item.status !== 'Contracted' &&
       item.status !== 'On Site' &&
@@ -219,12 +234,17 @@ export function buildAlerts(
     }
 
     const onSite = item.dateSubOnSite ? new Date(item.dateSubOnSite) : null;
+    const procurementStarted =
+      !!item.awardDate ||
+      item.contractedValue > 0 ||
+      ['Awarded', 'Contracted', 'Bidding', 'On Site'].includes(item.status);
+
     if (
       onSite &&
       onSite < today &&
+      procurementStarted &&
       item.status !== 'On Site' &&
-      item.status !== 'Complete' &&
-      (item.contractedValue > 0 || item.awardDate)
+      item.status !== 'Complete'
     ) {
       alerts.push({
         id: item.id,
@@ -235,7 +255,11 @@ export function buildAlerts(
       });
     }
 
-    if (item.proposalAmount > 0 && item.totalValueBudget > item.proposalAmount * 1.05) {
+    if (
+      item.proposalAmount >= 5000 &&
+      item.contractedValue > 0 &&
+      item.totalValueBudget > item.proposalAmount * 1.1
+    ) {
       const over = item.totalValueBudget - item.proposalAmount;
       alerts.push({
         id: item.id,
