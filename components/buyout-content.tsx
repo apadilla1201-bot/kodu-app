@@ -49,6 +49,9 @@ interface Summary {
   delta: number;
   alertCount: number;
   highAlerts: number;
+  investedSource?: string;
+  latestPayAppNumber?: number | null;
+  contractSumToDate?: number | null;
 }
 
 interface AlertRow {
@@ -268,8 +271,24 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
           <Kpi label="Proposal" value={fmtMoney(summary.totalProposal)} />
           <Kpi label="Contracted" value={fmtMoney(summary.totalContracted)} />
           <Kpi label="Total Budget" value={fmtMoney(summary.totalBudget)} sub={`Delta ${fmtMoney(summary.delta)}`} />
-          <Kpi label="Cash Invested" value={fmtMoney(summary.totalInvested)} />
-          <Kpi label="Remaining" value={fmtMoney(summary.totalRemaining)} sub={`${(summary.remainingPct * 100).toFixed(0)}% spent`} />
+          <Kpi
+            label="Cash Invested"
+            value={fmtMoney(summary.totalInvested)}
+            sub={
+              summary.investedSource
+                ? `Executed to date · ${summary.investedSource}`
+                : 'Executed to date'
+            }
+          />
+          <Kpi
+            label="Remaining"
+            value={fmtMoney(summary.totalRemaining)}
+            sub={`${(summary.remainingPct * 100).toFixed(0)}% spent${
+              summary.contractSumToDate
+                ? ` · PA contract ${fmtMoney(summary.contractSumToDate)}`
+                : ''
+            }`}
+          />
           <Kpi label="Alerts" value={String(summary.alertCount)} sub={`${summary.highAlerts} high`} warn={summary.highAlerts > 0} />
         </div>
       )}

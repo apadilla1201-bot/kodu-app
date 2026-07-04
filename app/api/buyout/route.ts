@@ -30,19 +30,59 @@ export async function GET(request: Request) {
       orderBy: { sortOrder: 'asc' },
     });
 
+    // Cash Invested = executed-to-date from LATEST Pay Application (G702 / G703), never Excel column
+    const latestPa = await prisma.payApplication.findFirst({
+      where: { projectId },
+      orderBy: { applicationNumber: 'desc' },
+      include: {
+        lineItems: { where: { isSection: false } },
+      },
+    });
+
+    let totalInvested = 0;
+    let investedFromPa: {
+      applicationNumber: number;
+      g702TotalCompleted: number | null;
+      g702ContractSumToDate: number | null;
+    } | null = null;
+
+    if (latestPa) {
+      const fromLines = latestPa.lineItems.reduce(
+        (s, li) => s + (li.previousCompleted || 0) + (li.thisCompleted || 0),
+        0
+      );
+      totalInvested =
+        latestPa.g702TotalCompleted != null && latestPa.g702TotalCompleted > 0
+          ? latestPa.g702TotalCompleted
+          : fromLines;
+      investedFromPa = {
+        applicationNumber: latestPa.applicationNumber,
+        g702TotalCompleted: latestPa.g702TotalCompleted,
+        g702ContractSumToDate: latestPa.g702ContractSumToDate,
+      };
+    }
+
     const lineItems = items.filter((i) => i.lineType !== 'Division');
     const totalProposal = lineItems.reduce((s, i) => s + (i.proposalAmount || 0), 0);
     const totalContracted = lineItems.reduce((s, i) => s + (i.contractedValue || 0), 0);
     const totalBudget = lineItems.reduce((s, i) => s + (i.totalValueBudget || 0), 0);
-    const totalInvested = lineItems.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
+    // Fallback only if project has no pay apps yet
+    const excelInvested = lineItems.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
+    if (!investedFromPa) totalInvested = excelInvested;
+
     const totalRemaining = computeRemaining(totalBudget, totalInvested);
+
+    // Scale division invested so chart totals match PA executed amount
+    const scale =
+      excelInvested > 0 && investedFromPa ? totalInvested / excelInvested : 1;
 
     const byDivision = items
       .filter((i) => i.lineType === 'Division')
       .map((d) => {
         const code = d.divisionCode || d.trade;
         const children = lineItems.filter((i) => i.divisionCode === code || i.divisionCode === d.trade);
-        const invested = children.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
+        const investedRaw = children.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
+        const invested = investedRaw * scale;
         const budget = d.totalByChapter || children.reduce((s, i) => s + (i.totalValueBudget || 0), 0);
         return {
           name: d.trade,
@@ -66,6 +106,11 @@ export async function GET(request: Request) {
       delta: computeDelta(totalBudget, totalProposal),
       alertCount: alerts.length,
       highAlerts: alerts.filter((a) => a.severity === 'high').length,
+      investedSource: investedFromPa
+        ? `PA #${investedFromPa.applicationNumber}`
+        : 'Buyout lines (no pay app)',
+      latestPayAppNumber: investedFromPa?.applicationNumber ?? null,
+      contractSumToDate: investedFromPa?.g702ContractSumToDate ?? null,
     };
 
     return NextResponse.json({
