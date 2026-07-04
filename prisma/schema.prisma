@@ -110,6 +110,7 @@ model Project {
   budgets         Budget[]
   schedules       Schedule[]
   submittals      Submittal[]
+  buyoutItems     BuyoutItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -259,6 +260,49 @@ model SubmittalAttachment {
   createdAt        DateTime  @default(now())
 
   @@index([submittalId])
+}
+
+/// Buyout / Contract Tracking — one editable matrix per project (trades + CORs mixed)
+model BuyoutItem {
+  id                        String    @id @default(cuid())
+  projectId                 String
+  project                   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sortOrder                 Int       @default(0)
+  lineType                  String    @default("Trade") // Division | Trade | COR | GC | Allowance
+  divisionCode              String?
+  trade                     String
+  status                    String    @default("Not Started")
+  // Money
+  proposalAmount            Float     @default(0)
+  proposalDetails           String?   @db.Text
+  potentialBuyoutAmount     Float     @default(0)
+  potentialBuyoutDetails    String?   @db.Text
+  contractedValue           Float     @default(0)
+  pendingCor                Float     @default(0)
+  changeOrders              Float     @default(0)
+  totalValueBudget          Float     @default(0)
+  totalByChapter            Float?
+  cashFlowInvested          Float     @default(0)
+  // Schedule / procurement
+  targetContractDate        DateTime?
+  actualContractDate        DateTime?
+  dateSubOnSite             DateTime?
+  productLeadTimeDays       Int?
+  approvalLeadTimeDays      Int?
+  finalOwnerApprovalDate    DateTime?
+  finalSubmissionApprovalDate DateTime?
+  forecastBidDate           DateTime?
+  forecastContractDate      DateTime?
+  awardDate                 DateTime?
+  subcontractor             String?
+  notes                     String?   @db.Text
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([lineType])
+  @@index([status])
+  @@index([sortOrder])
 }
 
 model PayApplication {
