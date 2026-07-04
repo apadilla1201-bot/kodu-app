@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { resolveEmailAddress, sendRfiAnsweredEmail } from '@/lib/email';
+import { collectEmails, resolveEmailAddress, sendRfiAnsweredEmail } from '@/lib/email';
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -44,15 +44,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
       });
     }
 
+    const responder = responseBy ? String(responseBy) : (session.user?.name || 'Respondent');
+
     const updated = await prisma.rFI.update({
       where: { id: params.id },
       data: {
         responseText: String(responseText),
-        responseBy: responseBy ? String(responseBy) : 'Augusto Padilla',
+        responseBy: responder,
         responseDate: new Date(),
         status: 'Answered',
         costImpact: costImpact || rfi.costImpact,
         scheduleImpact: scheduleImpact || rfi.scheduleImpact,
+        // Ball in court returns to PM after response
+        ballInCourt: rfi.submittedBy,
+        ballInCourtRole: rfi.submittedByRole || 'Project Manager',
       },
       include: {
         project: { select: { id: true, projectNumber: true, projectName: true } },
@@ -60,21 +65,29 @@ export async function POST(request: Request, { params }: { params: { id: string 
       },
     });
 
-    // Send email notification for RFI response
+    // Notify PM (primary) + CC assignee, super, requesting sub
     try {
-      const recipient = resolveEmailAddress(
+      const toList = collectEmails(
         notifyEmail,
+        (rfi as any).submittedByEmail,
         rfi.submittedBy,
         session.user?.email,
       );
-      if (recipient) {
+      const ccList = collectEmails(
+        (rfi as any).assignedToEmail,
+        (rfi as any).superintendentEmail,
+        (rfi as any).requestingSubEmail,
+      ).filter((e) => !toList.includes(e));
+
+      if (toList.length) {
         await sendRfiAnsweredEmail({
-          to: recipient,
+          to: toList,
+          cc: ccList,
           rfiId: rfi.id,
           rfiNumber: rfi.rfiNumber,
           subject: rfi.subject,
           responseText: String(responseText),
-          responseBy: responseBy ? String(responseBy) : (session.user?.name || 'Project Manager'),
+          responseBy: responder,
           costImpact: String(costImpact || rfi.costImpact || 'TBD'),
           scheduleImpact: String(scheduleImpact || rfi.scheduleImpact || 'TBD'),
         });

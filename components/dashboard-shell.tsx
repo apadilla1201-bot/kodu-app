@@ -15,6 +15,8 @@ import {
   FileStack,
   BarChart3,
   ClipboardList,
+  Users,
+  Settings,
   Menu,
   X,
   LogOut,
@@ -28,8 +30,10 @@ const navItems = [
   { href: '/dashboard/rfis', label: 'RFI Log', icon: FileQuestion },
   { href: '/dashboard/submittals', label: 'Submittals', icon: FileStack },
   { href: '/dashboard/buyout', label: 'Buyout', icon: ClipboardList },
+  { href: '/dashboard/directory', label: 'Directory', icon: Users },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/import', label: 'Import Excel', icon: FileSpreadsheet },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {

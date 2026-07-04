@@ -30,5 +30,14 @@ export default async function NewRFIPage({ searchParams }: { searchParams: { pro
     nextSequence: ((p?.rfis?.[0]?.sequence ?? 0) + 1),
   }));
 
-  return <NewRFIForm projects={projectsData} initialProjectId={searchParams?.projectId ?? ''} />;
+  return (
+    <NewRFIForm
+      projects={projectsData}
+      initialProjectId={searchParams?.projectId ?? ''}
+      currentUser={{
+        name: session.user?.name || '',
+        email: session.user?.email || '',
+      }}
+    />
+  );
 }

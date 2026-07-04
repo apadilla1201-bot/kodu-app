@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { resolveEmailAddress, sendRfiAssignedEmail } from '@/lib/email';
+import { collectEmails, resolveEmailAddress, sendRfiAssignedEmail } from '@/lib/email';
 
 export async function GET(request: Request) {
   try {
@@ -47,7 +47,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       projectId, subject, question, discipline, drawingReference, specReference,
-      priority,       submittedBy, submittedByRole, assignedTo, assignedToRole, assignedToEmail,
+      priority, submittedBy, submittedByRole, submittedByEmail,
+      assignedTo, assignedToRole, assignedToEmail,
+      superintendentName, superintendentEmail,
+      requestingSubName, requestingSubEmail,
       daysToRespond, costImpact, scheduleImpact, scheduleImpactDays, notes,
       attachments,
     } = body ?? {};
@@ -77,6 +80,11 @@ export async function POST(request: Request) {
     const dateDue = new Date();
     dateDue.setDate(dateDue.getDate() + days);
 
+    const pmName = submittedBy ? String(submittedBy) : (session.user?.name || 'Project Manager');
+    const pmEmail = resolveEmailAddress(submittedByEmail, session.user?.email);
+    const assigneeName = String(assignedTo || '');
+    const assigneeEmail = resolveEmailAddress(assignedToEmail, assignedTo);
+
     const rfi = await prisma.rFI.create({
       data: {
         projectId,
@@ -89,10 +97,18 @@ export async function POST(request: Request) {
         specReference: specReference ? String(specReference) : null,
         priority: priority || 'Normal',
         status: 'Open',
-        submittedBy: submittedBy ? String(submittedBy) : 'Augusto Padilla',
+        submittedBy: pmName,
         submittedByRole: submittedByRole ? String(submittedByRole) : 'Project Manager',
-        assignedTo: String(assignedTo || ''),
+        submittedByEmail: pmEmail,
+        assignedTo: assigneeName,
         assignedToRole: assignedToRole ? String(assignedToRole) : null,
+        assignedToEmail: assigneeEmail,
+        superintendentName: superintendentName ? String(superintendentName) : null,
+        superintendentEmail: resolveEmailAddress(superintendentEmail),
+        requestingSubName: requestingSubName ? String(requestingSubName) : null,
+        requestingSubEmail: resolveEmailAddress(requestingSubEmail),
+        ballInCourt: assigneeName || null,
+        ballInCourtRole: assignedToRole ? String(assignedToRole) : null,
         daysToRespond: days,
         dateDue,
         costImpact: costImpact || 'TBD',
@@ -115,26 +131,37 @@ export async function POST(request: Request) {
       },
     });
 
-    // Send email notification for RFI assignment
+    // Email: To = assignee (must respond); CC = PM, superintendent, requesting sub
     try {
-      const recipient = resolveEmailAddress(
-        assignedToEmail,
-        assignedTo,
+      const toList = collectEmails(assigneeEmail);
+      const ccList = collectEmails(
+        pmEmail,
+        superintendentEmail,
+        requestingSubEmail,
         session.user?.email,
-      );
-      if (recipient) {
+      ).filter((e) => !toList.includes(e));
+
+      // If no assignee email, send to PM so the RFI is not lost
+      const primaryTo = toList.length ? toList : collectEmails(pmEmail, session.user?.email);
+
+      if (primaryTo.length) {
         await sendRfiAssignedEmail({
-          to: recipient,
+          to: primaryTo,
+          cc: ccList,
+          replyTo: pmEmail || undefined,
           rfiId: rfi.id,
           rfiNumber: rfi.rfiNumber,
           projectName: project.projectName,
           projectNumber: project.projectNumber,
           subject: String(subject),
           question: String(question),
-          assignedTo: String(assignedTo || ''),
-          submittedBy: String(submittedBy || session.user?.name || 'Project Manager'),
+          assignedTo: assigneeName,
+          submittedBy: pmName,
           dueDate: dateDue,
           priority: priority || 'Normal',
+          ballInCourt: assigneeName,
+          superintendent: superintendentName ? String(superintendentName) : undefined,
+          requestingSub: requestingSubName ? String(requestingSubName) : undefined,
         });
       }
     } catch (emailErr) {

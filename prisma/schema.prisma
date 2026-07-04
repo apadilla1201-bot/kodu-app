@@ -111,6 +111,7 @@ model Project {
   schedules       Schedule[]
   submittals      Submittal[]
   buyoutItems     BuyoutItem[]
+  contacts        ProjectContact[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -170,6 +171,24 @@ model LineItem {
   @@index([changeOrderId])
 }
 
+model ProjectContact {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  role      String   // Project Manager | Superintendent | Architect | Subcontractor | Owner | Designer | Engineer
+  company   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([role])
+  @@index([email])
+}
+
 model RFI {
   id                 String          @id @default(cuid())
   projectId          String
@@ -185,8 +204,16 @@ model RFI {
   status             String          @default("Open")
   submittedBy        String
   submittedByRole    String?
+  submittedByEmail   String?
   assignedTo         String
   assignedToRole     String?
+  assignedToEmail    String?
+  superintendentName String?
+  superintendentEmail String?
+  requestingSubName  String?
+  requestingSubEmail String?
+  ballInCourt        String?         // name of who must act now
+  ballInCourtRole    String?
   dateSubmitted      DateTime        @default(now())
   dateDue            DateTime?
   daysToRespond      Int             @default(7)

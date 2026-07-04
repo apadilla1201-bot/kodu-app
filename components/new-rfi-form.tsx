@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -16,6 +17,13 @@ interface ProjectData {
   nextSequence: number;
 }
 
+interface Contact {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 const disciplines = [
   'Architectural', 'Structural', 'Mechanical', 'Electrical', 'Plumbing',
   'Fire Protection', 'Civil', 'Landscape', 'Interior Design', 'General',
@@ -26,11 +34,20 @@ const roles = [
   'Subcontractor', 'Inspector', 'Consultant',
 ];
 
-export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectData[]; initialProjectId?: string }) {
+export function NewRFIForm({
+  projects,
+  initialProjectId,
+  currentUser,
+}: {
+  projects: ProjectData[];
+  initialProjectId?: string;
+  currentUser?: { name: string; email: string };
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   const [form, setForm] = useState({
     projectId: initialProjectId || (projects?.[0]?.id ?? ''),
@@ -40,11 +57,16 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
     drawingReference: '',
     specReference: '',
     priority: 'Normal',
-    submittedBy: 'Augusto Padilla',
+    submittedBy: currentUser?.name || '',
+    submittedByEmail: currentUser?.email || '',
     submittedByRole: 'Project Manager',
     assignedTo: '',
     assignedToEmail: '',
     assignedToRole: '',
+    superintendentName: '',
+    superintendentEmail: '',
+    requestingSubName: '',
+    requestingSubEmail: '',
     daysToRespond: '7',
     costImpact: 'TBD',
     scheduleImpact: 'TBD',
@@ -56,7 +78,52 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
     ? `${selectedProject.projectNumber}-${String(selectedProject.nextSequence).padStart(3, '0')}`
     : '';
 
+  useEffect(() => {
+    if (!form.projectId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/projects/${form.projectId}/contacts`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: Contact[] = data.contacts || [];
+        setContacts(list);
+
+        // Auto-fill Super if empty
+        const superC = list.find((c) => c.role === 'Superintendent');
+        const pmC = list.find((c) => c.role === 'Project Manager');
+        setForm((prev) => ({
+          ...prev,
+          submittedBy: prev.submittedBy || pmC?.name || currentUser?.name || '',
+          submittedByEmail: prev.submittedByEmail || pmC?.email || currentUser?.email || '',
+          superintendentName: prev.superintendentName || superC?.name || '',
+          superintendentEmail: prev.superintendentEmail || superC?.email || '',
+        }));
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [form.projectId, currentUser?.name, currentUser?.email]);
+
   const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  const pickContact = (
+    contactId: string,
+    nameField: string,
+    emailField: string,
+    roleField?: string
+  ) => {
+    const c = contacts.find((x) => x.id === contactId);
+    if (!c) return;
+    setForm((prev) => ({
+      ...prev,
+      [nameField]: c.name,
+      [emailField]: c.email,
+      ...(roleField ? { [roleField]: c.role } : {}),
+    }));
+  };
+
+  const contactsByRole = (role: string) =>
+    contacts.filter((c) => c.role === role || (role === 'Architect' && c.role === 'Engineer'));
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
@@ -86,6 +153,10 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
     }
     if (!form.assignedTo) {
       toast({ title: 'Missing field', description: 'Please specify who this RFI is assigned to', variant: 'destructive' });
+      return;
+    }
+    if (!form.assignedToEmail) {
+      toast({ title: 'Missing field', description: 'Assignee email is required so the RFI can be sent', variant: 'destructive' });
       return;
     }
 
@@ -232,8 +303,21 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
 
           {/* People */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2 lg:col-span-3 text-xs text-muted-foreground">
+              Distribution: <strong>To</strong> = Assignee (must respond). <strong>CC</strong> = you (PM), Superintendent, Requesting Sub.
+              {contacts.length === 0 && (
+                <span className="block mt-1 text-amber-700">
+                  No directory contacts yet —{' '}
+                  <Link href={`/dashboard/directory?projectId=${form.projectId}`} className="underline text-[#C9A96E]">
+                    add them in Project Directory
+                  </Link>
+                  , or type names/emails below.
+                </span>
+              )}
+            </div>
+
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Submitted By</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">PM / Submitted By</label>
               <input
                 type="text"
                 value={form.submittedBy}
@@ -242,7 +326,16 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Submitted By Role</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">PM Email</label>
+              <input
+                type="email"
+                value={form.submittedByEmail}
+                onChange={(e) => update('submittedByEmail', e.target.value)}
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/40"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">PM Role</label>
               <select
                 value={form.submittedByRole}
                 onChange={(e) => update('submittedByRole', e.target.value)}
@@ -251,18 +344,33 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
                 {roles.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assigned To *</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assignee (Ball in Court) *</label>
+              {contacts.length > 0 && (
+                <select
+                  className="w-full mb-1.5 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) pickContact(e.target.value, 'assignedTo', 'assignedToEmail', 'assignedToRole');
+                  }}
+                >
+                  <option value="">Pick from directory…</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name} — {c.role}</option>
+                  ))}
+                </select>
+              )}
               <input
                 type="text"
                 value={form.assignedTo}
                 onChange={(e) => update('assignedTo', e.target.value)}
-                placeholder="Name of the person who must respond"
+                placeholder="Who must respond"
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/40"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assigned To Email</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assignee Email *</label>
               <input
                 type="email"
                 value={form.assignedToEmail}
@@ -272,7 +380,7 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assigned To Role</label>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Assignee Role</label>
               <select
                 value={form.assignedToRole}
                 onChange={(e) => update('assignedToRole', e.target.value)}
@@ -281,6 +389,75 @@ export function NewRFIForm({ projects, initialProjectId }: { projects: ProjectDa
                 <option value="">Select Role</option>
                 {roles.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Superintendent (CC)</label>
+              {contactsByRole('Superintendent').length > 0 && (
+                <select
+                  className="w-full mb-1.5 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) pickContact(e.target.value, 'superintendentName', 'superintendentEmail');
+                  }}
+                >
+                  <option value="">Pick superintendent…</option>
+                  {contactsByRole('Superintendent').map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
+              <input
+                type="text"
+                value={form.superintendentName}
+                onChange={(e) => update('superintendentName', e.target.value)}
+                placeholder="Name"
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Superintendent Email</label>
+              <input
+                type="email"
+                value={form.superintendentEmail}
+                onChange={(e) => update('superintendentEmail', e.target.value)}
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background"
+              />
+            </div>
+            <div className="hidden lg:block" />
+
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Requesting Subcontractor (CC)</label>
+              {contactsByRole('Subcontractor').length > 0 && (
+                <select
+                  className="w-full mb-1.5 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  defaultValue=""
+                  onChange={(e) => {
+                    if (e.target.value) pickContact(e.target.value, 'requestingSubName', 'requestingSubEmail');
+                  }}
+                >
+                  <option value="">Pick subcontractor…</option>
+                  {contactsByRole('Subcontractor').map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              )}
+              <input
+                type="text"
+                value={form.requestingSubName}
+                onChange={(e) => update('requestingSubName', e.target.value)}
+                placeholder="Sub who requested this RFI"
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Subcontractor Email</label>
+              <input
+                type="email"
+                value={form.requestingSubEmail}
+                onChange={(e) => update('requestingSubEmail', e.target.value)}
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background"
+              />
             </div>
           </div>
 

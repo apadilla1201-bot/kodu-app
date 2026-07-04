@@ -13,6 +13,16 @@ export function resolveEmailAddress(...candidates: (string | null | undefined)[]
   return fallback && EMAIL_RE.test(fallback) ? fallback : null;
 }
 
+/** Collect unique valid emails from candidates (for To / CC lists). */
+export function collectEmails(...candidates: (string | null | undefined)[]): string[] {
+  const out: string[] = [];
+  for (const c of candidates) {
+    const trimmed = c?.trim().toLowerCase();
+    if (trimmed && EMAIL_RE.test(trimmed) && !out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
+}
+
 export function appBaseUrl(): string {
   return (process.env.NEXTAUTH_URL || 'https://app.kodupm.com').replace(/\/$/, '');
 }
@@ -25,25 +35,41 @@ function emailFrom(): string {
 
 export async function sendEmail(opts: {
   to: string | string[];
+  cc?: string | string[];
   subject: string;
   html: string;
   replyTo?: string;
 }): Promise<{ ok: boolean; skipped?: boolean; id?: string; error?: string }> {
-  const recipients = (Array.isArray(opts.to) ? opts.to : [opts.to]).filter((e) => EMAIL_RE.test(e));
-  if (recipients.length === 0) {
+  const recipients = (Array.isArray(opts.to) ? opts.to : [opts.to])
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => EMAIL_RE.test(e));
+  const uniqueTo = [...new Set(recipients)];
+  const ccList = (Array.isArray(opts.cc) ? opts.cc : opts.cc ? [opts.cc] : [])
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => EMAIL_RE.test(e) && !uniqueTo.includes(e));
+  const uniqueCc = [...new Set(ccList)];
+
+  if (uniqueTo.length === 0) {
     console.warn('[email] No valid recipients for:', opts.subject);
     return { ok: false, error: 'no_recipients' };
   }
 
   if (!resend) {
-    console.warn('[email] RESEND_API_KEY not set — skipping:', opts.subject, '→', recipients.join(', '));
+    console.warn(
+      '[email] RESEND_API_KEY not set — skipping:',
+      opts.subject,
+      '→',
+      uniqueTo.join(', '),
+      uniqueCc.length ? `cc:${uniqueCc.join(',')}` : ''
+    );
     return { ok: false, skipped: true };
   }
 
   try {
     const result = await resend.emails.send({
       from: emailFrom(),
-      to: recipients,
+      to: uniqueTo,
+      cc: uniqueCc.length ? uniqueCc : undefined,
       subject: opts.subject,
       html: opts.html,
       replyTo: opts.replyTo,
@@ -74,7 +100,9 @@ function wrapEmail(headerBg: string, headerTitle: string, headerColor: string, b
 }
 
 export async function sendRfiAssignedEmail(opts: {
-  to: string;
+  to: string | string[];
+  cc?: string | string[];
+  replyTo?: string;
   rfiNumber: string;
   projectName: string;
   projectNumber: string;
@@ -85,6 +113,9 @@ export async function sendRfiAssignedEmail(opts: {
   dueDate: Date;
   rfiId: string;
   priority?: string;
+  ballInCourt?: string;
+  superintendent?: string;
+  requestingSub?: string;
 }) {
   const link = `${appBaseUrl()}/dashboard/rfis/${opts.rfiId}`;
   const html = wrapEmail(
@@ -96,8 +127,11 @@ export async function sendRfiAssignedEmail(opts: {
       <p><strong>Project:</strong> ${opts.projectName} (#${opts.projectNumber})</p>
       <p><strong>Subject:</strong> ${opts.subject}</p>
       <p><strong>Priority:</strong> ${opts.priority || 'Normal'}</p>
-      <p><strong>Assigned To:</strong> ${opts.assignedTo}</p>
-      <p><strong>Submitted By:</strong> ${opts.submittedBy}</p>
+      <p><strong>Ball in Court:</strong> ${opts.ballInCourt || opts.assignedTo}</p>
+      <p><strong>Assigned To (respond):</strong> ${opts.assignedTo}</p>
+      <p><strong>PM / Submitted By:</strong> ${opts.submittedBy}</p>
+      ${opts.superintendent ? `<p><strong>Superintendent (CC):</strong> ${opts.superintendent}</p>` : ''}
+      ${opts.requestingSub ? `<p><strong>Requesting Subcontractor (CC):</strong> ${opts.requestingSub}</p>` : ''}
       <p><strong>Due Date:</strong> ${opts.dueDate.toLocaleDateString('en-US')}</p>
       <div style="background:white;padding:15px;border-radius:4px;border-left:4px solid #C9A96E;margin:12px 0;">
         <p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Question</p>
@@ -108,13 +142,16 @@ export async function sendRfiAssignedEmail(opts: {
   );
   return sendEmail({
     to: opts.to,
+    cc: opts.cc,
+    replyTo: opts.replyTo,
     subject: `RFI ${opts.rfiNumber} Assigned — ${opts.subject.substring(0, 60)}`,
     html,
   });
 }
 
 export async function sendRfiAnsweredEmail(opts: {
-  to: string;
+  to: string | string[];
+  cc?: string | string[];
   rfiNumber: string;
   subject: string;
   responseText: string;
@@ -143,6 +180,7 @@ export async function sendRfiAnsweredEmail(opts: {
   );
   return sendEmail({
     to: opts.to,
+    cc: opts.cc,
     subject: `RFI ${opts.rfiNumber} Answered — ${opts.subject.substring(0, 60)}`,
     html,
   });
