@@ -89,10 +89,11 @@ export function mergeExcelIntoGenerated(
     const ex = excelRows[bestIdx];
 
     const subcontractor = ex.subcontractor?.trim() || gen.subcontractor;
-    const contractedValue = gen.contractedValue > 0 ? gen.contractedValue : (ex.contractedValue || 0);
-    const proposalAmount = ex.proposalAmount > 0 ? ex.proposalAmount : gen.proposalAmount;
+    // Keep Pay App money; Excel only fills gaps when PA row has no value
+    const proposalAmount = gen.proposalAmount > 0 ? gen.proposalAmount : (ex.proposalAmount || 0);
     const potentialBuyoutAmount =
-      ex.potentialBuyoutAmount > 0 ? ex.potentialBuyoutAmount : gen.potentialBuyoutAmount;
+      gen.potentialBuyoutAmount > 0 ? gen.potentialBuyoutAmount : (ex.potentialBuyoutAmount || 0);
+    const contractedValue = gen.contractedValue > 0 ? gen.contractedValue : (ex.contractedValue || 0);
 
     const mergedRow: MergeableBuyoutRow = {
       ...gen,

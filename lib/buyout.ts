@@ -97,9 +97,41 @@ export function sumPayAppCompleted(
     .reduce((s, li) => s + (li.previousCompleted ?? 0) + (li.thisCompleted ?? 0), 0);
 }
 
+/** Sum G703 revised values for lines with billing activity (contracted / in progress). */
+export function sumPayAppContracted(
+  lines: Array<{
+    scheduledValue?: number | null;
+    budgetRealloc?: number | null;
+    previousChanges?: number | null;
+    currentChanges?: number | null;
+    previousCompleted?: number | null;
+    thisCompleted?: number | null;
+    isSection?: boolean | null;
+    isFee?: boolean | null;
+    isBelowLine?: boolean | null;
+  }>,
+): number {
+  return lines
+    .filter(isPayAppWorkLine)
+    .reduce((s, li) => {
+      const invested = (li.previousCompleted ?? 0) + (li.thisCompleted ?? 0);
+      return s + (invested > 0 ? revisedScheduled(li) : 0);
+    }, 0);
+}
+
+/** Excel-only rows appended outside Pay App scope — exclude from contract KPI rollups. */
+export function isExcelOnlyBuyoutRow(notes: string | null | undefined): boolean {
+  return !!notes?.includes('[Excel procurement — not in Pay App scope]');
+}
+
 /** Buyout log lines that roll up to KPI totals (exclude division headers). */
 export function isBuyoutKpiLine(lineType: string): boolean {
   return lineType !== 'Division';
+}
+
+/** PA-scoped buyout lines for KPI totals when a Pay App exists. */
+export function isPaScopedBuyoutLine(item: { lineType: string; notes?: string | null }): boolean {
+  return isBuyoutKpiLine(item.lineType) && !isExcelOnlyBuyoutRow(item.notes);
 }
 
 /** Infer status from subcontractor notes + dates (matches Arena Madness spreadsheet language). */

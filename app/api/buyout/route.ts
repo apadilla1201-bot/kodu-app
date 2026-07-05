@@ -11,7 +11,9 @@ import {
   computeRemaining,
   computeRemainingPct,
   isBuyoutKpiLine,
+  isPaScopedBuyoutLine,
   sumPayAppCompleted,
+  sumPayAppContracted,
   sumPayAppRevised,
 } from '@/lib/buyout';
 
@@ -73,10 +75,24 @@ export async function GET(request: Request) {
     }
 
     const kpiLines = items.filter((i) => isBuyoutKpiLine(i.lineType));
-    const procurementProposal = kpiLines.reduce((s, i) => s + (i.proposalAmount || 0), 0);
-    const procurementContracted = kpiLines.reduce((s, i) => s + (i.contractedValue || 0), 0);
-    const procurementBudget = kpiLines.reduce((s, i) => s + (i.totalValueBudget || 0), 0);
-    const excelInvested = kpiLines.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
+    const paScopedLines = kpiLines.filter((i) => isPaScopedBuyoutLine(i));
+
+    const logProposal = kpiLines.reduce((s, i) => s + (i.proposalAmount || 0), 0);
+    const logContracted = kpiLines.reduce((s, i) => s + (i.contractedValue || 0), 0);
+    const logBudget = kpiLines.reduce((s, i) => s + (i.totalValueBudget || 0), 0);
+    const excelInvested = paScopedLines.reduce((s, i) => s + (i.cashFlowInvested || 0), 0);
+
+    let procurementProposal = logProposal;
+    let procurementContracted = logContracted;
+    let procurementBudget = logBudget;
+
+    if (latestPa) {
+      const paLines = latestPa.lineItems;
+      const paRevisedSum = sumPayAppRevised(paLines);
+      procurementProposal = paRevisedSum;
+      procurementContracted = sumPayAppContracted(paLines);
+      procurementBudget = paRevisedSum;
+    }
 
     if (!investedFromPa) {
       contractBudget = procurementBudget;
@@ -85,7 +101,7 @@ export async function GET(request: Request) {
 
     const totalBudget = contractBudget;
     const totalRemaining = computeRemaining(totalBudget, totalInvested);
-    const lineItems = kpiLines;
+    const lineItems = investedFromPa ? paScopedLines : kpiLines;
 
     // Scale division invested so chart totals match PA executed amount
     const scale =
@@ -122,6 +138,9 @@ export async function GET(request: Request) {
       procurementBudget,
       procurementProposal,
       procurementContracted,
+      procurementLogProposal: logProposal,
+      procurementLogContracted: logContracted,
+      procurementLogBudget: logBudget,
       alertCount: alerts.length,
       highAlerts: alerts.filter((a) => a.severity === 'high').length,
       investedSource: investedFromPa

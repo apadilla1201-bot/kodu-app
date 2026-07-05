@@ -50,10 +50,13 @@ interface Summary {
   procurementBudget?: number;
   procurementProposal?: number;
   procurementContracted?: number;
+  procurementLogProposal?: number;
+  procurementLogContracted?: number;
+  procurementLogBudget?: number;
+  budgetSource?: string;
   alertCount: number;
   highAlerts: number;
   investedSource?: string;
-  budgetSource?: string;
   latestPayAppNumber?: number | null;
   contractSumToDate?: number | null;
 }
@@ -348,8 +351,24 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
             value={fmtMoney(summary.totalBudget)}
             sub={summary.budgetSource || 'Pay App contract sum'}
           />
-          <Kpi label="Buyout Proposal" value={fmtMoney(summary.totalProposal)} sub="Full procurement log" />
-          <Kpi label="Buyout Contracted" value={fmtMoney(summary.totalContracted)} sub={`Log budget ${fmtMoney(summary.procurementBudget ?? summary.totalBudget)}`} />
+          <Kpi
+            label="Buyout Proposal"
+            value={fmtMoney(summary.totalProposal)}
+            sub={
+              summary.latestPayAppNumber
+                ? `PA #${summary.latestPayAppNumber} revised budget`
+                : 'Full procurement log'
+            }
+          />
+          <Kpi
+            label="Buyout Contracted"
+            value={fmtMoney(summary.totalContracted)}
+            sub={
+              summary.latestPayAppNumber
+                ? `PA #${summary.latestPayAppNumber} billed scope`
+                : `Log budget ${fmtMoney(summary.procurementBudget ?? summary.totalBudget)}`
+            }
+          />
           <Kpi
             label="Cash Invested"
             value={fmtMoney(summary.totalInvested)}
