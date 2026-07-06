@@ -113,6 +113,7 @@ model Project {
   buyoutItems     BuyoutItem[]
   contacts        ProjectContact[]
   sitePhotos      SitePhoto[]
+  dailyLogs       DailyLog[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -207,7 +208,8 @@ model SitePhoto {
   uploadedByEmail  String?
   latitude         Float?
   longitude        Float?
-  dailyLogId       String?   // Sprint 2 — link to daily log
+  dailyLogId       String?
+  dailyLog         DailyLog? @relation(fields: [dailyLogId], references: [id], onDelete: SetNull)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -215,6 +217,33 @@ model SitePhoto {
   @@index([takenAt])
   @@index([tag])
   @@index([dailyLogId])
+}
+
+/// Superintendent daily field report
+model DailyLog {
+  id            String      @id @default(cuid())
+  projectId     String
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  logDate       DateTime
+  authorName    String
+  authorEmail   String?
+  weather       String?
+  temperature   String?
+  workPerformed String?     @db.Text
+  crewNotes     String?     @db.Text
+  deliveries    String?     @db.Text
+  delays        String?     @db.Text
+  status        String      @default("Draft") // Draft | Submitted | Approved
+  approvedBy    String?
+  approvedAt    DateTime?
+  photos        SitePhoto[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([projectId, logDate])
+  @@index([projectId])
+  @@index([logDate])
+  @@index([status])
 }
 
 model RFI {

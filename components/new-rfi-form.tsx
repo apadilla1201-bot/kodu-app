@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import {
-  FileQuestion, Upload, X, Paperclip, ArrowLeft, Send, AlertTriangle,
+  FileQuestion, Upload, X, Paperclip, ArrowLeft, Send, AlertTriangle, Mic, Sparkles, Loader2,
 } from 'lucide-react';
 import { uploadFileToStorage } from '@/lib/upload-client';
 
@@ -48,6 +48,8 @@ export function NewRFIForm({
   const [submitting, setSubmitting] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [fieldNote, setFieldNote] = useState('');
+  const [drafting, setDrafting] = useState(false);
 
   const [form, setForm] = useState({
     projectId: initialProjectId || (projects?.[0]?.id ?? ''),
@@ -103,6 +105,67 @@ export function NewRFIForm({
       }
     })();
   }, [form.projectId, currentUser?.name, currentUser?.email]);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('kodu_rfi_draft_note');
+    if (stored) {
+      setFieldNote(stored);
+      sessionStorage.removeItem('kodu_rfi_draft_note');
+    }
+  }, []);
+
+  const generateDraft = async (noteOverride?: string) => {
+    const note = (noteOverride ?? fieldNote).trim();
+    if (!note) {
+      toast({ title: 'Escribe o dicta una nota de campo', variant: 'destructive' });
+      return;
+    }
+    if (!form.projectId) {
+      toast({ title: 'Selecciona un proyecto primero', variant: 'destructive' });
+      return;
+    }
+    setDrafting(true);
+    try {
+      const res = await fetch('/api/rfis/draft-from-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ note, projectId: form.projectId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      const d = data.draft;
+      setForm((prev) => ({
+        ...prev,
+        subject: d.subject || prev.subject,
+        question: d.question || prev.question,
+        discipline: d.discipline || prev.discipline,
+        priority: d.priority || prev.priority,
+        drawingReference: d.drawingReference || prev.drawingReference,
+        specReference: d.specReference || prev.specReference,
+      }));
+      toast({ title: 'Borrador RFI generado — revisa y envía' });
+    } catch (e: any) {
+      toast({ title: e?.message ?? 'Error al generar borrador', variant: 'destructive' });
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  const startFieldVoice = () => {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      toast({ title: 'Voz no disponible en este navegador', variant: 'destructive' });
+      return;
+    }
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.onresult = (ev: any) => {
+      const text = ev.results[0][0].transcript;
+      setFieldNote((prev) => (prev ? `${prev}\n${text}` : text));
+    };
+    rec.start();
+  };
 
   const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -213,6 +276,34 @@ export function NewRFIForm({
         <div className="h-1.5 bg-gradient-to-r from-[#C9A96E] to-[#B8944F]" />
 
         <div className="p-6 space-y-6">
+          {/* Field note → AI draft */}
+          <div className="rounded-lg border border-[#C9A96E]/30 bg-[#C9A96E]/5 p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#C9A96E] flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> Nota de campo → borrador RFI
+            </p>
+            <textarea
+              value={fieldNote}
+              onChange={(e) => setFieldNote(e.target.value)}
+              rows={3}
+              placeholder="Dicta o pega lo que pasó en obra (ej. conflict duct vs beam grid C4, need engineer response)..."
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => generateDraft()}
+                disabled={drafting}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                {drafting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Generar borrador
+              </button>
+              <button type="button" onClick={startFieldVoice} className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm">
+                <Mic className="w-4 h-4" /> Dictar
+              </button>
+            </div>
+          </div>
+
           {/* Project Select */}
           <div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Project *</label>
