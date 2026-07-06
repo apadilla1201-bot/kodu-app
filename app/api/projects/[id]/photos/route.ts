@@ -14,7 +14,7 @@ async function assertProject(projectId: string, companyId: string) {
 }
 
 async function withImageUrl<T extends { cloudStoragePath: string }>(photo: T) {
-  const imageUrl = await getFileUrl(photo.cloudStoragePath, false);
+  const imageUrl = await getFileUrl(photo.cloudStoragePath, false, { inline: true });
   return { ...photo, imageUrl };
 }
 

@@ -17,19 +17,38 @@ const EXT_TO_MIME: Record<string, string> = {
   tif: 'image/tiff',
 };
 
+export function fileExtension(name: string): string {
+  const i = name.lastIndexOf('.');
+  if (i < 1 || i === name.length - 1) return '';
+  return name.slice(i + 1).toLowerCase();
+}
+
 /** iOS gallery picks often omit file.type — accept by MIME or extension. */
 export function isImageFile(file: File): boolean {
   if (file.type?.startsWith('image/')) return true;
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  if (IMAGE_EXTENSIONS.has(ext)) return true;
-  // Picker was accept="image/*" but OS gave no type/extension (common on iOS).
-  return !file.type && !ext;
+  const ext = fileExtension(file.name);
+  if (ext && IMAGE_EXTENSIONS.has(ext)) return true;
+  // Gallery picker (accept=image/*) often sends empty type and no extension on iOS.
+  if (!file.type || file.type === 'application/octet-stream') {
+    if (!ext) return true;
+  }
+  return false;
 }
 
 export function resolveImageContentType(file: File): string {
   if (file.type?.startsWith('image/')) return file.type;
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const ext = fileExtension(file.name);
   return EXT_TO_MIME[ext] ?? 'image/jpeg';
+}
+
+export function isHeicFile(file: File): boolean {
+  const ext = fileExtension(file.name);
+  return (
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    ext === 'heic' ||
+    ext === 'heif'
+  );
 }
 
 export const PHOTO_TAGS = [

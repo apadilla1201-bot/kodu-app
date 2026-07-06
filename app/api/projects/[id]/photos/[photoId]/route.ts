@@ -27,7 +27,7 @@ export async function GET(
     });
     if (!photo) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const imageUrl = await getFileUrl(photo.cloudStoragePath, false);
+    const imageUrl = await getFileUrl(photo.cloudStoragePath, false, { inline: true });
     return NextResponse.json({ ...photo, imageUrl });
   } catch (error: any) {
     console.error('GET photo error:', error);
@@ -66,7 +66,7 @@ export async function PATCH(
       data,
     });
 
-    const imageUrl = await getFileUrl(updated.cloudStoragePath, false);
+    const imageUrl = await getFileUrl(updated.cloudStoragePath, false, { inline: true });
     return NextResponse.json({ ...updated, imageUrl });
   } catch (error: any) {
     console.error('PATCH photo error:', error);

@@ -52,11 +52,20 @@ export async function uploadFileToStorage(file: File, isPublic = false): Promise
     // URL local relativa o sin parámetros S3 — no requiere Content-Disposition
   }
 
+  // S3 presigned URLs are cross-origin — credentials break CORS on mobile Safari.
+  const sameOrigin = (() => {
+    try {
+      return new URL(uploadUrl, window.location.href).origin === window.location.origin;
+    } catch {
+      return true;
+    }
+  })();
+
   const uploadRes = await fetch(uploadUrl, {
     method: 'PUT',
     headers: uploadHeaders,
     body: file,
-    credentials: 'include',
+    ...(sameOrigin ? { credentials: 'include' as const } : {}),
   });
   if (!uploadRes.ok) {
     throw new Error(`No se pudo guardar el archivo: ${file.name}`);

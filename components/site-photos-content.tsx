@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { uploadFileToStorage } from '@/lib/upload-client';
+import { prepareImageForUpload } from '@/lib/prepare-image-upload';
 import {
   PHOTO_TAGS,
   groupPhotosByDate,
@@ -93,16 +94,23 @@ export function SitePhotosContent({
   }, [selected]);
 
   const uploadFiles = async (files: FileList | File[]) => {
-    if (!projectId || !files.length) return;
+    if (!projectId) {
+      toast({ title: 'Selecciona un proyecto', variant: 'destructive' });
+      return;
+    }
+    const list = Array.from(files);
+    if (!list.length) return;
+
     setUploading(true);
     let ok = 0;
     let skipped = 0;
     try {
-      for (const file of Array.from(files)) {
-        if (!isImageFile(file)) {
+      for (const raw of list) {
+        if (!isImageFile(raw)) {
           skipped++;
           continue;
         }
+        const file = await prepareImageForUpload(raw);
         const uploaded = await uploadFileToStorage(file, false);
         const fileType = resolveImageContentType(file);
         const res = await fetch(`/api/projects/${projectId}/photos`, {
@@ -142,6 +150,12 @@ export function SitePhotosContent({
       if (cameraInputRef.current) cameraInputRef.current.value = '';
       if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
+  };
+
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    void uploadFiles(files);
   };
 
   const openFilePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
@@ -245,19 +259,19 @@ export function SitePhotosContent({
           <input
             ref={cameraInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
             multiple
             capture="environment"
             className="hidden"
-            onChange={(e) => e.target.files?.length && uploadFiles(e.target.files)}
+            onChange={handleFilePick}
           />
           <input
             ref={galleryInputRef}
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
             multiple
             className="hidden"
-            onChange={(e) => e.target.files?.length && uploadFiles(e.target.files)}
+            onChange={handleFilePick}
           />
           <button
             type="button"

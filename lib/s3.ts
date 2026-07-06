@@ -45,7 +45,8 @@ export async function generatePresignedUploadUrl(
 
 export async function getFileUrl(
   cloud_storage_path: string,
-  isPublic: boolean = false
+  isPublic: boolean = false,
+  options?: { inline?: boolean },
 ): Promise<string> {
   if (isLocalStoragePath(cloud_storage_path) && await localFileExists(cloud_storage_path)) {
     return `${appBaseUrl()}/api/upload/local?path=${encodeURIComponent(cloud_storage_path)}`;
@@ -63,7 +64,7 @@ export async function getFileUrl(
   const command = new GetObjectCommand({
     Bucket: bucketName,
     Key: cloud_storage_path,
-    ResponseContentDisposition: "attachment",
+    ResponseContentDisposition: options?.inline ? "inline" : "attachment",
   });
   return getSignedUrl(s3Client, command, { expiresIn: 3600 });
 }
