@@ -10,6 +10,7 @@ import {
   localFileExists,
   localFilePath,
   readLocalFile,
+  requireUploadStorage,
 } from "./storage";
 
 const s3Client = createS3Client();
@@ -19,7 +20,8 @@ export async function generatePresignedUploadUrl(
   contentType: string,
   isPublic: boolean = false
 ): Promise<{ uploadUrl: string; cloud_storage_path: string }> {
-  if (!isS3Configured()) {
+  const mode = requireUploadStorage();
+  if (mode === 'local') {
     const cloud_storage_path = buildLocalStoragePath(fileName);
     return {
       uploadUrl: buildLocalUploadUrl(cloud_storage_path),
@@ -52,11 +54,17 @@ export async function uploadBufferToStorage(
 ): Promise<{ cloud_storage_path: string }> {
   const safeName = (fileName ?? 'file').replace(/[/\\]/g, '_');
 
-  if (!isS3Configured()) {
+  const mode = requireUploadStorage();
+  if (mode === 'local') {
     const cloud_storage_path = buildLocalStoragePath(safeName);
     const { saveLocalFile } = await import('./storage');
     await saveLocalFile(cloud_storage_path, body);
     return { cloud_storage_path };
+  }
+
+  if (mode === 'blob') {
+    const { uploadBufferToBlob } = await import('./blob-storage');
+    return uploadBufferToBlob(body, safeName, contentType);
   }
 
   const { bucketName, folderPrefix } = getBucketConfig();
@@ -81,6 +89,11 @@ export async function getFileUrl(
   isPublic: boolean = false,
   options?: { inline?: boolean },
 ): Promise<string> {
+  const { isBlobStoragePath, blobPublicUrl } = await import('./blob-storage');
+  if (isBlobStoragePath(cloud_storage_path)) {
+    return blobPublicUrl(cloud_storage_path);
+  }
+
   if (isLocalStoragePath(cloud_storage_path) && await localFileExists(cloud_storage_path)) {
     return `${appBaseUrl()}/api/upload/local?path=${encodeURIComponent(cloud_storage_path)}`;
   }
@@ -103,6 +116,12 @@ export async function getFileUrl(
 }
 
 export async function deleteFile(cloud_storage_path: string): Promise<void> {
+  const { isBlobStoragePath, deleteBlobFile } = await import('./blob-storage');
+  if (isBlobStoragePath(cloud_storage_path)) {
+    await deleteBlobFile(cloud_storage_path);
+    return;
+  }
+
   if (isLocalStoragePath(cloud_storage_path)) {
     const fs = await import("fs/promises");
     try {

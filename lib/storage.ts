@@ -4,8 +4,24 @@ import { appBaseUrl } from '@/lib/app-url';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
+/** Local disk only works in dev — Vercel/serverless has a read-only filesystem. */
+export function canUseLocalStorage(): boolean {
+  return !process.env.VERCEL;
+}
+
 export function isS3Configured(): boolean {
   return Boolean(process.env.AWS_BUCKET_NAME?.trim());
+}
+
+export function requireUploadStorage(): 's3' | 'blob' | 'local' {
+  if (isS3Configured()) return 's3';
+  // Lazy import guard — blob-storage imports @vercel/blob
+  if (Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim())) return 'blob';
+  if (canUseLocalStorage()) return 'local';
+  throw new Error(
+    'Almacenamiento en la nube no configurado. ' +
+    'En Vercel: activa Blob Storage o configura AWS_BUCKET_NAME.',
+  );
 }
 
 export function localFilePath(storagePath: string): string {
