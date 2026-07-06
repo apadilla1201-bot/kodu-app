@@ -11,7 +11,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { uploadFileToStorage } from '@/lib/upload-client';
+import { uploadSitePhoto } from '@/lib/upload-site-photo';
 import { prepareImageForUpload } from '@/lib/prepare-image-upload';
 import {
   PHOTO_TAGS,
@@ -19,7 +19,6 @@ import {
   isImageFile,
   photoTagLabel,
   photoTagStyle,
-  resolveImageContentType,
   type PhotoTagId,
 } from '@/lib/site-photos';
 
@@ -55,6 +54,8 @@ export function SitePhotosContent({
   const [photos, setPhotos] = useState<SitePhotoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string>('all');
   const [selected, setSelected] = useState<SitePhotoRow | null>(null);
   const [editCaption, setEditCaption] = useState('');
@@ -102,49 +103,48 @@ export function SitePhotosContent({
     if (!list.length) return;
 
     setUploading(true);
+    setUploadError(null);
     let ok = 0;
     let skipped = 0;
     try {
-      for (const raw of list) {
+      for (let i = 0; i < list.length; i++) {
+        const raw = list[i];
         if (!isImageFile(raw)) {
           skipped++;
           continue;
         }
+        setUploadStatus(
+          list.length > 1
+            ? `Preparando foto ${i + 1} de ${list.length}…`
+            : 'Preparando foto…',
+        );
         const file = await prepareImageForUpload(raw);
-        const uploaded = await uploadFileToStorage(file, false);
-        const fileType = resolveImageContentType(file);
-        const res = await fetch(`/api/projects/${projectId}/photos`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            cloudStoragePath: uploaded.cloud_storage_path,
-            fileName: file.name || `photo-${Date.now()}.jpg`,
-            fileType,
-            caption: pendingCaption || null,
-            tag: pendingTag,
-            takenAt: new Date().toISOString(),
-          }),
+        setUploadStatus(
+          list.length > 1
+            ? `Subiendo foto ${i + 1} de ${list.length}…`
+            : 'Subiendo foto…',
+        );
+        await uploadSitePhoto(projectId, file, {
+          caption: pendingCaption || null,
+          tag: pendingTag,
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err?.error || 'Upload failed');
-        }
         ok++;
       }
       if (ok > 0) {
+        setUploadStatus(null);
         toast({ title: ok === 1 ? 'Foto subida' : `${ok} fotos subidas` });
         setPendingCaption('');
         await load();
       } else if (skipped > 0) {
-        toast({
-          title: 'Formato no soportado',
-          description: 'Usa JPG, PNG o HEIC desde la galería.',
-          variant: 'destructive',
-        });
+        const msg = 'Usa JPG, PNG o HEIC desde la galería.';
+        setUploadError(msg);
+        toast({ title: 'Formato no soportado', description: msg, variant: 'destructive' });
       }
     } catch (e: any) {
-      toast({ title: e?.message ?? 'Error al subir', variant: 'destructive' });
+      const msg = e?.message ?? 'Error al subir la foto';
+      setUploadError(msg);
+      setUploadStatus(null);
+      toast({ title: msg, variant: 'destructive' });
     } finally {
       setUploading(false);
       if (cameraInputRef.current) cameraInputRef.current.value = '';
@@ -291,6 +291,17 @@ export function SitePhotosContent({
             <Upload className="w-4 h-4" /> Galería
           </button>
         </div>
+        {uploadStatus && (
+          <p className="flex items-center gap-2 text-sm text-[#C9A96E] font-medium">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+            {uploadStatus}
+          </p>
+        )}
+        {uploadError && !uploading && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {uploadError}
+          </p>
+        )}
       </div>
 
       {/* Tag filter */}

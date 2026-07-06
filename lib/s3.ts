@@ -43,6 +43,39 @@ export async function generatePresignedUploadUrl(
   return { uploadUrl, cloud_storage_path };
 }
 
+/** Server-side upload — avoids S3 CORS issues on mobile Safari. */
+export async function uploadBufferToStorage(
+  body: Buffer,
+  fileName: string,
+  contentType: string,
+  isPublic: boolean = false,
+): Promise<{ cloud_storage_path: string }> {
+  const safeName = (fileName ?? 'file').replace(/[/\\]/g, '_');
+
+  if (!isS3Configured()) {
+    const cloud_storage_path = buildLocalStoragePath(safeName);
+    const { saveLocalFile } = await import('./storage');
+    await saveLocalFile(cloud_storage_path, body);
+    return { cloud_storage_path };
+  }
+
+  const { bucketName, folderPrefix } = getBucketConfig();
+  const cloud_storage_path = isPublic
+    ? `${folderPrefix}public/uploads/${Date.now()}-${safeName}`
+    : `${folderPrefix}uploads/${Date.now()}-${safeName}`;
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Key: cloud_storage_path,
+      Body: body,
+      ContentType: contentType || 'image/jpeg',
+    }),
+  );
+
+  return { cloud_storage_path };
+}
+
 export async function getFileUrl(
   cloud_storage_path: string,
   isPublic: boolean = false,
