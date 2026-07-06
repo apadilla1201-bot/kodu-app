@@ -1,5 +1,37 @@
 /** Site Photo / jobsite gallery helpers */
 
+const IMAGE_EXTENSIONS = new Set([
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'bmp', 'tiff', 'tif',
+]);
+
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  bmp: 'image/bmp',
+  tiff: 'image/tiff',
+  tif: 'image/tiff',
+};
+
+/** iOS gallery picks often omit file.type — accept by MIME or extension. */
+export function isImageFile(file: File): boolean {
+  if (file.type?.startsWith('image/')) return true;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  if (IMAGE_EXTENSIONS.has(ext)) return true;
+  // Picker was accept="image/*" but OS gave no type/extension (common on iOS).
+  return !file.type && !ext;
+}
+
+export function resolveImageContentType(file: File): string {
+  if (file.type?.startsWith('image/')) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return EXT_TO_MIME[ext] ?? 'image/jpeg';
+}
+
 export const PHOTO_TAGS = [
   { id: 'progress', label: 'Progress', color: 'bg-emerald-100 text-emerald-800' },
   { id: 'issue', label: 'Issue', color: 'bg-red-100 text-red-800' },

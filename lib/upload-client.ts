@@ -8,8 +8,24 @@ export type UploadedFile = {
   isPublic: boolean;
 };
 
+function resolveContentType(file: File): string {
+  if (file.type) return file.type;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const byExt: Record<string, string> = {
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    heic: 'image/heic',
+    heif: 'image/heif',
+    pdf: 'application/pdf',
+  };
+  return byExt[ext] ?? 'application/octet-stream';
+}
+
 export async function uploadFileToStorage(file: File, isPublic = false): Promise<UploadedFile> {
-  const contentType = file.type || 'application/octet-stream';
+  const contentType = resolveContentType(file);
 
   const presignRes = await fetch('/api/upload/presigned', {
     method: 'POST',

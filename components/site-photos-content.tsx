@@ -15,8 +15,10 @@ import { uploadFileToStorage } from '@/lib/upload-client';
 import {
   PHOTO_TAGS,
   groupPhotosByDate,
+  isImageFile,
   photoTagLabel,
   photoTagStyle,
+  resolveImageContentType,
   type PhotoTagId,
 } from '@/lib/site-photos';
 
@@ -46,7 +48,8 @@ export function SitePhotosContent({
   initialProjectId?: string;
 }) {
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
   const [photos, setPhotos] = useState<SitePhotoRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,18 +96,23 @@ export function SitePhotosContent({
     if (!projectId || !files.length) return;
     setUploading(true);
     let ok = 0;
+    let skipped = 0;
     try {
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) continue;
+        if (!isImageFile(file)) {
+          skipped++;
+          continue;
+        }
         const uploaded = await uploadFileToStorage(file, false);
+        const fileType = resolveImageContentType(file);
         const res = await fetch(`/api/projects/${projectId}/photos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
             cloudStoragePath: uploaded.cloud_storage_path,
-            fileName: file.name,
-            fileType: file.type,
+            fileName: file.name || `photo-${Date.now()}.jpg`,
+            fileType,
             caption: pendingCaption || null,
             tag: pendingTag,
             takenAt: new Date().toISOString(),
@@ -120,13 +128,27 @@ export function SitePhotosContent({
         toast({ title: ok === 1 ? 'Foto subida' : `${ok} fotos subidas` });
         setPendingCaption('');
         await load();
+      } else if (skipped > 0) {
+        toast({
+          title: 'Formato no soportado',
+          description: 'Usa JPG, PNG o HEIC desde la galería.',
+          variant: 'destructive',
+        });
       }
     } catch (e: any) {
       toast({ title: e?.message ?? 'Error al subir', variant: 'destructive' });
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
+  };
+
+  const openFilePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
+    const input = ref.current;
+    if (!input) return;
+    input.value = '';
+    input.click();
   };
 
   const savePhoto = async () => {
@@ -221,34 +243,35 @@ export function SitePhotosContent({
         />
         <div className="flex flex-wrap gap-2">
           <input
-            ref={fileInputRef}
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             multiple
             capture="environment"
             className="hidden"
-            onChange={(e) => e.target.files && uploadFiles(e.target.files)}
+            onChange={(e) => e.target.files?.length && uploadFiles(e.target.files)}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => e.target.files?.length && uploadFiles(e.target.files)}
           />
           <button
             type="button"
             disabled={uploading || !projectId}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => openFilePicker(cameraInputRef)}
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A96E] hover:bg-[#B8944F] text-white rounded-lg font-semibold text-sm disabled:opacity-50"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-            {uploading ? 'Subiendo…' : 'Tomar / Subir fotos'}
+            {uploading ? 'Subiendo…' : 'Tomar foto'}
           </button>
           <button
             type="button"
             disabled={uploading || !projectId}
-            onClick={() => {
-              const input = fileInputRef.current;
-              if (input) {
-                input.removeAttribute('capture');
-                input.click();
-                input.setAttribute('capture', 'environment');
-              }
-            }}
+            onClick={() => openFilePicker(galleryInputRef)}
             className="inline-flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium hover:bg-muted disabled:opacity-50"
           >
             <Upload className="w-4 h-4" /> Galería
