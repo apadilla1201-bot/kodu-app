@@ -52,21 +52,48 @@ export function isHeicFile(file: File): boolean {
 }
 
 export const PHOTO_TAGS = [
-  { id: 'progress', label: 'Progress', color: 'bg-emerald-100 text-emerald-800' },
-  { id: 'issue', label: 'Issue', color: 'bg-red-100 text-red-800' },
-  { id: 'safety', label: 'Safety', color: 'bg-amber-100 text-amber-800' },
-  { id: 'delivery', label: 'Delivery', color: 'bg-blue-100 text-blue-800' },
-  { id: 'other', label: 'Other', color: 'bg-gray-100 text-gray-700' },
+  { id: 'progress', label: 'Progress', labelEs: 'Progreso', color: 'bg-emerald-100 text-emerald-800' },
+  { id: 'issue', label: 'Issue', labelEs: 'Issue / Problema', color: 'bg-red-100 text-red-800' },
+  { id: 'safety', label: 'Safety', labelEs: 'Seguridad', color: 'bg-amber-100 text-amber-800' },
+  { id: 'delivery', label: 'Delivery', labelEs: 'Entrega', color: 'bg-blue-100 text-blue-800' },
+  { id: 'other', label: 'Other', labelEs: 'Otro', color: 'bg-gray-100 text-gray-700' },
+] as const;
+
+/** Quick-pick ubicaciones comunes en obra */
+export const AREA_PRESETS = [
+  'Level 1', 'Level 2', 'Level 3', 'Roof', 'Exterior', 'Parking', 'Site', 'Grid A', 'Grid B', 'Grid C',
+] as const;
+
+/** Oficios frecuentes */
+export const TRADE_PRESETS = [
+  'Concrete', 'Steel', 'Framing', 'Electrical', 'Plumbing', 'HVAC', 'Drywall', 'Finishes', 'Sitework',
 ] as const;
 
 export type PhotoTagId = (typeof PHOTO_TAGS)[number]['id'];
 
 export function photoTagLabel(tag: string): string {
-  return PHOTO_TAGS.find((t) => t.id === tag)?.label ?? tag;
+  return PHOTO_TAGS.find((t) => t.id === tag)?.labelEs ?? PHOTO_TAGS.find((t) => t.id === tag)?.label ?? tag;
 }
 
 export function photoTagStyle(tag: string): string {
   return PHOTO_TAGS.find((t) => t.id === tag)?.color ?? 'bg-gray-100 text-gray-700';
+}
+
+/** Línea corta para tarjetas: ubicación + oficio */
+export function photoLocationLine(photo: {
+  area?: string | null;
+  trade?: string | null;
+}): string | null {
+  const parts = [photo.area?.trim(), photo.trade?.trim()].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+export function photoHasIdentification(photo: {
+  caption?: string | null;
+  area?: string | null;
+  trade?: string | null;
+}): boolean {
+  return Boolean(photo.area?.trim() || photo.caption?.trim() || photo.trade?.trim());
 }
 
 export function groupPhotosByDate<T extends { takenAt: string | Date }>(

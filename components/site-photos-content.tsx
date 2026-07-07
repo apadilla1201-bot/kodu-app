@@ -15,8 +15,11 @@ import { uploadSitePhoto } from '@/lib/upload-site-photo';
 import { prepareImageForUpload } from '@/lib/prepare-image-upload';
 import {
   PHOTO_TAGS,
+  AREA_PRESETS,
+  TRADE_PRESETS,
   groupPhotosByDate,
   isImageFile,
+  photoLocationLine,
   photoTagLabel,
   photoTagStyle,
   type PhotoTagId,
@@ -64,6 +67,8 @@ export function SitePhotosContent({
   const [editTag, setEditTag] = useState<PhotoTagId>('progress');
   const [pendingTag, setPendingTag] = useState<PhotoTagId>('progress');
   const [pendingCaption, setPendingCaption] = useState('');
+  const [pendingArea, setPendingArea] = useState('');
+  const [pendingTrade, setPendingTrade] = useState('');
 
   const selectedProject = projects.find((p) => p.id === projectId);
 
@@ -99,6 +104,16 @@ export function SitePhotosContent({
       toast({ title: 'Selecciona un proyecto', variant: 'destructive' });
       return;
     }
+    const area = pendingArea.trim();
+    const caption = pendingCaption.trim();
+    if (!area && !caption) {
+      toast({
+        title: 'Falta identificación',
+        description: 'Indica al menos la ubicación (área) o qué muestra la foto.',
+        variant: 'destructive',
+      });
+      return;
+    }
     const list = Array.from(files);
     if (!list.length) return;
 
@@ -125,7 +140,9 @@ export function SitePhotosContent({
             : 'Subiendo foto…',
         );
         await uploadSitePhoto(projectId, file, {
-          caption: pendingCaption || null,
+          caption: caption || null,
+          area: area || null,
+          trade: pendingTrade.trim() || null,
           tag: pendingTag,
         });
         ok++;
@@ -134,6 +151,8 @@ export function SitePhotosContent({
         setUploadStatus(null);
         toast({ title: ok === 1 ? 'Foto subida' : `${ok} fotos subidas` });
         setPendingCaption('');
+        setPendingArea('');
+        setPendingTrade('');
         await load();
       } else if (skipped > 0) {
         const msg = 'Usa JPG, PNG o HEIC desde la galería.';
@@ -231,31 +250,107 @@ export function SitePhotosContent({
       </div>
 
       {/* Upload bar — sticky on mobile */}
-      <div className="bg-card border rounded-xl p-4 shadow-sm space-y-3 lg:sticky lg:top-4 lg:z-10">
-        <p className="text-sm font-medium">
-          {selectedProject ? `#${selectedProject.projectNumber} — ${selectedProject.projectName}` : 'Select project'}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {PHOTO_TAGS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setPendingTag(t.id)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                pendingTag === t.id ? t.color + ' ring-2 ring-[#C9A96E]' : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+      <div className="bg-card border rounded-xl p-4 shadow-sm space-y-4 lg:sticky lg:top-4 lg:z-10">
+        <div>
+          <p className="text-sm font-medium">
+            {selectedProject ? `#${selectedProject.projectNumber} — ${selectedProject.projectName}` : 'Select project'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Completa la identificación antes de tomar o elegir la foto
+          </p>
         </div>
-        <input
-          value={pendingCaption}
-          onChange={(e) => setPendingCaption(e.target.value)}
-          placeholder="Nota opcional (ej. Grid B4 slab pour)"
-          className="w-full px-3 py-2 border rounded-lg bg-background text-sm"
-        />
-        <div className="flex flex-wrap gap-2">
+
+        {/* Qué es */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Qué es
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PHOTO_TAGS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setPendingTag(t.id)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  pendingTag === t.id ? t.color + ' ring-2 ring-[#C9A96E]' : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {t.labelEs}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Dónde */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+            <MapPin className="w-3 h-3" /> Dónde (área / ubicación) *
+          </label>
+          <input
+            value={pendingArea}
+            onChange={(e) => setPendingArea(e.target.value)}
+            placeholder="Ej. Level 2 · Grid B4 · East wing"
+            className="w-full px-3 py-2 border rounded-lg bg-background text-sm"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {AREA_PRESETS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setPendingArea(a)}
+                className={`px-2 py-0.5 rounded text-[11px] border ${
+                  pendingArea === a ? 'bg-[#0F1B33] text-[#C9A96E] border-[#C9A96E]' : 'bg-muted/50 text-muted-foreground'
+                }`}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Oficio */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Oficio / trade
+          </label>
+          <input
+            value={pendingTrade}
+            onChange={(e) => setPendingTrade(e.target.value)}
+            placeholder="Ej. Concrete, Electrical, Steel"
+            className="w-full px-3 py-2 border rounded-lg bg-background text-sm"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {TRADE_PRESETS.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setPendingTrade(t)}
+                className={`px-2 py-0.5 rounded text-[11px] border ${
+                  pendingTrade === t ? 'bg-[#0F1B33] text-[#C9A96E] border-[#C9A96E]' : 'bg-muted/50 text-muted-foreground'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Descripción */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Qué muestra (descripción)
+          </label>
+          <textarea
+            value={pendingCaption}
+            onChange={(e) => setPendingCaption(e.target.value)}
+            rows={2}
+            placeholder="Ej. Slab pour completed, rebar inspection, delivery of steel beams…"
+            className="w-full px-3 py-2 border rounded-lg bg-background text-sm resize-none"
+          />
+          <p className="text-[11px] text-muted-foreground">* Ubicación o descripción — al menos uno requerido</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-1">
           <input
             ref={cameraInputRef}
             type="file"
@@ -320,7 +415,7 @@ export function SitePhotosContent({
             onClick={() => setTagFilter(t.id)}
             className={`px-3 py-1 rounded-full text-xs font-medium ${tagFilter === t.id ? t.color + ' ring-1 ring-[#C9A96E]' : 'bg-muted text-muted-foreground'}`}
           >
-            {t.label}
+            {t.labelEs}
           </button>
         ))}
       </div>
@@ -344,7 +439,9 @@ export function SitePhotosContent({
                 <span className="ml-2 font-normal">({group.photos.length})</span>
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {group.photos.map((photo) => (
+                {group.photos.map((photo) => {
+                  const location = photoLocationLine(photo);
+                  return (
                   <button
                     key={photo.id}
                     type="button"
@@ -354,19 +451,27 @@ export function SitePhotosContent({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={photo.imageUrl}
-                      alt={photo.caption || photo.fileName}
+                      alt={photo.caption || location || photo.fileName}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
                     <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-semibold ${photoTagStyle(photo.tag)}`}>
                       {photoTagLabel(photo.tag)}
                     </span>
-                    {photo.caption && (
-                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6">
-                        <p className="text-white text-xs line-clamp-2">{photo.caption}</p>
+                    {(location || photo.caption) && (
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-8 space-y-0.5">
+                        {location && (
+                          <p className="text-white text-[10px] font-semibold flex items-center gap-1 line-clamp-1">
+                            <MapPin className="w-2.5 h-2.5 shrink-0" /> {location}
+                          </p>
+                        )}
+                        {photo.caption && (
+                          <p className="text-white/90 text-[10px] line-clamp-2">{photo.caption}</p>
+                        )}
                       </div>
                     )}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -391,30 +496,21 @@ export function SitePhotosContent({
                 {selected.uploadedBy ? ` · ${selected.uploadedBy}` : ''}
               </p>
               <div>
-                <label className="text-xs font-medium">Tag</label>
+                <label className="text-xs font-medium">Tipo</label>
                 <select
                   value={editTag}
                   onChange={(e) => setEditTag(e.target.value as PhotoTagId)}
                   className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
                 >
                   {PHOTO_TAGS.map((t) => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
+                    <option key={t.id} value={t.id}>{t.labelEs}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium">Caption</label>
-                <textarea
-                  value={editCaption}
-                  onChange={(e) => setEditCaption(e.target.value)}
-                  rows={2}
-                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
-                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> Area
+                    <MapPin className="w-3 h-3" /> Ubicación
                   </label>
                   <input
                     value={editArea}
@@ -424,7 +520,7 @@ export function SitePhotosContent({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium">Trade</label>
+                  <label className="text-xs font-medium">Oficio</label>
                   <input
                     value={editTrade}
                     onChange={(e) => setEditTrade(e.target.value)}
@@ -432,6 +528,16 @@ export function SitePhotosContent({
                     className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium">Descripción</label>
+                <textarea
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  rows={2}
+                  placeholder="Qué muestra la foto…"
+                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
+                />
               </div>
               <div className="flex gap-2 pt-2">
                 <button

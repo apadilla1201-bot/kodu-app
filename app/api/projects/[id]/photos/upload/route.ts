@@ -42,8 +42,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const contentType = String(formData.get('contentType') || file.type || 'image/jpeg');
     const captionRaw = formData.get('caption');
     const tagRaw = formData.get('tag');
-    const caption = captionRaw ? String(captionRaw) : null;
+    const areaRaw = formData.get('area');
+    const tradeRaw = formData.get('trade');
+    const caption = captionRaw ? String(captionRaw).trim() || null : null;
+    const area = areaRaw ? String(areaRaw).trim() || null : null;
+    const trade = tradeRaw ? String(tradeRaw).trim() || null : null;
     const photoTag = tagRaw && VALID_TAGS.has(String(tagRaw) as PhotoTagId) ? String(tagRaw) : 'progress';
+
+    if (!area && !caption) {
+      return NextResponse.json(
+        { error: 'Indica al menos la ubicación (área) o una descripción' },
+        { status: 400 },
+      );
+    }
 
     const { cloud_storage_path } = await uploadBufferToStorage(buffer, fileName, contentType, false);
 
@@ -54,6 +65,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
         fileName,
         fileType: contentType,
         caption,
+        area,
+        trade,
         tag: photoTag,
         takenAt: new Date(),
         uploadedBy: session.user?.name ?? null,
