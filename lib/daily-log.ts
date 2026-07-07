@@ -37,3 +37,11 @@ export const WEATHER_OPTIONS = [
   'Hot',
   'Cold',
 ] as const;
+
+/** Last 7 calendar days ending today (inclusive). */
+export function weekRangeEnding(end: Date = new Date()): { from: string; to: string } {
+  const to = startOfDay(end);
+  const from = new Date(to);
+  from.setDate(from.getDate() - 6);
+  return { from: dateKey(from), to: dateKey(to) };
+}

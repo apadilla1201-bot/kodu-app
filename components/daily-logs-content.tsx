@@ -8,7 +8,9 @@ import {
   CalendarDays,
   Camera,
   ClipboardList,
+  Download,
   FileQuestion,
+  FileText,
   Loader2,
   Mic,
   MicOff,
@@ -16,10 +18,10 @@ import {
   Send,
 } from 'lucide-react';
 import {
-  DAILY_LOG_STATUSES,
   WEATHER_OPTIONS,
   dateKey,
   formatLogDate,
+  weekRangeEnding,
 } from '@/lib/daily-log';
 
 interface ProjectOpt {
@@ -71,6 +73,9 @@ export function DailyLogsContent({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [listening, setListening] = useState(false);
+  const [reportFrom, setReportFrom] = useState(() => weekRangeEnding().from);
+  const [reportTo, setReportTo] = useState(() => weekRangeEnding().to);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   const [form, setForm] = useState({
     weather: '',
@@ -219,6 +224,39 @@ export function DailyLogsContent({
     router.push(`/dashboard/rfis/new?projectId=${projectId}&fromDailyLog=1`);
   };
 
+  const downloadOwnerFieldReport = async () => {
+    if (!projectId) return;
+    setGeneratingReport(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/field-report/pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ from: reportFrom, to: reportTo }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'No se pudo generar el PDF');
+      }
+      const blob = await res.blob();
+      const proj = projects.find((p) => p.id === projectId);
+      const fname = `Field_Report_${proj?.projectNumber ?? 'project'}_${reportFrom}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: 'PDF generado — listo para enviar al owner' });
+    } catch (e: any) {
+      toast({ title: e?.message ?? 'Error al generar PDF', variant: 'destructive' });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   const selectedProject = projects.find((p) => p.id === projectId);
 
   return (
@@ -241,6 +279,62 @@ export function DailyLogsContent({
             <option key={p.id} value={p.id}>#{p.projectNumber} — {p.projectName}</option>
           ))}
         </select>
+      </div>
+
+      {/* Owner field report PDF */}
+      <div className="bg-gradient-to-br from-[#0F1B33]/5 to-[#C9A96E]/10 border border-[#C9A96E]/25 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-sm flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#C9A96E]" />
+              Reporte semanal para Owner (PDF)
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1 max-w-lg">
+              Incluye daily logs, fotos identificadas (ubicación, oficio, descripción) y RFIs abiertos — formato ejecutivo PDG.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">Desde</label>
+              <input
+                type="date"
+                value={reportFrom}
+                onChange={(e) => setReportFrom(e.target.value)}
+                className="block mt-0.5 px-2 py-1.5 border rounded-lg bg-background text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">Hasta</label>
+              <input
+                type="date"
+                value={reportTo}
+                onChange={(e) => setReportTo(e.target.value)}
+                className="block mt-0.5 px-2 py-1.5 border rounded-lg bg-background text-sm"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={generatingReport || !projectId}
+              onClick={() => {
+                const w = weekRangeEnding();
+                setReportFrom(w.from);
+                setReportTo(w.to);
+              }}
+              className="px-3 py-1.5 text-xs border rounded-lg hover:bg-muted"
+            >
+              Última semana
+            </button>
+            <button
+              type="button"
+              disabled={generatingReport || !projectId}
+              onClick={downloadOwnerFieldReport}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
+            >
+              {generatingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {generatingReport ? 'Generando…' : 'Descargar PDF'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

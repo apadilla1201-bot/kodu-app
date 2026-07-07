@@ -174,6 +174,13 @@ export async function getPresignedUrlForPart(
 }
 
 export async function downloadFileBuffer(cloud_storage_path: string): Promise<Buffer> {
+  const { isBlobStoragePath, blobPublicUrl } = await import('./blob-storage');
+  if (isBlobStoragePath(cloud_storage_path)) {
+    const res = await fetch(blobPublicUrl(cloud_storage_path));
+    if (!res.ok) throw new Error(`Blob no encontrado: ${cloud_storage_path}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+
   if (isLocalStoragePath(cloud_storage_path)) {
     if (await localFileExists(cloud_storage_path)) {
       return readLocalFile(cloud_storage_path);
