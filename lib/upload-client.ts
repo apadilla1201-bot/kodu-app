@@ -1,6 +1,6 @@
 /**
  * Helpers de subida/descarga de archivos (cliente).
- * Usa almacenamiento local cuando AWS no está configurado.
+ * Usa subida por servidor (compatible con Vercel Blob, S3 y local).
  */
 
 export type UploadedFile = {
@@ -24,61 +24,50 @@ function resolveContentType(file: File): string {
   return byExt[ext] ?? 'application/octet-stream';
 }
 
+export function downloadBlobFile(blob: Blob, fileName: string, openInNewTab = false): void {
+  const url = URL.createObjectURL(blob);
+  if (openInNewTab) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setTimeout(() => URL.revokeObjectURL(url), 120_000);
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export async function uploadFileToStorage(file: File, isPublic = false): Promise<UploadedFile> {
   const contentType = resolveContentType(file);
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+  fd.append('fileName', file.name);
+  fd.append('contentType', contentType);
+  fd.append('isPublic', isPublic ? 'true' : 'false');
 
-  const presignRes = await fetch('/api/upload/presigned', {
+  const res = await fetch('/api/upload/server', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileName: file.name, contentType, isPublic }),
+    body: fd,
+    credentials: 'include',
   });
-  const presignData = await presignRes.json();
-  if (!presignRes.ok) {
-    throw new Error(presignData?.error ?? 'No se pudo preparar la subida del archivo');
-  }
-
-  const uploadUrl = presignData.uploadUrl ?? '';
-  if (!uploadUrl) {
-    throw new Error('No se recibió URL de subida');
-  }
-
-  const uploadHeaders: Record<string, string> = { 'Content-Type': contentType };
-  try {
-    const signedHeaders = new URL(uploadUrl).searchParams.get('X-Amz-SignedHeaders') ?? '';
-    if (signedHeaders.includes('content-disposition')) {
-      uploadHeaders['Content-Disposition'] = 'attachment';
-    }
-  } catch {
-    // URL local relativa o sin parámetros S3 — no requiere Content-Disposition
-  }
-
-  // S3 presigned URLs are cross-origin — credentials break CORS on mobile Safari.
-  const sameOrigin = (() => {
-    try {
-      return new URL(uploadUrl, window.location.href).origin === window.location.origin;
-    } catch {
-      return true;
-    }
-  })();
-
-  const uploadRes = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: uploadHeaders,
-    body: file,
-    ...(sameOrigin ? { credentials: 'include' as const } : {}),
-  });
-  if (!uploadRes.ok) {
-    throw new Error(`No se pudo guardar el archivo: ${file.name}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error ?? 'No se pudo subir el archivo');
   }
 
   return {
-    cloud_storage_path: presignData.cloud_storage_path ?? '',
-    isPublic,
+    cloud_storage_path: data.cloud_storage_path ?? '',
+    isPublic: data.isPublic ?? isPublic,
   };
 }
 
 export async function getStorageDownloadUrl(storagePath: string): Promise<string> {
-  const res = await fetch(`/api/upload/presigned?path=${encodeURIComponent(storagePath)}`);
+  const res = await fetch(`/api/upload/presigned?path=${encodeURIComponent(storagePath)}`, {
+    credentials: 'include',
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.error ?? 'No se pudo obtener el enlace de descarga');
@@ -96,4 +85,16 @@ export async function downloadStorageFile(storagePath: string, fileName: string)
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+export async function fetchRfiPdf(rfiId: string): Promise<Blob> {
+  const res = await fetch(`/api/rfis/${rfiId}/pdf`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || 'No se pudo generar el PDF');
+  }
+  return res.blob();
 }

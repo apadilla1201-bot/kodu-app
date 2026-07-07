@@ -18,14 +18,15 @@ export async function uploadBufferToBlob(
   body: Buffer,
   fileName: string,
   contentType: string,
+  folder = 'uploads',
 ): Promise<{ cloud_storage_path: string }> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
     throw new Error('Almacenamiento Blob no configurado (BLOB_READ_WRITE_TOKEN)');
   }
 
-  const safeName = (fileName ?? 'photo.jpg').replace(/[/\\]/g, '_');
-  const pathname = `site-photos/${Date.now()}-${safeName}`;
+  const safeName = (fileName ?? 'file').replace(/[/\\]/g, '_');
+  const pathname = `${folder}/${Date.now()}-${safeName}`;
 
   const result = await put(pathname, body, {
     access: 'public',

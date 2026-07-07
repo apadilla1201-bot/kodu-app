@@ -6,9 +6,9 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import {
-  FileQuestion, Upload, X, Paperclip, ArrowLeft, Send, AlertTriangle, Mic, Sparkles, Loader2,
+  FileQuestion, Upload, X, Paperclip, ArrowLeft, Send, AlertTriangle, Mic, Sparkles, Loader2, FileText,
 } from 'lucide-react';
-import { uploadFileToStorage } from '@/lib/upload-client';
+import { uploadFileToStorage, downloadBlobFile, fetchRfiPdf } from '@/lib/upload-client';
 
 interface ProjectData {
   id: string;
@@ -46,6 +46,7 @@ export function NewRFIForm({
   const router = useRouter();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const [previewingPdf, setPreviewingPdf] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [fieldNote, setFieldNote] = useState('');
@@ -209,6 +210,37 @@ export function NewRFIForm({
     };
   };
 
+  const handlePreviewPdf = async () => {
+    if (!form.projectId || !form.subject.trim() || !form.question.trim()) {
+      toast({ title: 'Completa proyecto, asunto y pregunta para la vista previa', variant: 'destructive' });
+      return;
+    }
+    setPreviewingPdf(true);
+    try {
+      const res = await fetch('/api/rfis/preview-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...form,
+          daysToRespond: parseInt(form.daysToRespond) || 7,
+          rfiNumberPreview: nextNum || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || 'No se pudo generar la vista previa');
+      }
+      const blob = await res.blob();
+      downloadBlobFile(blob, `RFI_PREVIEW_${nextNum || 'draft'}.pdf`, true);
+      toast({ title: 'Vista previa PDF abierta en nueva pestaña' });
+    } catch (e: any) {
+      toast({ title: e?.message ?? 'Error al generar vista previa', variant: 'destructive' });
+    } finally {
+      setPreviewingPdf(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!form.projectId || !form.subject || !form.question) {
       toast({ title: 'Missing fields', description: 'Project, subject and question are required', variant: 'destructive' });
@@ -245,7 +277,21 @@ export function NewRFIForm({
       }
 
       const rfi = await res.json();
-      toast({ title: 'RFI Created', description: `RFI ${rfi?.rfiNumber ?? ''} has been submitted` });
+      toast({ title: 'RFI creado', description: `RFI ${rfi?.rfiNumber ?? ''} enviado — generando PDF…` });
+
+      try {
+        const pdfBlob = await fetchRfiPdf(rfi.id);
+        const fname = `RFI_${rfi.rfiNumber}_${(form.subject || '').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30)}.pdf`;
+        downloadBlobFile(pdfBlob, fname);
+        toast({ title: 'PDF del RFI descargado' });
+      } catch (pdfErr: any) {
+        toast({
+          title: 'RFI guardado — PDF pendiente',
+          description: pdfErr?.message ?? 'Puedes descargarlo desde el detalle del RFI',
+          variant: 'destructive',
+        });
+      }
+
       router.push(`/dashboard/rfis/${rfi?.id ?? ''}`);
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message ?? 'Failed to create RFI', variant: 'destructive' });
@@ -635,14 +681,29 @@ export function NewRFIForm({
           {/* Submit */}
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <button
+              type="button"
               onClick={() => router.back()}
               className="px-6 py-2.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors font-medium"
             >
               Cancel
             </button>
             <button
+              type="button"
+              onClick={handlePreviewPdf}
+              disabled={previewingPdf || submitting}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-[#0F1B33] text-[#0F1B33] hover:bg-[#0F1B33]/5 font-semibold transition-colors disabled:opacity-50"
+            >
+              {previewingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+              {previewingPdf ? 'Generando…' : 'Vista previa PDF'}
+            </button>
+            <button
+              type="button"
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || previewingPdf}
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-[#C9A96E] hover:bg-[#B8944F] text-white font-semibold transition-colors disabled:opacity-50 shadow-md"
             >
               {submitting ? (

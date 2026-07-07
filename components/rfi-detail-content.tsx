@@ -9,7 +9,7 @@ import {
   Paperclip, Upload, X, Download, MessageSquare, CalendarDays, User,
   Building2, MapPin, FileText,
 } from 'lucide-react';
-import { uploadFileToStorage, downloadStorageFile } from '@/lib/upload-client';
+import { uploadFileToStorage, downloadStorageFile, downloadBlobFile, fetchRfiPdf } from '@/lib/upload-client';
 
 
 interface Attachment {
@@ -109,23 +109,9 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
   const handleGeneratePdf = async () => {
     setPdfLoading(true);
     try {
-      const res = await fetch(`/api/rfis/${rfi.id}/pdf`, { method: 'POST' });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || 'No se pudo generar el PDF');
-      }
-      const blob = await res.blob();
+      const blob = await fetchRfiPdf(rfi.id);
       const fname = `RFI_${rfi.rfiNumber}_${(rfi.subject ?? '').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30)}.pdf`;
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const a = document.createElement('a');
-        a.href = reader.result as string;
-        a.download = fname;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      };
-      reader.readAsDataURL(blob);
+      downloadBlobFile(blob, fname);
       toast({ title: 'PDF generado', description: 'El PDF del RFI se descargó correctamente' });
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message ?? 'No se pudo generar el PDF', variant: 'destructive' });
