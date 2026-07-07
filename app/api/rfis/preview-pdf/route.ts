@@ -7,7 +7,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
 import { appBaseUrl } from '@/lib/app-url';
-import { buildRfiPdfFilename, buildRfiPdfHtml } from '@/lib/rfi-pdf';
+import { buildRfiPdfFilename, buildRfiPdfHtml, mergeRfiPdfWithAttachments, RfiPdfMergeError } from '@/lib/rfi-pdf';
 
 export async function POST(request: Request) {
   try {
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       scheduleImpact,
       notes,
       rfiNumberPreview,
+      attachments,
     } = body ?? {};
 
     if (!projectId || !subject || !question) {
@@ -58,6 +59,17 @@ export async function POST(request: Request) {
         ? String(rfiNumberPreview)
         : `${project.projectNumber}-PREVIEW`;
 
+    const attachmentRows = Array.isArray(attachments)
+      ? attachments
+          .filter((a: any) => a?.cloudStoragePath)
+          .map((a: any) => ({
+            fileName: String(a.fileName ?? 'attachment'),
+            fileType: a.fileType ? String(a.fileType) : null,
+            cloudStoragePath: String(a.cloudStoragePath),
+            attachmentType: a.attachmentType ? String(a.attachmentType) : 'question',
+          }))
+      : [];
+
     const mockRfi = {
       rfiNumber,
       subject: String(subject),
@@ -76,14 +88,32 @@ export async function POST(request: Request) {
       costImpact: costImpact ? String(costImpact) : 'TBD',
       scheduleImpact: scheduleImpact ? String(scheduleImpact) : 'TBD',
       notes: notes ? String(notes) : null,
-      attachments: [],
+      attachments: attachmentRows,
     };
 
     const logoUrl = `${appBaseUrl()}/pdg_logo.png`;
     const htmlContent = buildRfiPdfHtml(mockRfi, project, logoUrl);
     const pdfBuffer = await htmlToPdf(htmlContent);
 
-    return new NextResponse(pdfBuffer, {
+    let finalPdfBytes: Uint8Array;
+    try {
+      finalPdfBytes = await mergeRfiPdfWithAttachments(pdfBuffer, attachmentRows);
+    } catch (err) {
+      if (err instanceof RfiPdfMergeError) {
+        return NextResponse.json(
+          {
+            error:
+              'No se pudo anexar el PDF del subcontratista al final. ' +
+              'Vuelve a subir el anexo PDF y genera de nuevo.',
+            failedFiles: err.failedFiles,
+          },
+          { status: 500 },
+        );
+      }
+      throw err;
+    }
+
+    return new NextResponse(Buffer.from(finalPdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="${buildRfiPdfFilename(rfiNumber, mockRfi.subject)}"`,

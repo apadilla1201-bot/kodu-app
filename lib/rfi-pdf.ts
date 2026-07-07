@@ -46,8 +46,8 @@ export class RfiPdfMergeError extends Error {
 
   constructor(failedFiles: string[]) {
     super(
-      'No se pudieron anexar algunos archivos al PDF del RFI. ' +
-        'Vuelve a subir las fotos o planos y guarda antes de generar el PDF.',
+      'No se pudo anexar el PDF del subcontratista al final del RFI. ' +
+        'Vuelve a subir el anexo PDF y genera de nuevo.',
     );
     this.name = 'RfiPdfMergeError';
     this.failedFiles = failedFiles;
@@ -273,39 +273,68 @@ export function buildRfiPdfHtml(rfi: RfiPdfData, project: RfiProjectData, logoUr
 </html>`;
 }
 
+function isPdfAttachment(att: RfiPdfAttachment): boolean {
+  const fname = (att.fileName ?? '').toLowerCase();
+  const ftype = (att.fileType ?? '').toLowerCase();
+  return fname.endsWith('.pdf') || ftype.includes('pdf');
+}
+
+function isImageAttachment(att: RfiPdfAttachment): boolean {
+  const fname = (att.fileName ?? '').toLowerCase();
+  const ftype = (att.fileType ?? '').toLowerCase();
+  return /\.(png|jpg|jpeg|gif|webp|bmp|tiff?)$/i.test(fname) || ftype.startsWith('image/');
+}
+
+/** Sub / question PDFs first, then images; response attachments last (COR-style appendix). */
+function sortAttachmentsForMerge(attachments: RfiPdfAttachment[]): RfiPdfAttachment[] {
+  const question = attachments.filter((a) => a.attachmentType !== 'response');
+  const response = attachments.filter((a) => a.attachmentType === 'response');
+  const pdfFirst = (list: RfiPdfAttachment[]) =>
+    [...list].sort((a, b) => Number(isPdfAttachment(b)) - Number(isPdfAttachment(a)));
+  return [...pdfFirst(question), ...pdfFirst(response)];
+}
+
 export async function mergeRfiPdfWithAttachments(
   pdfBuffer: Buffer | Uint8Array,
   attachments: RfiPdfAttachment[],
 ): Promise<Uint8Array> {
-  const mergeableAttachments = attachments.filter(a => a.cloudStoragePath);
+  const mergeableAttachments = sortAttachmentsForMerge(
+    attachments.filter((a) => a.cloudStoragePath),
+  );
   if (mergeableAttachments.length === 0) {
     return pdfBuffer instanceof Uint8Array ? pdfBuffer : new Uint8Array(pdfBuffer);
   }
 
   const mergedPdf = await PDFDocument.create();
-  const failedAttachments: string[] = [];
+  const failedPdfFiles: string[] = [];
   let mergedAttachmentCount = 0;
 
   const rfiDoc = await PDFDocument.load(pdfBuffer);
   const rfiPages = await mergedPdf.copyPages(rfiDoc, rfiDoc.getPageIndices());
-  rfiPages.forEach(page => mergedPdf.addPage(page));
+  rfiPages.forEach((page) => mergedPdf.addPage(page));
 
   for (const att of mergeableAttachments) {
+    const fname = (att.fileName ?? '').toLowerCase();
+    const ftype = (att.fileType ?? '').toLowerCase();
+    const isPdf = isPdfAttachment(att);
+    const isImage = isImageAttachment(att);
+
+    if (!isPdf && !isImage) {
+      console.log(`Skipping non-mergeable attachment: ${att.fileName} (${ftype})`);
+      continue;
+    }
+
     try {
-      console.log('Downloading RFI attachment:', att.fileName, att.cloudStoragePath);
+      console.log('Appending RFI attachment at end:', att.fileName, att.cloudStoragePath);
       const attBuffer = await downloadFileBuffer(att.cloudStoragePath);
-      const fname = (att.fileName ?? '').toLowerCase();
-      const ftype = (att.fileType ?? '').toLowerCase();
-      const isPdf = fname.endsWith('.pdf') || ftype.includes('pdf');
-      const isImage = /\.(png|jpg|jpeg|gif|webp|bmp|tiff?)$/i.test(fname) || ftype.startsWith('image/');
 
       if (isPdf) {
         const attDoc = await PDFDocument.load(attBuffer, { ignoreEncryption: true });
         const attPages = await mergedPdf.copyPages(attDoc, attDoc.getPageIndices());
-        attPages.forEach(page => mergedPdf.addPage(page));
+        attPages.forEach((page) => mergedPdf.addPage(page));
         mergedAttachmentCount += 1;
-        console.log(`Merged ${attPages.length} PDF pages from ${att.fileName}`);
-      } else if (isImage) {
+        console.log(`Merged ${attPages.length} PDF page(s) from ${att.fileName}`);
+      } else {
         let img;
         if (fname.endsWith('.png') || ftype.includes('png')) {
           img = await mergedPdf.embedPng(attBuffer);
@@ -313,7 +342,8 @@ export async function mergeRfiPdfWithAttachments(
           img = await mergedPdf.embedJpg(attBuffer);
         }
         const { width, height } = img.scale(1);
-        const maxW = 572; const maxH = 752;
+        const maxW = 572;
+        const maxH = 752;
         const scale = Math.min(maxW / width, maxH / height, 1);
         const imgW = width * scale;
         const imgH = height * scale;
@@ -325,22 +355,25 @@ export async function mergeRfiPdfWithAttachments(
           height: imgH,
         });
         mergedAttachmentCount += 1;
-        console.log(`Embedded image ${att.fileName} as page`);
-      } else {
-        console.log(`Skipping non-PDF/image attachment: ${att.fileName} (${ftype})`);
-        failedAttachments.push(att.fileName ?? 'archivo desconocido');
+        console.log(`Embedded image ${att.fileName} as appendix page`);
       }
     } catch (attErr: any) {
       console.error(`Failed to merge attachment ${att.fileName}:`, attErr?.message);
-      failedAttachments.push(att.fileName ?? 'archivo desconocido');
+      if (isPdf) {
+        failedPdfFiles.push(att.fileName ?? 'PDF del subcontratista');
+      }
     }
   }
 
-  if (failedAttachments.length > 0) {
-    throw new RfiPdfMergeError(failedAttachments);
+  if (failedPdfFiles.length > 0) {
+    throw new RfiPdfMergeError(failedPdfFiles);
   }
 
-  console.log(`RFI PDF merged: ${rfiPages.length} RFI pages + ${mergedAttachmentCount} attachment(s)`);
+  if (mergedAttachmentCount === 0) {
+    return pdfBuffer instanceof Uint8Array ? pdfBuffer : new Uint8Array(pdfBuffer);
+  }
+
+  console.log(`RFI PDF merged: ${rfiPages.length} RFI page(s) + ${mergedAttachmentCount} appendix file(s)`);
   return mergedPdf.save();
 }
 

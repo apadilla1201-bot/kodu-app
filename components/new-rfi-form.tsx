@@ -217,6 +217,12 @@ export function NewRFIForm({
     }
     setPreviewingPdf(true);
     try {
+      const uploadedAttachments = [];
+      for (const file of selectedFiles) {
+        const att = await uploadFile(file);
+        uploadedAttachments.push(att);
+      }
+
       const res = await fetch('/api/rfis/preview-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -225,6 +231,7 @@ export function NewRFIForm({
           ...form,
           daysToRespond: parseInt(form.daysToRespond) || 7,
           rfiNumberPreview: nextNum || undefined,
+          attachments: uploadedAttachments,
         }),
       });
       if (!res.ok) {
@@ -649,17 +656,22 @@ export function NewRFIForm({
             />
           </div>
 
-          {/* Attachments */}
+          {/* Subcontractor appendix — merged at end of PDF (like COR) */}
           <div>
-            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Attachments</label>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+              Anexo del Subcontratista (PDF)
+            </label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Cotización, plano o soporte del sub — se anexa al <strong>final</strong> del PDF del RFI, igual que en los COR.
+            </p>
             <div className="border-2 border-dashed border-border rounded-lg p-4 hover:border-[#C9A96E]/40 transition-colors">
               <div className="flex items-center gap-3">
                 <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-sm font-medium transition-colors">
                   <Upload className="w-4 h-4" />
-                  Choose Files
-                  <input type="file" multiple onChange={handleFileSelect} className="hidden" accept=".pdf,.jpg,.jpeg,.png,.dwg,.doc,.docx,.xlsx" />
+                  Subir PDF del Sub
+                  <input type="file" multiple onChange={handleFileSelect} className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
                 </label>
-                <span className="text-xs text-muted-foreground">PDF, images, drawings, documents</span>
+                <span className="text-xs text-muted-foreground">PDF recomendado · también imágenes</span>
               </div>
               {selectedFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
