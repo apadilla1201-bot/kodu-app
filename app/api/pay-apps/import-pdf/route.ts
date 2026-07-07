@@ -3,8 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-
-const LLM_URL = 'https://api.abacus.ai/v1/chat/completions';
+import { askClaudeWithPdf } from '@/lib/ai';
 
 export async function POST(request: Request) {
   try {
@@ -21,8 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const base64 = buffer.toString('base64');
+    const base64 = Buffer.from(await file.arrayBuffer()).toString('base64');
     const mimeType = file.type || 'application/pdf';
 
     let prompt = '';
@@ -90,53 +88,27 @@ Extract the following information into a JSON object:
 Return ONLY a valid JSON object. Use null for missing fields. Percentages as decimals (8% = 0.08).`;
     }
 
-    const llmResponse = await fetch(LLM_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        max_tokens: 16000,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              {
-                type: 'file',
-                file: {
-                  filename: file.name,
-                  content: base64,
-                  content_type: mimeType,
-                },
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!llmResponse.ok) {
-      const errText = await llmResponse.text();
-      console.error('LLM API error:', llmResponse.status, errText);
+    let content: string;
+    try {
+      content = await askClaudeWithPdf({
+        prompt,
+        pdfBase64: base64,
+        mediaType: mimeType,
+        maxTokens: 16000,
+      });
+    } catch (e: any) {
+      console.error('LLM API error:', e?.message);
       return NextResponse.json({ error: 'Failed to process PDF with AI' }, { status: 500 });
     }
-
-    const llmData = await llmResponse.json();
-    const content = llmData?.choices?.[0]?.message?.content ?? '';
 
     // Extract JSON from response
     let parsed: any = null;
     try {
-      // Try to find JSON in code blocks
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
       const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
       parsed = JSON.parse(jsonStr);
     } catch (parseErr) {
       console.error('JSON parse error:', parseErr);
-      // Try to find any JSON object in the response
       const objMatch = content.match(/\{[\s\S]*\}/);
       if (objMatch) {
         try {
@@ -152,7 +124,6 @@ Return ONLY a valid JSON object. Use null for missing fields. Percentages as dec
     }
 
     if (type === 'g703') {
-      // Format line items with sortOrder
       const items = (parsed.lineItems ?? []).map((li: any, idx: number) => ({
         sortOrder: idx + 1,
         itemNumber: String(li.itemNumber ?? ''),
