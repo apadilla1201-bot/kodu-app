@@ -75,6 +75,9 @@ export function DailyLogsContent({
   const [listening, setListening] = useState(false);
   const [reportFrom, setReportFrom] = useState(() => weekRangeEnding().from);
   const [reportTo, setReportTo] = useState(() => weekRangeEnding().to);
+  const [reportOverview, setReportOverview] = useState('');
+  const [reportTcoTarget, setReportTcoTarget] = useState('');
+  const [reportOptionsOpen, setReportOptionsOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
 
   const [form, setForm] = useState({
@@ -232,7 +235,12 @@ export function DailyLogsContent({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ from: reportFrom, to: reportTo }),
+        body: JSON.stringify({
+          from: reportFrom,
+          to: reportTo,
+          ...(reportOverview.trim() ? { overview: reportOverview.trim() } : {}),
+          ...(reportTcoTarget.trim() ? { tcoTarget: reportTcoTarget.trim() } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -240,7 +248,7 @@ export function DailyLogsContent({
       }
       const blob = await res.blob();
       const proj = projects.find((p) => p.id === projectId);
-      const fname = `Field_Report_${proj?.projectNumber ?? 'project'}_${reportFrom}.pdf`;
+      const fname = `REPORT_${proj?.projectNumber ?? 'project'}_${reportTo}.pdf`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -290,7 +298,7 @@ export function DailyLogsContent({
               Reporte semanal para Owner (PDF)
             </h2>
             <p className="text-xs text-muted-foreground mt-1 max-w-lg">
-              Incluye daily logs, fotos identificadas (ubicación, oficio, descripción) y RFIs abiertos — formato ejecutivo PDG.
+              Formato Ritz / PDG: Overview, Field Status, Photography, Milestones, Open Items y Action Items — auto desde daily logs, fotos y RFIs.
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
@@ -335,6 +343,41 @@ export function DailyLogsContent({
             </button>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => setReportOptionsOpen((o) => !o)}
+          className="mt-3 text-xs text-[#0F1B33] font-medium underline-offset-2 hover:underline"
+        >
+          {reportOptionsOpen ? 'Ocultar opciones Ritz' : 'Opciones Ritz (Overview, TCO)'}
+        </button>
+        {reportOptionsOpen && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                1. Project Overview (opcional — si vacío, se arma desde los daily logs)
+              </label>
+              <textarea
+                value={reportOverview}
+                onChange={(e) => setReportOverview(e.target.value)}
+                rows={3}
+                placeholder="Narrativa ejecutiva para el owner, estilo Ritz…"
+                className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm resize-y"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">
+                TCO Target (opcional)
+              </label>
+              <input
+                type="text"
+                value={reportTcoTarget}
+                onChange={(e) => setReportTcoTarget(e.target.value)}
+                placeholder="ej. Last week of October 2026 · Zero float"
+                className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -1,5 +1,5 @@
 /**
- * Weekly / range Field Report PDF for owners — daily logs + site photos.
+ * Weekly Field Report PDF — Ritz / PDG owner format (6 sections).
  */
 import { downloadFileBuffer } from '@/lib/s3';
 import { GC_ADDRESS_FULL, GC_NAME_UPPER } from '@/lib/gc-branding';
@@ -36,8 +36,40 @@ export type FieldReportLog = {
 export type FieldReportRfi = {
   rfiNumber: string;
   subject: string;
+  question?: string | null;
   status: string;
   priority: string;
+  dateDue?: Date | null;
+  assignedTo?: string | null;
+  ballInCourt?: string | null;
+};
+
+export type FieldReportSubmittal = {
+  submittalNumber: string;
+  title: string;
+  status: string;
+  subcontractor: string | null;
+  submittedDate: Date | null;
+};
+
+export type FieldReportMilestone = {
+  title: string;
+  bullets: string[];
+};
+
+export type FieldReportOpenItem = {
+  num: number;
+  item: string;
+  deadline: string;
+  responsible: string;
+  priority: string;
+};
+
+export type FieldReportActionItem = {
+  num: number;
+  action: string;
+  responsible: string;
+  targetDate: string;
 };
 
 export type FieldReportData = {
@@ -48,8 +80,14 @@ export type FieldReportData = {
   from: string;
   to: string;
   preparedBy: string;
+  tcoTarget: string | null;
+  overview: string;
+  photoIntro: string | null;
   logs: FieldReportLog[];
   photosByDay: { date: string; label: string; photos: FieldReportPhoto[] }[];
+  milestones: FieldReportMilestone[];
+  openItems: FieldReportOpenItem[];
+  actionItems: FieldReportActionItem[];
   openRfis: FieldReportRfi[];
 };
 
@@ -64,9 +102,157 @@ function esc(s: string | null | undefined): string {
 function fmtRange(from: string, to: string): string {
   const f = new Date(`${from}T12:00:00`);
   const t = new Date(`${to}T12:00:00`);
-  const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
+  const opts: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
   if (from === to) return f.toLocaleDateString('en-US', opts);
   return `${f.toLocaleDateString('en-US', opts)} – ${t.toLocaleDateString('en-US', opts)}`;
+}
+
+function fmtShortDate(d: Date | string): string {
+  const dt = typeof d === 'string' ? new Date(`${d.slice(0, 10)}T12:00:00`) : d;
+  return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function fmtTitleDate(to: string): string {
+  const t = new Date(`${to}T12:00:00`);
+  return t.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+}
+
+function truncate(s: string, max: number): string {
+  const t = s.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
+}
+
+export function autoOverview(
+  project: { projectName: string; client: string | null; location: string | null },
+  logs: FieldReportLog[],
+): string {
+  const work = logs.map((l) => l.workPerformed?.trim()).filter(Boolean) as string[];
+  const deliveries = logs.map((l) => l.deliveries?.trim()).filter(Boolean) as string[];
+  const client = project.client ? ` · ${project.client}` : '';
+  const loc = project.location ? `${project.location}. ` : '';
+  const parts: string[] = [];
+  if (work.length) parts.push(work.join(' '));
+  if (deliveries.length) parts.push(`Deliveries / mobilization: ${deliveries.join('; ')}.`);
+  const body = parts.length
+    ? parts.join(' ')
+    : 'Field activity documented in superintendent daily logs this reporting period.';
+  return `${project.projectName}${client}. ${loc}${body}`;
+}
+
+export function autoPhotoIntro(): string {
+  return 'Documentation of construction progress — site conditions, trade activity, and coordination captured during the reporting period.';
+}
+
+export function autoMilestones(
+  submittals: FieldReportSubmittal[],
+  logs: FieldReportLog[],
+): FieldReportMilestone[] {
+  const out: FieldReportMilestone[] = [];
+
+  const activeSubs = submittals.filter((s) => s.status !== 'Draft' && s.status !== 'Rejected');
+  if (activeSubs.length) {
+    out.push({
+      title: 'Submittals — Activity This Period',
+      bullets: activeSubs.map((s) => {
+        const who = s.subcontractor ? ` (${s.subcontractor})` : '';
+        const when = s.submittedDate ? ` — submitted ${fmtShortDate(s.submittedDate)}` : '';
+        return `${s.submittalNumber}: ${s.title}${who} — ${s.status}${when}`;
+      }),
+    });
+  }
+
+  const deliveryLogs = logs.filter((l) => l.deliveries?.trim());
+  if (deliveryLogs.length) {
+    out.push({
+      title: 'Deliveries & Mobilization',
+      bullets: deliveryLogs.map((l) => `${formatLogDate(l.logDate)}: ${l.deliveries!.trim()}`),
+    });
+  }
+
+  const approved = logs.filter((l) => l.status === 'Approved' || l.status === 'Submitted');
+  if (approved.length && !deliveryLogs.length && !activeSubs.length) {
+    out.push({
+      title: 'Field Progress',
+      bullets: approved.map((l) => {
+        const note = l.workPerformed?.trim() || 'Daily log submitted';
+        return `${formatLogDate(l.logDate)}: ${note}`;
+      }),
+    });
+  }
+
+  return out;
+}
+
+export function autoOpenItems(rfis: FieldReportRfi[], logs: FieldReportLog[]): FieldReportOpenItem[] {
+  const items: FieldReportOpenItem[] = [];
+  let n = 1;
+
+  for (const r of rfis) {
+    const detail = r.question?.trim() ? ` — ${truncate(r.question, 100)}` : '';
+    items.push({
+      num: n++,
+      item: `${r.rfiNumber}: ${r.subject}${detail}`,
+      deadline: r.dateDue ? fmtShortDate(r.dateDue) : 'Ongoing',
+      responsible: r.ballInCourt || r.assignedTo || 'Design / Owner',
+      priority: r.priority || 'Normal',
+    });
+  }
+
+  for (const l of logs) {
+    if (!l.delays?.trim()) continue;
+    items.push({
+      num: n++,
+      item: `Field issue (${formatLogDate(l.logDate)}): ${l.delays.trim()}`,
+      deadline: 'Ongoing',
+      responsible: l.authorName || 'PDG',
+      priority: 'IN PROGRESS',
+    });
+  }
+
+  return items;
+}
+
+export function autoActionItems(rfis: FieldReportRfi[], logs: FieldReportLog[]): FieldReportActionItem[] {
+  const items: FieldReportActionItem[] = [];
+  let n = 1;
+
+  for (const r of rfis) {
+    items.push({
+      num: n++,
+      action: `Respond to ${r.rfiNumber} — ${r.subject}`,
+      responsible: r.ballInCourt || r.assignedTo || 'Design / Owner',
+      targetDate: r.dateDue ? fmtShortDate(r.dateDue) : 'ASAP',
+    });
+  }
+
+  for (const l of logs) {
+    if (!l.delays?.trim()) continue;
+    items.push({
+      num: n++,
+      action: `Resolve field delay / issue noted ${formatLogDate(l.logDate)}: ${truncate(l.delays.trim(), 140)}`,
+      responsible: l.authorName || 'PDG',
+      targetDate: 'Week of report',
+    });
+  }
+
+  const nextWork = logs.filter((l) => l.workPerformed?.trim()).slice(-2);
+  for (const l of nextWork) {
+    if (items.length >= 8) break;
+    items.push({
+      num: n++,
+      action: `Continue work in progress: ${truncate(l.workPerformed!.trim(), 120)}`,
+      responsible: l.authorName || 'PDG / Trades',
+      targetDate: 'Ongoing',
+    });
+  }
+
+  return items;
+}
+
+export function formatTcoTarget(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 async function photoToDataUrl(photo: FieldReportPhoto): Promise<string | null> {
@@ -89,248 +275,311 @@ async function embedPhotos(photos: FieldReportPhoto[]): Promise<PhotoWithData[]>
   return out;
 }
 
-function logBlock(log: FieldReportLog): string {
-  const rows: string[] = [];
-  const add = (label: string, val: string | null | undefined) => {
-    if (!val?.trim()) return;
-    rows.push(`<tr><td class="lbl">${esc(label)}</td><td>${esc(val.trim())}</td></tr>`);
-  };
-  add('Weather', log.weather ? `${log.weather}${log.temperature ? ` · ${log.temperature}` : ''}` : log.temperature);
-  add('Work performed', log.workPerformed);
-  add('Crew / manpower', log.crewNotes);
-  add('Deliveries', log.deliveries);
-  add('Delays / issues', log.delays);
-  if (!rows.length) {
-    rows.push('<tr><td colspan="2" class="dim">No field notes recorded for this day.</td></tr>');
-  }
-  return `
-    <div class="day-block">
-      <div class="day-hdr">
-        <div class="day-title">${esc(formatLogDate(log.logDate))}</div>
-        <div class="day-meta">${esc(log.authorName)} · ${esc(log.status)}</div>
-      </div>
-      <table class="log-tbl">${rows.join('')}</table>
-    </div>`;
+function photoCaption(p: FieldReportPhoto): string {
+  const area = p.area?.trim();
+  const cap = p.caption?.trim();
+  if (area && cap) return `${area} — ${cap}`;
+  if (cap) return cap;
+  if (area) return area;
+  const loc = photoLocationLine(p);
+  if (loc) return loc;
+  return photoTagLabel(p.tag) || 'Site photo';
 }
 
-function photoCard(p: PhotoWithData): string {
-  const loc = photoLocationLine(p);
-  const meta = [photoTagLabel(p.tag), loc, p.caption?.trim()].filter(Boolean).join(' · ');
+function fieldStatusBullet(log: FieldReportLog): string {
+  const day = new Date(log.logDate).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+  const parts: string[] = [];
+  if (log.workPerformed?.trim()) parts.push(log.workPerformed.trim());
+  if (log.crewNotes?.trim()) parts.push(log.crewNotes.trim());
+  if (log.deliveries?.trim()) parts.push(log.deliveries.trim());
+  if (log.delays?.trim()) parts.push(`Delays / issues: ${log.delays.trim()}`);
+  if (log.weather?.trim()) {
+    parts.push(`Weather: ${log.weather}${log.temperature ? ` (${log.temperature})` : ''}`);
+  }
+  const text = parts.join(' ') || 'No field notes recorded for this day.';
+  return `<li><strong>${esc(day)}:</strong> ${esc(text)}</li>`;
+}
+
+function photoCell(p: PhotoWithData): string {
   const img = p.dataUrl
     ? `<img src="${p.dataUrl}" alt="" class="photo-img"/>`
     : `<div class="photo-missing">Image unavailable</div>`;
   return `
-    <div class="photo-card">
+    <div class="photo-cell">
       ${img}
-      <div class="photo-cap">${esc(meta || 'Site photo')}</div>
+      <div class="photo-cap">${esc(photoCaption(p))}</div>
     </div>`;
 }
 
-function photosPage(title: string, photos: PhotoWithData[], pageNum: number, totalPages: number, data: FieldReportData): string {
-  const grid = photos.map(photoCard).join('');
-  return `
-  <div class="page">
-    <div class="sub-hdr">
-      <div class="sub-hdr-title">${esc(title)}</div>
-      <div class="sub-hdr-proj">#${esc(data.projectNumber)} ${esc(data.projectName)}</div>
-    </div>
-    <div class="gold-line"></div>
-    <div class="body">
-      <div class="photo-grid">${grid}</div>
-    </div>
-    ${footer(pageNum, totalPages, data)}
-  </div>`;
+function milestonesHtml(milestones: FieldReportMilestone[]): string {
+  if (!milestones.length) {
+    return `<p class="dim">No milestones auto-detected this period — add submittal activity or note deliveries in daily logs.</p>`;
+  }
+  return milestones
+    .map(
+      (m) => `
+    <div class="milestone-block">
+      <div class="milestone-title">${esc(m.title)}</div>
+      <ul class="milestone-list">${m.bullets.map((b) => `<li>${esc(b)}</li>`).join('')}</ul>
+    </div>`,
+    )
+    .join('');
 }
 
-function footer(pageNum: number, totalPages: number, data: FieldReportData): string {
+function openItemsTable(items: FieldReportOpenItem[]): string {
+  if (!items.length) {
+    return `<p class="dim">No open items or open RFIs in this period.</p>`;
+  }
   return `
-    <div class="ftr">
-      <div>${GC_NAME_UPPER} | ${GC_ADDRESS_FULL}</div>
-      <div>Page ${pageNum} of ${totalPages}</div>
-      <div>CONFIDENTIAL — FIELD REPORT</div>
-    </div>`;
+    <p class="table-note">Items marked URGENT are on the critical path. Timely Owner and Designer decisions protect the TCO target.</p>
+    <table class="ritz-tbl">
+      <thead>
+        <tr><th>#</th><th>Item</th><th>Deadline</th><th>Responsible</th><th>Priority</th></tr>
+      </thead>
+      <tbody>
+        ${items
+          .map(
+            (r) => `
+          <tr>
+            <td class="num">${r.num}</td>
+            <td>${esc(r.item)}</td>
+            <td>${esc(r.deadline)}</td>
+            <td>${esc(r.responsible)}</td>
+            <td>${esc(r.priority)}</td>
+          </tr>`,
+          )
+          .join('')}
+      </tbody>
+    </table>`;
+}
+
+function actionItemsTable(items: FieldReportActionItem[]): string {
+  if (!items.length) {
+    return `<p class="dim">No action items generated — add RFIs or delays in daily logs to populate this section.</p>`;
+  }
+  return `
+    <table class="ritz-tbl">
+      <thead>
+        <tr><th>#</th><th>Action</th><th>Responsible</th><th>Target Date</th></tr>
+      </thead>
+      <tbody>
+        ${items
+          .map(
+            (r) => `
+          <tr>
+            <td class="num">${r.num}</td>
+            <td>${esc(r.action)}</td>
+            <td>${esc(r.responsible)}</td>
+            <td>${esc(r.targetDate)}</td>
+          </tr>`,
+          )
+          .join('')}
+      </tbody>
+    </table>`;
 }
 
 export async function buildFieldReportHtml(data: FieldReportData): Promise<string> {
-  const totalPhotos = data.photosByDay.reduce((n, d) => n + d.photos.length, 0);
-  const daysWithLogs = data.logs.length;
-  const issuePhotos = data.photosByDay.flatMap((d) => d.photos).filter((p) => p.tag === 'issue' || p.tag === 'safety').length;
+  const allPhotos = data.photosByDay.flatMap((d) => d.photos);
+  const embedded = await embedPhotos(allPhotos);
 
-  // Embed all photos
-  const embeddedByDay: { date: string; label: string; photos: PhotoWithData[] }[] = [];
-  for (const day of data.photosByDay) {
-    embeddedByDay.push({
-      ...day,
-      photos: await embedPhotos(day.photos),
-    });
-  }
+  const reportDate = fmtShortDate(data.to);
+  const titleDate = fmtTitleDate(data.to);
+  const weekLabel = fmtRange(data.from, data.to);
+  const subtitle = data.client
+    ? `${data.projectName} · ${data.client}`
+    : data.projectName;
 
-  const photoPages: { title: string; photos: PhotoWithData[] }[] = [];
-  for (const day of embeddedByDay) {
-    if (!day.photos.length) continue;
-    for (let i = 0; i < day.photos.length; i += 4) {
-      photoPages.push({
-        title: i === 0 ? `Site Photos — ${day.label}` : `${day.label} (continued)`,
-        photos: day.photos.slice(i, i + 4),
-      });
-    }
-  }
+  const fieldBullets = data.logs.length
+    ? data.logs.map(fieldStatusBullet).join('')
+    : '<li class="dim">No daily logs in this date range.</li>';
 
-  const hasRfi = data.openRfis.length > 0;
-  const totalPages = 1 + (daysWithLogs > 0 ? 1 : 0) + photoPages.length + (hasRfi ? 1 : 0);
-  let pageNum = 1;
-
-  const cover = `
-  <div class="page">
-    <div class="hdr">
-      <div class="hdr-left">
-        <div class="hdr-eyebrow">WEEKLY FIELD REPORT <span>|</span> ${esc(fmtRange(data.from, data.to))} <span>|</span> CONFIDENTIAL</div>
-        <div class="hdr-project">${esc(data.projectName.toUpperCase())}</div>
-      </div>
-      <div class="hdr-right">
-        ${esc(data.client || 'Owner')} | Project #${esc(data.projectNumber)}${data.location ? ` | ${esc(data.location)}` : ''}
-      </div>
-    </div>
-    <div class="gold-line"></div>
-    <div class="body">
-      <div class="sec-title-wrap">
-        <div class="sec-title-bar"></div>
-        <div>
-          <div class="sec-title">Jobsite Progress Summary</div>
-          <div class="sec-subtitle">DAILY LOGS & SITE PHOTOGRAPHY | ${esc(fmtRange(data.from, data.to))}</div>
-        </div>
-      </div>
-      <div class="sec-desc">
-        Executive field report prepared by ${esc(data.preparedBy)} for the project owner.
-        Includes superintendent daily logs, identified site photos (location, trade, description), and open RFIs.
-      </div>
-      <div class="kpi-row">
-        <div class="kpi-card gold"><div class="kpi-val">${daysWithLogs}</div><div class="kpi-label">Daily logs</div></div>
-        <div class="kpi-card blue"><div class="kpi-val">${totalPhotos}</div><div class="kpi-label">Site photos</div></div>
-        <div class="kpi-card amber"><div class="kpi-val">${issuePhotos}</div><div class="kpi-label">Issue / safety photos</div></div>
-        <div class="kpi-card green"><div class="kpi-val">${data.openRfis.length}</div><div class="kpi-label">Open RFIs</div></div>
-      </div>
-      ${data.logs.some((l) => l.delays?.trim()) ? `
-      <div class="driver-box">
-        <div class="driver-title">Field delays noted this period</div>
-        <div class="driver-text">${data.logs.filter((l) => l.delays?.trim()).map((l) => `<strong>${esc(formatLogDate(l.logDate))}:</strong> ${esc(l.delays!.trim())}`).join('<br/>')}</div>
-      </div>` : ''}
-      <div class="slabel">Report contents</div>
-      <ul class="toc">
-        ${daysWithLogs ? '<li>Daily superintendent logs</li>' : ''}
-        ${totalPhotos ? `<li>${totalPhotos} site photo(s) with location &amp; trade identification</li>` : ''}
-        ${hasRfi ? '<li>Open RFIs requiring owner / design response</li>' : ''}
-        ${!daysWithLogs && !totalPhotos ? '<li class="dim">No field data in this date range — expand dates or add daily logs / photos.</li>' : ''}
-      </ul>
-    </div>
-    ${footer(pageNum++, totalPages, data)}
-  </div>`;
-
-  let logsPage = '';
-  if (daysWithLogs > 0) {
-    logsPage = `
-    <div class="page">
-      <div class="sub-hdr">
-        <div class="sub-hdr-title">Daily Superintendent Logs</div>
-        <div class="sub-hdr-proj">${esc(fmtRange(data.from, data.to))}</div>
-      </div>
-      <div class="gold-line"></div>
-      <div class="body">
-        ${data.logs.map(logBlock).join('')}
-      </div>
-      ${footer(pageNum++, totalPages, data)}
-    </div>`;
-  }
-
-  const photoPagesHtml = photoPages.map((pp) => photosPage(pp.title, pp.photos, pageNum++, totalPages, data)).join('');
-
-  let rfiPage = '';
-  if (hasRfi) {
-    rfiPage = `
-    <div class="page">
-      <div class="sub-hdr">
-        <div class="sub-hdr-title">Open RFIs</div>
-        <div class="sub-hdr-proj">Ball in court — design / owner</div>
-      </div>
-      <div class="gold-line"></div>
-      <div class="body">
-        <table class="ft">
-          <thead><tr><th>RFI #</th><th>Subject</th><th>Priority</th><th>Status</th></tr></thead>
-          <tbody>
-            ${data.openRfis.map((r) => `
-              <tr>
-                <td><strong>${esc(r.rfiNumber)}</strong></td>
-                <td>${esc(r.subject)}</td>
-                <td>${esc(r.priority)}</td>
-                <td>${esc(r.status)}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-      ${footer(pageNum++, totalPages, data)}
-    </div>`;
+  const photoIntro = data.photoIntro?.trim() || autoPhotoIntro();
+  const photoRows: string[] = [];
+  for (let i = 0; i < embedded.length; i += 2) {
+    const pair = embedded.slice(i, i + 2);
+    photoRows.push(`<div class="photo-row">${pair.map(photoCell).join('')}</div>`);
   }
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', sans-serif; color: #1a1a1a; background: #F5F3EF; font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 8.5in; height: 11in; position: relative; overflow: hidden; page-break-after: always; background: #F5F3EF; }
-  .page:last-child { page-break-after: auto; }
-  .hdr { background: #0F1B33; padding: 16px 40px 14px; display: flex; justify-content: space-between; align-items: flex-start; }
-  .hdr-eyebrow { font-size: 8px; letter-spacing: 2.5px; text-transform: uppercase; color: #C9A96E; font-weight: 600; }
-  .hdr-eyebrow span { color: rgba(255,255,255,0.35); }
-  .hdr-project { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 800; color: #C9A96E; margin-top: 4px; }
-  .hdr-right { text-align: right; color: rgba(255,255,255,0.5); font-size: 8px; line-height: 1.5; max-width: 220px; }
-  .sub-hdr { background: #0F1B33; padding: 10px 40px; display: flex; justify-content: space-between; align-items: center; }
-  .sub-hdr-title { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: #fff; }
-  .sub-hdr-proj { font-size: 8px; color: rgba(255,255,255,0.55); }
-  .gold-line { height: 3px; background: linear-gradient(90deg, #C9A96E, rgba(201,169,110,0.2)); }
-  .body { padding: 18px 40px 50px; }
-  .sec-title-wrap { display: flex; align-items: stretch; margin-bottom: 8px; }
-  .sec-title-bar { width: 4px; background: #C9A96E; border-radius: 2px; margin-right: 14px; }
-  .sec-title { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 800; color: #0F1B33; line-height: 1.15; }
-  .sec-subtitle { font-size: 9px; text-transform: uppercase; letter-spacing: 2px; color: #999; font-weight: 600; margin-top: 4px; }
-  .sec-desc { font-size: 10px; color: #666; line-height: 1.55; margin-bottom: 16px; max-width: 100%; }
-  .kpi-row { display: flex; gap: 10px; margin-bottom: 16px; }
-  .kpi-card { flex: 1; background: #fff; border: 1px solid #e8e5e0; border-radius: 8px; padding: 12px; text-align: center; }
-  .kpi-card.gold { border-top: 3px solid #C9A96E; }
-  .kpi-card.blue { border-top: 3px solid #3B82F6; }
-  .kpi-card.amber { border-top: 3px solid #D97706; }
-  .kpi-card.green { border-top: 3px solid #10B981; }
-  .kpi-val { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 800; color: #0F1B33; }
-  .kpi-label { font-size: 7px; text-transform: uppercase; letter-spacing: 1.5px; color: #999; margin-top: 4px; font-weight: 700; }
-  .driver-box { background: #fff; border: 1px solid #e8e5e0; border-left: 4px solid #C9A96E; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; }
-  .driver-title { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #0F1B33; margin-bottom: 6px; }
-  .driver-text { font-size: 9.5px; line-height: 1.6; color: #333; }
-  .slabel { font-size: 8px; text-transform: uppercase; letter-spacing: 2px; color: #999; font-weight: 700; margin-bottom: 8px; }
-  .toc { font-size: 10px; color: #333; line-height: 1.8; padding-left: 18px; }
-  .toc .dim { color: #999; }
-  .day-block { background: #fff; border: 1px solid #e8e5e0; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
-  .day-hdr { margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #eee; }
-  .day-title { font-family: 'Playfair Display', serif; font-size: 14px; font-weight: 700; color: #0F1B33; }
-  .day-meta { font-size: 8px; color: #888; margin-top: 2px; }
-  .log-tbl { width: 100%; border-collapse: collapse; }
-  .log-tbl td { padding: 4px 0; font-size: 9.5px; vertical-align: top; line-height: 1.5; }
-  .log-tbl td.lbl { width: 110px; font-weight: 700; color: #666; text-transform: uppercase; font-size: 7.5px; letter-spacing: 0.5px; }
-  .log-tbl td.dim { color: #999; font-style: italic; }
-  .photo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .photo-card { background: #fff; border: 1px solid #e8e5e0; border-radius: 6px; overflow: hidden; }
-  .photo-img { width: 100%; height: 2.4in; object-fit: cover; display: block; }
-  .photo-missing { height: 2.4in; background: #eee; display: flex; align-items: center; justify-content: center; color: #999; font-size: 9px; }
-  .photo-cap { padding: 8px 10px; font-size: 8.5px; line-height: 1.45; color: #333; border-top: 1px solid #eee; }
-  .ft { width: 100%; border-collapse: collapse; }
-  .ft th { font-size: 7.5px; text-transform: uppercase; letter-spacing: 1px; text-align: left; padding: 6px 8px; border-bottom: 2px solid #0F1B33; color: #C9A96E; }
-  .ft td { padding: 6px 8px; font-size: 9.5px; border-bottom: 1px solid #e8e5e0; }
-  .ftr { position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 40px; font-size: 7px; color: #aaa; border-top: 1px solid #ddd; display: flex; justify-content: space-between; }
+  @page { size: Letter; margin: 0.7in 0.8in 0.85in 0.8in; }
+  body {
+    font-family: 'Libre Baskerville', Georgia, 'Times New Roman', serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+    color: #111;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .doc { max-width: 7in; margin: 0 auto; }
+  .doc-title {
+    font-family: Inter, sans-serif;
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .doc-subtitle {
+    font-size: 11pt;
+    font-weight: 700;
+    margin-bottom: 18px;
+    color: #222;
+  }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 24px;
+    margin-bottom: 22px;
+    font-family: Inter, sans-serif;
+    font-size: 9pt;
+  }
+  .meta-cell label {
+    display: block;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #666;
+    margin-bottom: 2px;
+  }
+  .meta-cell span { font-weight: 600; color: #111; }
+  .section { margin-bottom: 20px; page-break-inside: avoid; }
+  .section.break-before { page-break-before: always; }
+  .sec-hdr {
+    font-family: Inter, sans-serif;
+    font-size: 10pt;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 8px;
+    color: #0F1B33;
+    border-bottom: 2px solid #C9A96E;
+    padding-bottom: 4px;
+  }
+  .sec-body { font-size: 10.5pt; line-height: 1.5; color: #222; }
+  .sec-body p { margin-bottom: 8px; }
+  .field-list { margin: 0 0 8px 18px; padding: 0; }
+  .field-list li { margin-bottom: 8px; }
+  .field-list .dim { color: #888; font-style: italic; list-style: none; margin-left: -18px; }
+  .photo-intro { font-size: 10pt; color: #444; margin-bottom: 14px; font-style: italic; }
+  .photo-row { display: flex; gap: 16px; margin-bottom: 18px; page-break-inside: avoid; }
+  .photo-cell { flex: 1; min-width: 0; }
+  .photo-img { width: 100%; height: 2.35in; object-fit: cover; display: block; border: 1px solid #ddd; }
+  .photo-missing {
+    width: 100%; height: 2.35in; background: #f0f0f0; border: 1px solid #ddd;
+    display: flex; align-items: center; justify-content: center;
+    font-family: Inter, sans-serif; font-size: 9pt; color: #999;
+  }
+  .photo-cap {
+    margin-top: 6px;
+    font-size: 9.5pt;
+    line-height: 1.4;
+    text-align: center;
+    color: #333;
+  }
+  .milestone-block { margin-bottom: 12px; }
+  .milestone-title { font-weight: 700; margin-bottom: 4px; }
+  .milestone-list { margin-left: 18px; }
+  .milestone-list li { margin-bottom: 4px; }
+  .table-note { font-size: 9.5pt; color: #555; margin-bottom: 10px; font-style: italic; }
+  .ritz-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: Inter, sans-serif;
+    font-size: 8.5pt;
+    margin-top: 6px;
+  }
+  .ritz-tbl th {
+    text-align: left;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 7.5pt;
+    letter-spacing: 0.4px;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    background: #f5f5f5;
+  }
+  .ritz-tbl td {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+    line-height: 1.4;
+  }
+  .ritz-tbl td.num { width: 28px; text-align: center; font-weight: 700; }
+  .dim { color: #888; font-style: italic; }
+  .ftr {
+    margin-top: 28px;
+    padding-top: 10px;
+    border-top: 1px solid #ccc;
+    font-family: Inter, sans-serif;
+    font-size: 7.5pt;
+    color: #888;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
 </style>
 </head>
 <body>
-${cover}
-${logsPage}
-${photoPagesHtml}
-${rfiPage}
+<div class="doc">
+  <div class="doc-title">Project Report &nbsp; ${esc(titleDate)}</div>
+  <div class="doc-subtitle">${esc(subtitle)}</div>
+
+  <div class="meta-grid">
+    <div class="meta-cell"><label>Location</label><span>${esc(data.location || '—')}</span></div>
+    <div class="meta-cell"><label>Report Date</label><span>${esc(reportDate)}</span></div>
+    <div class="meta-cell"><label>Prepared By</label><span>${esc(data.preparedBy)} — ${esc(GC_NAME_UPPER)}</span></div>
+    <div class="meta-cell"><label>TCO Target</label><span>${esc(data.tcoTarget || 'See master schedule')}</span></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-hdr">1. Project Overview</div>
+    <div class="sec-body"><p>${esc(data.overview)}</p></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-hdr">2. Field Status — Week of ${esc(weekLabel)}</div>
+    <div class="sec-body">
+      <ul class="field-list">${fieldBullets}</ul>
+    </div>
+  </div>
+
+  <div class="section${allPhotos.length ? ' break-before' : ''}">
+    <div class="sec-hdr">3. Field Photography — Week of ${esc(weekLabel)}</div>
+    <div class="sec-body">
+      <p class="photo-intro">${esc(photoIntro)}</p>
+      ${allPhotos.length ? photoRows.join('') : '<p class="dim">No site photos in this date range.</p>'}
+    </div>
+  </div>
+
+  <div class="section break-before">
+    <div class="sec-hdr">4. Key Milestones This Week</div>
+    <div class="sec-body">${milestonesHtml(data.milestones)}</div>
+  </div>
+
+  <div class="section">
+    <div class="sec-hdr">5. Open Items — Decisions Required</div>
+    <div class="sec-body">${openItemsTable(data.openItems)}</div>
+  </div>
+
+  <div class="section">
+    <div class="sec-hdr">6. Action Items</div>
+    <div class="sec-body">${actionItemsTable(data.actionItems)}</div>
+  </div>
+
+  <div class="ftr">
+    <span>${GC_NAME_UPPER} · ${GC_ADDRESS_FULL}</span>
+    <span>CONFIDENTIAL — PROJECT REPORT #${esc(data.projectNumber)}</span>
+  </div>
+</div>
 </body></html>`;
 }

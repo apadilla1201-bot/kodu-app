@@ -7,7 +7,17 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
 import { dateKey, logDateFromInput, weekRangeEnding } from '@/lib/daily-log';
-import { buildFieldReportHtml, type FieldReportData } from '@/lib/field-report-pdf';
+import {
+  autoActionItems,
+  autoMilestones,
+  autoOpenItems,
+  autoOverview,
+  autoPhotoIntro,
+  buildFieldReportHtml,
+  formatTcoTarget,
+  type FieldReportData,
+  type FieldReportMilestone,
+} from '@/lib/field-report-pdf';
 
 export async function POST(
   request: Request,
@@ -36,7 +46,7 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
     }
 
-    const [logs, photos, openRfis] = await Promise.all([
+    const [logs, photos, openRfis, submittals, schedule] = await Promise.all([
       prisma.dailyLog.findMany({
         where: {
           projectId: params.id,
@@ -58,8 +68,39 @@ export async function POST(
           status: { in: ['Open', 'Pending', 'Submitted'] },
         },
         orderBy: { createdAt: 'desc' },
-        take: 15,
-        select: { rfiNumber: true, subject: true, status: true, priority: true },
+        take: 20,
+        select: {
+          rfiNumber: true,
+          subject: true,
+          question: true,
+          status: true,
+          priority: true,
+          dateDue: true,
+          assignedTo: true,
+          ballInCourt: true,
+        },
+      }),
+      prisma.submittal.findMany({
+        where: {
+          projectId: params.id,
+          OR: [
+            { submittedDate: { gte: fromDate, lte: toDate } },
+            { updatedAt: { gte: fromDate, lte: toDate } },
+          ],
+        },
+        orderBy: { submittalNumber: 'asc' },
+        take: 12,
+        select: {
+          submittalNumber: true,
+          title: true,
+          status: true,
+          subcontractor: true,
+          submittedDate: true,
+        },
+      }),
+      prisma.schedule.findFirst({
+        where: { projectId: params.id, status: 'Active' },
+        select: { tcoDate: true, projectFinish: true },
       }),
     ]);
 
@@ -88,6 +129,57 @@ export async function POST(
         photos: dayPhotos,
       }));
 
+    const mapPhoto = (p: (typeof photos)[0]) => ({
+      id: p.id,
+      fileName: p.fileName,
+      cloudStoragePath: p.cloudStoragePath,
+      fileType: p.fileType,
+      caption: p.caption,
+      area: p.area,
+      trade: p.trade,
+      tag: p.tag,
+      takenAt: p.takenAt,
+    });
+
+    const mappedLogs = logs.map((l) => ({
+      id: l.id,
+      logDate: l.logDate,
+      authorName: l.authorName,
+      weather: l.weather,
+      temperature: l.temperature,
+      workPerformed: l.workPerformed,
+      crewNotes: l.crewNotes,
+      deliveries: l.deliveries,
+      delays: l.delays,
+      status: l.status,
+      photos: l.photos.map(mapPhoto),
+    }));
+
+    const mappedRfis = openRfis.map((r) => ({
+      rfiNumber: r.rfiNumber,
+      subject: r.subject,
+      question: r.question,
+      status: r.status,
+      priority: r.priority,
+      dateDue: r.dateDue,
+      assignedTo: r.assignedTo,
+      ballInCourt: r.ballInCourt,
+    }));
+
+    const mappedSubmittals = submittals.map((s) => ({
+      submittalNumber: s.submittalNumber,
+      title: s.title,
+      status: s.status,
+      subcontractor: s.subcontractor,
+      submittedDate: s.submittedDate,
+    }));
+
+    const tcoFromSchedule = formatTcoTarget(schedule?.tcoDate ?? schedule?.projectFinish);
+
+    const customMilestones = Array.isArray(body?.milestones)
+      ? (body.milestones as FieldReportMilestone[]).filter((m) => m?.title?.trim())
+      : null;
+
     const reportData: FieldReportData = {
       projectNumber: project.projectNumber,
       projectName: project.projectName,
@@ -96,53 +188,34 @@ export async function POST(
       from,
       to,
       preparedBy: session.user?.name || 'Project Team',
-      logs: logs.map((l) => ({
-        id: l.id,
-        logDate: l.logDate,
-        authorName: l.authorName,
-        weather: l.weather,
-        temperature: l.temperature,
-        workPerformed: l.workPerformed,
-        crewNotes: l.crewNotes,
-        deliveries: l.deliveries,
-        delays: l.delays,
-        status: l.status,
-        photos: l.photos.map((p) => ({
-          id: p.id,
-          fileName: p.fileName,
-          cloudStoragePath: p.cloudStoragePath,
-          fileType: p.fileType,
-          caption: p.caption,
-          area: p.area,
-          trade: p.trade,
-          tag: p.tag,
-          takenAt: p.takenAt,
-        })),
-      })),
+      tcoTarget: String(body?.tcoTarget || '').trim() || tcoFromSchedule,
+      overview: String(body?.overview || '').trim() || autoOverview(project, mappedLogs),
+      photoIntro: String(body?.photoIntro || '').trim() || autoPhotoIntro(),
+      logs: mappedLogs,
       photosByDay: photosByDay.map((d) => ({
         ...d,
-        photos: d.photos.map((p) => ({
-          id: p.id,
-          fileName: p.fileName,
-          cloudStoragePath: p.cloudStoragePath,
-          fileType: p.fileType,
-          caption: p.caption,
-          area: p.area,
-          trade: p.trade,
-          tag: p.tag,
-          takenAt: p.takenAt,
-        })),
+        photos: d.photos.map(mapPhoto),
       })),
-      openRfis,
+      milestones: customMilestones?.length
+        ? customMilestones
+        : autoMilestones(mappedSubmittals, mappedLogs),
+      openItems: autoOpenItems(mappedRfis, mappedLogs),
+      actionItems: autoActionItems(mappedRfis, mappedLogs),
+      openRfis: mappedRfis,
     };
 
     const html = await buildFieldReportHtml(reportData);
     const pdfBytes = await htmlToPdf(html, {
       format: 'Letter',
-      margin: { top: '0', right: '0', bottom: '0', left: '0' },
+      margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
     });
 
-    const fname = `Field_Report_${project.projectNumber}_${from}_to_${to}.pdf`;
+    const reportDate = new Date(`${to}T12:00:00`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).replace(/,/g, '').replace(/ /g, '_');
+    const fname = `REPORT_${project.projectNumber}_${reportDate}.pdf`;
     return new NextResponse(pdfBytes, {
       headers: {
         'Content-Type': 'application/pdf',
