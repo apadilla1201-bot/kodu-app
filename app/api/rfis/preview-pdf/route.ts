@@ -103,8 +103,8 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error:
-              'No se pudo anexar el PDF del subcontratista al final. ' +
-              'Vuelve a subir el anexo PDF y genera de nuevo.',
+              'Could not append the subcontractor PDF to the end. ' +
+              'Re-upload the PDF attachment and generate again.',
             failedFiles: err.failedFiles,
           },
           { status: 500 },

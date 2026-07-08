@@ -55,7 +55,7 @@ export async function uploadFileToStorage(file: File, isPublic = false): Promise
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data?.error ?? 'No se pudo subir el archivo');
+    throw new Error(data?.error ?? 'Failed to upload file');
   }
 
   return {
@@ -70,10 +70,10 @@ export async function getStorageDownloadUrl(storagePath: string): Promise<string
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data?.error ?? 'No se pudo obtener el enlace de descarga');
+    throw new Error(data?.error ?? 'Failed to get download link');
   }
   const url = data?.url ?? data?.downloadUrl ?? '';
-  if (!url) throw new Error('Enlace de descarga no disponible');
+  if (!url) throw new Error('Download link unavailable');
   return url;
 }
 
@@ -94,7 +94,7 @@ export async function fetchRfiPdf(rfiId: string): Promise<Blob> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || 'No se pudo generar el PDF');
+    throw new Error(err?.error || 'Failed to generate PDF');
   }
   return res.blob();
 }

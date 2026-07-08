@@ -118,11 +118,11 @@ export function NewRFIForm({
   const generateDraft = async (noteOverride?: string) => {
     const note = (noteOverride ?? fieldNote).trim();
     if (!note) {
-      toast({ title: 'Escribe o dicta una nota de campo', variant: 'destructive' });
+      toast({ title: 'Type or dictate a field note first', variant: 'destructive' });
       return;
     }
     if (!form.projectId) {
-      toast({ title: 'Selecciona un proyecto primero', variant: 'destructive' });
+      toast({ title: 'Select a project first', variant: 'destructive' });
       return;
     }
     setDrafting(true);
@@ -145,9 +145,9 @@ export function NewRFIForm({
         drawingReference: d.drawingReference || prev.drawingReference,
         specReference: d.specReference || prev.specReference,
       }));
-      toast({ title: 'Borrador RFI generado — revisa y envía' });
+      toast({ title: 'RFI draft generated — review and submit' });
     } catch (e: any) {
-      toast({ title: e?.message ?? 'Error al generar borrador', variant: 'destructive' });
+      toast({ title: e?.message ?? 'Failed to generate draft', variant: 'destructive' });
     } finally {
       setDrafting(false);
     }
@@ -156,7 +156,7 @@ export function NewRFIForm({
   const startFieldVoice = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
-      toast({ title: 'Voz no disponible en este navegador', variant: 'destructive' });
+      toast({ title: 'Voice input is not available in this browser', variant: 'destructive' });
       return;
     }
     const rec = new SR();
@@ -212,7 +212,7 @@ export function NewRFIForm({
 
   const handlePreviewPdf = async () => {
     if (!form.projectId || !form.subject.trim() || !form.question.trim()) {
-      toast({ title: 'Completa proyecto, asunto y pregunta para la vista previa', variant: 'destructive' });
+      toast({ title: 'Enter project, subject, and question to preview', variant: 'destructive' });
       return;
     }
     setPreviewingPdf(true);
@@ -236,13 +236,13 @@ export function NewRFIForm({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || 'No se pudo generar la vista previa');
+        throw new Error(err?.error || 'Failed to generate PDF preview');
       }
       const blob = await res.blob();
       downloadBlobFile(blob, `RFI_PREVIEW_${nextNum || 'draft'}.pdf`, true);
-      toast({ title: 'Vista previa PDF abierta en nueva pestaña' });
+      toast({ title: 'PDF preview opened in a new tab' });
     } catch (e: any) {
-      toast({ title: e?.message ?? 'Error al generar vista previa', variant: 'destructive' });
+      toast({ title: e?.message ?? 'Failed to generate PDF preview', variant: 'destructive' });
     } finally {
       setPreviewingPdf(false);
     }
@@ -284,17 +284,17 @@ export function NewRFIForm({
       }
 
       const rfi = await res.json();
-      toast({ title: 'RFI creado', description: `RFI ${rfi?.rfiNumber ?? ''} enviado — generando PDF…` });
+      toast({ title: 'RFI created', description: `RFI ${rfi?.rfiNumber ?? ''} submitted — generating PDF…` });
 
       try {
         const pdfBlob = await fetchRfiPdf(rfi.id);
         const fname = `RFI_${rfi.rfiNumber}_${(form.subject || '').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30)}.pdf`;
         downloadBlobFile(pdfBlob, fname);
-        toast({ title: 'PDF del RFI descargado' });
+        toast({ title: 'RFI PDF downloaded' });
       } catch (pdfErr: any) {
         toast({
-          title: 'RFI guardado — PDF pendiente',
-          description: pdfErr?.message ?? 'Puedes descargarlo desde el detalle del RFI',
+          title: 'RFI saved — PDF pending',
+          description: pdfErr?.message ?? 'You can download it from the RFI detail page',
           variant: 'destructive',
         });
       }
@@ -332,13 +332,13 @@ export function NewRFIForm({
           {/* Field note → AI draft */}
           <div className="rounded-lg border border-[#C9A96E]/30 bg-[#C9A96E]/5 p-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-[#C9A96E] flex items-center gap-2">
-              <Sparkles className="w-4 h-4" /> Nota de campo → borrador RFI
+              <Sparkles className="w-4 h-4" /> Field note → RFI draft
             </p>
             <textarea
               value={fieldNote}
               onChange={(e) => setFieldNote(e.target.value)}
               rows={3}
-              placeholder="Dicta o pega lo que pasó en obra (ej. conflict duct vs beam grid C4, need engineer response)..."
+              placeholder="Dictate or paste what happened in the field (e.g. conflict duct vs beam grid C4, need engineer response)..."
               className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
             />
             <div className="flex flex-wrap gap-2">
@@ -349,10 +349,10 @@ export function NewRFIForm({
                 className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
               >
                 {drafting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Generar borrador
+                Generate draft
               </button>
               <button type="button" onClick={startFieldVoice} className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm">
-                <Mic className="w-4 h-4" /> Dictar
+                <Mic className="w-4 h-4" /> Dictate
               </button>
             </div>
           </div>
@@ -659,19 +659,19 @@ export function NewRFIForm({
           {/* Subcontractor appendix — merged at end of PDF (like COR) */}
           <div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-              Anexo del Subcontratista (PDF)
+              Subcontractor Attachment (PDF)
             </label>
             <p className="text-xs text-muted-foreground mb-2">
-              Cotización, plano o soporte del sub — se anexa al <strong>final</strong> del PDF del RFI, igual que en los COR.
+              Sub quote, drawing, or supporting document — appended at the <strong>end</strong> of the RFI PDF, same as CORs.
             </p>
             <div className="border-2 border-dashed border-border rounded-lg p-4 hover:border-[#C9A96E]/40 transition-colors">
               <div className="flex items-center gap-3">
                 <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-sm font-medium transition-colors">
                   <Upload className="w-4 h-4" />
-                  Subir PDF del Sub
+                  Upload Sub PDF
                   <input type="file" multiple onChange={handleFileSelect} className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
                 </label>
-                <span className="text-xs text-muted-foreground">PDF recomendado · también imágenes</span>
+                <span className="text-xs text-muted-foreground">PDF recommended · images also supported</span>
               </div>
               {selectedFiles.length > 0 && (
                 <div className="mt-3 space-y-2">
@@ -710,7 +710,7 @@ export function NewRFIForm({
               ) : (
                 <FileText className="w-4 h-4" />
               )}
-              {previewingPdf ? 'Generando…' : 'Vista previa PDF'}
+              {previewingPdf ? 'Generating…' : 'Preview PDF'}
             </button>
             <button
               type="button"

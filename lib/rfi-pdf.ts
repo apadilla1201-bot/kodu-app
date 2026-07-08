@@ -46,8 +46,8 @@ export class RfiPdfMergeError extends Error {
 
   constructor(failedFiles: string[]) {
     super(
-      'No se pudo anexar el PDF del subcontratista al final del RFI. ' +
-        'Vuelve a subir el anexo PDF y genera de nuevo.',
+      'Could not append the subcontractor PDF to the end of this RFI. ' +
+        'Re-upload the PDF attachment and generate again.',
     );
     this.name = 'RfiPdfMergeError';
     this.failedFiles = failedFiles;
@@ -360,7 +360,7 @@ export async function mergeRfiPdfWithAttachments(
     } catch (attErr: any) {
       console.error(`Failed to merge attachment ${att.fileName}:`, attErr?.message);
       if (isPdf) {
-        failedPdfFiles.push(att.fileName ?? 'PDF del subcontratista');
+        failedPdfFiles.push(att.fileName ?? 'subcontractor PDF');
       }
     }
   }

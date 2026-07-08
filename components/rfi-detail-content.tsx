@@ -112,9 +112,9 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
       const blob = await fetchRfiPdf(rfi.id);
       const fname = `RFI_${rfi.rfiNumber}_${(rfi.subject ?? '').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30)}.pdf`;
       downloadBlobFile(blob, fname);
-      toast({ title: 'PDF generado', description: 'El PDF del RFI se descargó correctamente' });
+      toast({ title: 'PDF generated', description: 'RFI PDF downloaded successfully' });
     } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'No se pudo generar el PDF', variant: 'destructive' });
+      toast({ title: 'Error', description: err?.message ?? 'Failed to generate PDF', variant: 'destructive' });
     } finally {
       setPdfLoading(false);
     }
@@ -153,7 +153,7 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
     } catch {
       toast({
         title: 'Error',
-        description: 'No se pudo descargar el archivo. Vuelve a subirlo si es un RFI antiguo.',
+        description: 'Could not download the file. Re-upload it if this is an older RFI.',
         variant: 'destructive',
       });
     } finally {
@@ -221,7 +221,7 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
             className="inline-flex items-center gap-2 bg-[#0F1B33] hover:bg-[#1B2A4A] text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
           >
             <FileText className="w-4 h-4" />
-            {pdfLoading ? 'Generando...' : 'Descargar PDF'}
+            {pdfLoading ? 'Generating...' : 'Download PDF'}
           </button>
           <select
             value={rfi?.status ?? 'Open'}

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Empty file' }, { status: 400 });
     }
     if (buffer.length > MAX_BYTES) {
-      return NextResponse.json({ error: 'Archivo muy grande (máx 25 MB)' }, { status: 413 });
+      return NextResponse.json({ error: 'File too large (max 25 MB)' }, { status: 413 });
     }
 
     const fileName = String(formData.get('fileName') || (file as File).name || `file-${Date.now()}`);
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Server upload error:', error);
     return NextResponse.json(
-      { error: error?.message || 'No se pudo subir el archivo' },
+      { error: error?.message || 'Failed to upload file' },
       { status: 500 },
     );
   }
