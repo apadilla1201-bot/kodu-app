@@ -8,12 +8,14 @@ import { htmlToPdf } from '@/lib/pdf';
 import {
   buildExecutiveLookaheadHtml,
   buildFallbackExecutiveContent,
+  buildFallbackTechnicalFocus,
   buildTechnicalLookaheadHtml,
   extractAction,
   lookaheadPdfFilename,
   type ExecutiveContent,
   type LookAheadActivity,
   type LookAheadPdfInput,
+  type TechnicalFocusItem,
 } from '@/lib/ritz-lookahead-pdf';
 
 function fmtMonthDay(d: Date | string | null) {
@@ -29,80 +31,144 @@ function fmtDayRange(start: Date, end: Date) {
   return `${days[start.getDay()]} ${months[start.getMonth()]} ${start.getDate()} THROUGH ${days[end.getDay()]} ${months[end.getMonth()]} ${end.getDate()}, ${end.getFullYear()}`;
 }
 
-async function generateExecutiveContent(
-  input: LookAheadPdfInput,
-  actSummary: string,
-  critSummary: string,
-  counts: { starts: number; finishes: number; continues: number; critical: number }
-): Promise<ExecutiveContent> {
-  const fallback = buildFallbackExecutiveContent(input);
+async function callLlmJson<T>(system: string, user: string, fallback: T): Promise<T> {
   const apiKey = process.env.ABACUSAI_API_KEY;
   if (!apiKey) return fallback;
-
   try {
     const llmResponse = await fetch('https://api.abacus.ai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: 'gpt-5.4-mini',
-        max_tokens: 2000,
+        max_tokens: 2500,
         messages: [
-          {
-            role: 'system',
-            content: `You write executive 2-week construction look-ahead annexes for luxury residential owners. Output JSON only:
-{
-  "status": "ON TRACK" | "AT RISK" | "DELAYED",
-  "statusNarrative": "2-3 sentences",
-  "siteOperations": [{"title": "...", "description": "..."}],
-  "offSiteProduction": [{"title": "...", "description": "..."}],
-  "ownerAction": {"title": "...", "deadline": "...", "status": "...", "description": "..."} or null,
-  "executiveBrief": "1 elegant paragraph"
-}
-Use 3-6 site items and 2-5 off-site items. Tone: confident, precise, Ritz-level professionalism.`,
-          },
-          {
-            role: 'user',
-            content: `Project: ${input.projectName}
-Owner: ${input.client || 'Owner'}
-TCO: ${input.tcoDate ? fmtMonthDay(input.tcoDate) : 'TBD'}
-CPM: ${input.revision}
-Data Date: ${fmtMonthDay(input.dataDate)}
-Window: ${fmtDayRange(input.windowStart, input.windowEnd)}
-
-Activities (${input.activities.length}):
-${actSummary}
-
-Critical path:
-${critSummary || 'None'}
-
-Starts: ${counts.starts} | Finishes: ${counts.finishes} | Continues: ${counts.continues} | Critical in window: ${counts.critical}`,
-          },
+          { role: 'system', content: system },
+          { role: 'user', content: user },
         ],
       }),
     });
-
     if (!llmResponse.ok) return fallback;
     const llmData = await llmResponse.json();
     const content = llmData.choices?.[0]?.message?.content || '';
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = content.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
     if (!jsonMatch) return fallback;
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      status: ['ON TRACK', 'AT RISK', 'DELAYED'].includes(parsed.status) ? parsed.status : fallback.status,
-      statusNarrative: parsed.statusNarrative || fallback.statusNarrative,
-      siteOperations: Array.isArray(parsed.siteOperations) && parsed.siteOperations.length
-        ? parsed.siteOperations
-        : fallback.siteOperations,
-      offSiteProduction: Array.isArray(parsed.offSiteProduction) && parsed.offSiteProduction.length
-        ? parsed.offSiteProduction
-        : fallback.offSiteProduction,
-      ownerAction: parsed.ownerAction?.title ? parsed.ownerAction : fallback.ownerAction,
-      executiveBrief: parsed.executiveBrief || fallback.executiveBrief,
-    };
+    return JSON.parse(jsonMatch[0]) as T;
   } catch {
     return fallback;
   }
+}
+
+async function generateExecutiveContent(
+  input: LookAheadPdfInput,
+  actSummary: string,
+  critSummary: string
+): Promise<ExecutiveContent> {
+  const fallback = buildFallbackExecutiveContent(input);
+  const parsed = await callLlmJson<Partial<ExecutiveContent>>(
+    `You write Ritz-Carlton residence executive 2-week look-ahead annexes for ultra-high-net-worth owners.
+Output JSON only:
+{
+  "status": "ON TRACK" | "AT RISK" | "DELAYED",
+  "statusNarrative": "1-2 elegant sentences",
+  "siteOperations": [{"title": "3-5 word punchy title", "description": "1-2 sentences"}],
+  "offSiteProduction": [{"title": "3-5 word punchy title", "description": "1-2 sentences"}],
+  "ownerAction": {"title": "...", "deadline": "Month D, YYYY", "status": "AWAITING FINAL LOCK", "description": "2-3 sentences on cascade impact"} or null,
+  "executiveBrief": "one flowing paragraph, no label prefix"
+}
+Titles must read like magazine headlines (e.g. "Partition Framing Rises", "Main Kitchen Fabrication") — never raw CPM IDs.
+Use 3-4 site items and 2-3 off-site items. Tone: confident, Ritz-level, owner-facing.`,
+    `Project: ${input.projectName}
+Owner: ${input.client || 'Owner'}
+CPM: ${input.revision}
+Window: ${fmtDayRange(input.windowStart, input.windowEnd)}
+
+Look-ahead activities:
+${actSummary}
+
+Critical path context:
+${critSummary || 'None'}`,
+    fallback
+  );
+
+  return {
+    status: ['ON TRACK', 'AT RISK', 'DELAYED'].includes(parsed.status || '')
+      ? (parsed.status as ExecutiveContent['status'])
+      : fallback.status,
+    statusNarrative: parsed.statusNarrative || fallback.statusNarrative,
+    siteOperations:
+      Array.isArray(parsed.siteOperations) && parsed.siteOperations.length
+        ? parsed.siteOperations
+        : fallback.siteOperations,
+    offSiteProduction:
+      Array.isArray(parsed.offSiteProduction) && parsed.offSiteProduction.length
+        ? parsed.offSiteProduction
+        : fallback.offSiteProduction,
+    ownerAction: parsed.ownerAction?.title ? parsed.ownerAction : fallback.ownerAction,
+    executiveBrief: parsed.executiveBrief || fallback.executiveBrief,
+  };
+}
+
+async function generateTechnicalFocus(
+  input: LookAheadPdfInput,
+  actSummary: string
+): Promise<TechnicalFocusItem[]> {
+  const fallback = buildFallbackTechnicalFocus(input);
+  const parsed = await callLlmJson<TechnicalFocusItem[]>(
+    `You write CRITICAL FOCUS sidebar items for a Ritz-Carlton technical look-ahead annex.
+Output JSON array of 4-6 items:
+[{"heading": "OWNER KEY MILESTONE", "title": "...", "body": "2-3 sentences"}]
+Headings should be like: OWNER KEY MILESTONE, TIGHTEST CRITICAL PATH (TF: 1D), COORDINATION WATCH (TF: 4D), PROCUREMENT ASSURANCE, CUSTOM COMPONENT TRACKING.
+Be specific to the activities. Owner-facing but technical.`,
+    `Project: ${input.projectName}
+Window: ${fmtDayRange(input.windowStart, input.windowEnd)}
+
+Activities:
+${actSummary}`,
+    fallback
+  );
+  return Array.isArray(parsed) && parsed.length ? parsed : fallback;
+}
+
+function selectLookAheadActivities(
+  allActivities: {
+    id: string;
+    activityId: string;
+    activityName: string;
+    activityType: string;
+    originalDuration: number;
+    remainingDuration: number;
+    percentComplete: number;
+    startDate: Date | null;
+    finishDate: Date | null;
+    status: string;
+    floatDays: number;
+    notes: string | null;
+    resourceName: string | null;
+    isLookAhead: boolean;
+    sortOrder: number;
+  }[],
+  windowStart: Date,
+  windowEnd: Date
+) {
+  const laOnly = allActivities.filter((a) => a.isLookAhead);
+  if (laOnly.length > 0) return laOnly;
+
+  const cpmInWindow = allActivities.filter((a) => {
+    if (a.isLookAhead) return false;
+    if (a.activityType.startsWith('group_')) return false;
+    if (a.status === 'done') return false;
+    if (!a.startDate) return false;
+    const start = new Date(a.startDate);
+    const end = a.finishDate ? new Date(a.finishDate) : start;
+    return start <= windowEnd && end >= windowStart;
+  });
+
+  const seen = new Set<string>();
+  return cpmInWindow.filter((a) => {
+    if (seen.has(a.id)) return false;
+    seen.add(a.id);
+    return true;
+  });
 }
 
 export async function POST(
@@ -138,23 +204,7 @@ export async function POST(
     if (isNaN(windowStart.getTime())) return NextResponse.json({ error: 'Invalid startDate' }, { status: 400 });
     const windowEnd = new Date(windowStart.getTime() + 13 * 86400000);
 
-    const cpmInWindow = schedule.activities.filter((a) => {
-      if (a.isLookAhead) return false;
-      if (a.activityType.startsWith('group_')) return false;
-      if (a.status === 'done') return false;
-      if (!a.startDate) return false;
-      const start = new Date(a.startDate);
-      const end = a.finishDate ? new Date(a.finishDate) : start;
-      return start <= windowEnd && end >= windowStart;
-    });
-
-    const laActivities = schedule.activities.filter((a) => a.isLookAhead);
-    const seen = new Set<string>();
-    const windowActivities = [...cpmInWindow, ...laActivities].filter((a) => {
-      if (seen.has(a.id)) return false;
-      seen.add(a.id);
-      return true;
-    });
+    const windowActivities = selectLookAheadActivities(schedule.activities, windowStart, windowEnd);
 
     const activities: LookAheadActivity[] = windowActivities.map((a) => ({
       id: a.id,
@@ -172,42 +222,23 @@ export async function POST(
       isLookAhead: a.isLookAhead,
     }));
 
-    let starts = 0;
-    let finishes = 0;
-    let continues = 0;
-    let critical = 0;
-    for (const act of activities) {
-      const { action } = extractAction(act.activityName);
-      if (act.floatDays === 0 && act.status !== 'done') critical++;
-      if (action.includes('START') && action.includes('FINISH')) continues++;
-      else if (action.includes('FINISH')) finishes++;
-      else if (action.includes('START')) starts++;
-      else if (action.includes('CONTINU')) continues++;
-      else {
-        const s = act.startDate;
-        const f = act.finishDate;
-        if (s && s >= windowStart && s <= windowEnd) starts++;
-        else if (f && f >= windowStart && f <= windowEnd) finishes++;
-        else continues++;
-      }
-    }
-
     const actSummary = activities
       .map((a) => {
         const { cleanName, action } = extractAction(a.activityName);
-        return `${a.activityId.replace('LA-', '')}: ${cleanName} | ${action || 'N/A'} | ${a.status} | TF ${a.floatDays}d`;
+        const notes = a.notes ? ` | Notes: ${a.notes}` : '';
+        return `${a.activityId}: ${cleanName} | ${action || 'CONTINUE'} | ${fmtMonthDay(a.startDate)}–${fmtMonthDay(a.finishDate)} | ${a.status} | TF ${a.floatDays}d${notes}`;
       })
       .join('\n');
 
     const allCritical = schedule.activities.filter(
-      (a) => a.floatDays === 0 && a.status !== 'done' && !a.isLookAhead && !a.activityType.startsWith('group_')
+      (a) => a.floatDays <= 1 && a.status !== 'done' && !a.activityType.startsWith('group_')
     );
     const critSummary = allCritical
       .slice(0, 10)
       .map((a) => `${a.activityId}: ${a.activityName} | TF ${a.floatDays}d`)
       .join('\n');
 
-    const userName = (session.user as any)?.name || 'Project Manager';
+    const userName = (session.user as any)?.name || 'A. Padilla';
     const pdfInput: LookAheadPdfInput = {
       projectName: schedule.project.projectName || 'Project',
       projectNumber: schedule.project.projectNumber || '',
@@ -229,12 +260,9 @@ export async function POST(
     };
 
     if (reportType === 'executive') {
-      pdfInput.executive = await generateExecutiveContent(pdfInput, actSummary, critSummary, {
-        starts,
-        finishes,
-        continues,
-        critical,
-      });
+      pdfInput.executive = await generateExecutiveContent(pdfInput, actSummary, critSummary);
+    } else {
+      pdfInput.technicalFocus = await generateTechnicalFocus(pdfInput, actSummary);
     }
 
     const html =
@@ -243,9 +271,13 @@ export async function POST(
         : buildExecutiveLookaheadHtml(pdfInput);
 
     const pdfBuf = await htmlToPdf(html, {
-      format: 'Letter',
+      format: reportType === 'technical' ? 'Tabloid' : 'Letter',
       landscape: reportType === 'technical',
-      margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
+      margin:
+        reportType === 'technical'
+          ? { top: '4mm', right: '3mm', bottom: '4mm', left: '3mm' }
+          : { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
+      scale: reportType === 'technical' ? 0.88 : 1,
     });
 
     const safeName = lookaheadPdfFilename(

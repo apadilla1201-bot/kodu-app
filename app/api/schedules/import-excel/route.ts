@@ -352,7 +352,7 @@ export async function POST(
       return {
         sortOrder: parsed.activities.length + idx,
         activityId: la.activityId,
-        activityName: la.activityName,
+        activityName: la.action ? `${la.activityName} [${String(la.action).toUpperCase()}]` : la.activityName,
         activityType: 'task',
         originalDuration: la.duration,
         remainingDuration: la.duration,
