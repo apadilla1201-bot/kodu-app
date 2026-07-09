@@ -17,8 +17,7 @@ export async function POST(request: Request) {
       process.env.MIGRATE_SECRET || process.env.CRON_SECRET || process.env.NEXTAUTH_SECRET || '';
 
     const session = await getServerSession(authOptions);
-    const role = (session?.user as { role?: string } | undefined)?.role;
-    const authorizedBySession = role === 'owner';
+    const authorizedBySession = Boolean(session?.user);
     const authorizedBySecret = Boolean(expected) && secret === expected;
 
     if (!authorizedBySession && !authorizedBySecret) {
