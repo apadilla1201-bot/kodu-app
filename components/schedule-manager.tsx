@@ -289,22 +289,25 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
   };
 
   // ── Look-Ahead PDF ─────────────────────────────────
-  const [laPdfLoading, setLaPdfLoading] = useState(false);
-  const exportLookAheadPDF = async () => {
+  const [laPdfLoading, setLaPdfLoading] = useState<'executive' | 'technical' | null>(null);
+
+  const downloadLookAheadPdf = async (type: 'executive' | 'technical') => {
     if (!activeSchedule) return;
-    setLaPdfLoading(true);
+    setLaPdfLoading(type);
     try {
-      // Use the schedule PDF endpoint with a look-ahead filter
-      // But we want only the 2-week window. Let's use a custom approach.
       const res = await fetch(`/api/schedules/${activeSchedule.id}/lookahead/pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(laStartDate ? { startDate: laStartDate } : {}),
+        body: JSON.stringify({
+          type,
+          ...(laStartDate ? { startDate: laStartDate } : {}),
+        }),
       });
       if (!res.ok) throw new Error();
       const blob = await res.blob();
-      const fname = `LookAhead_2wk_${activeSchedule.revision}.pdf`;
-      // Safari-compatible download using FileReader dataURL
+      const cd = res.headers.get('Content-Disposition') || '';
+      const match = cd.match(/filename="([^"]+)"/);
+      const fname = match?.[1] || `LookAhead_${type}_${activeSchedule.revision}.pdf`;
       const reader = new FileReader();
       reader.onloadend = () => {
         const a = document.createElement('a');
@@ -315,9 +318,16 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         document.body.removeChild(a);
       };
       reader.readAsDataURL(blob);
-      toast.success(t('schedules.laPdfDownloaded'));
-    } catch { toast.error(t('schedules.laPdfError')); }
-    finally { setLaPdfLoading(false); }
+      toast.success(
+        type === 'executive'
+          ? t('schedules.laExecutivePdfDownloaded')
+          : t('schedules.laTechnicalPdfDownloaded')
+      );
+    } catch {
+      toast.error(t('schedules.laPdfError'));
+    } finally {
+      setLaPdfLoading(null);
+    }
   };
 
   // ── Excel CPM Import ────────────────────────────────────────
@@ -662,9 +672,21 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                 <Upload className="w-3 h-3" /> {t('schedules.importExcelBtn')}
                 <input type="file" accept=".csv,.xlsx,.xls" onChange={handleLAImport} className="hidden" />
               </label>
-              <button onClick={exportLookAheadPDF} disabled={laPdfLoading || !laData} className="px-3 py-1.5 bg-[#0F1B33] text-white rounded-md text-xs font-medium flex items-center gap-1 hover:bg-[#0a1225] disabled:opacity-50">
-                {laPdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                {t('schedules.exportPdf')}
+              <button
+                onClick={() => downloadLookAheadPdf('executive')}
+                disabled={!!laPdfLoading || !laData}
+                className="px-3 py-1.5 bg-[#0F1B33] text-white rounded-md text-xs font-medium flex items-center gap-1 hover:bg-[#0a1225] disabled:opacity-50"
+              >
+                {laPdfLoading === 'executive' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                {t('schedules.exportExecutivePdf')}
+              </button>
+              <button
+                onClick={() => downloadLookAheadPdf('technical')}
+                disabled={!!laPdfLoading || !laData}
+                className="px-3 py-1.5 border border-[#C9A96E] text-[#0F1B33] rounded-md text-xs font-medium flex items-center gap-1 hover:bg-[#faf8f4] disabled:opacity-50"
+              >
+                {laPdfLoading === 'technical' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                {t('schedules.exportTechnicalPdf')}
               </button>
               <button onClick={loadLookAhead} disabled={laLoading} className="px-2 py-1.5 border border-border rounded-md text-xs hover:bg-muted/60">
                 {laLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : '↻'}
