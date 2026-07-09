@@ -6,7 +6,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build && npx tsx scripts/migrate-user-locale.ts",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
