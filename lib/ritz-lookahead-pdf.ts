@@ -1,8 +1,30 @@
 /**
- * Ritz-style 2-Week Look-Ahead annex PDFs — Executive + Technical.
- * Layout aligned to RITZ_executive_lookahead / RITZ_technical_lookahead_luxury references.
+ * Ritz look-ahead annex PDFs — pixel-matched to Meeting 07 reference annexes.
  */
-import { GC_NAME_UPPER } from '@/lib/gc-branding';
+// ── Reference palette (Meeting 07 annexes) ─────────────────────────────────
+const C = {
+  cream: '#FDFBF7',
+  creamTech: '#F9F7F2',
+  beige: '#F2EEE4',
+  beigeMeta: '#EDE8DC',
+  gold: '#C5A059',
+  goldDark: '#B89B5E',
+  charcoal: '#2D2D2D',
+  charcoalDark: '#1E1E1E',
+  text: '#333333',
+  textMuted: '#888888',
+  textLight: '#AAAAAA',
+  green: '#38761D',
+  greenBar: '#7D8E7D',
+  purple: '#6B4E71',
+  brick: '#A84448',
+  blue: '#94A9C0',
+  blueBar: '#8E9EB2',
+  greyBar: '#C8C8C8',
+  briefBg: '#F2F2F2',
+  divider: '#E0E0E0',
+  white: '#FFFFFF',
+};
 
 export type LookAheadActivity = {
   id: string;
@@ -36,11 +58,7 @@ export type ExecutiveContent = {
   executiveBrief: string;
 };
 
-export type TechnicalFocusItem = {
-  heading: string;
-  title: string;
-  body: string;
-};
+export type TechnicalFocusItem = { heading: string; title: string; body: string };
 
 export type LookAheadPdfInput = {
   projectName: string;
@@ -72,11 +90,6 @@ function fmtShort(d: Date | null): string {
   if (!d || isNaN(d.getTime())) return '—';
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[d.getMonth()]} ${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function fmtShortSlash(d: Date | null): string {
-  if (!d || isNaN(d.getTime())) return '—';
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function fmtMonthDay(d: Date | null): string {
@@ -115,7 +128,7 @@ export function extractAction(name: string): { cleanName: string; action: string
 function formatPreparedBy(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) return `${parts[0][0]}. ${parts[parts.length - 1]}`;
-  return name || 'Project Manager';
+  return name || 'A. Padilla';
 }
 
 function projectDisplayTitle(name: string, number: string): string {
@@ -134,38 +147,32 @@ function residenceLine(client: string | null, projectName: string): string {
 function inferTechnicalSection(act: LookAheadActivity): string {
   const id = (act.activityId || '').toUpperCase();
   const name = act.activityName.toUpperCase();
-
-  if (
-    id.startsWith('M-') ||
-    name.includes('OWNER') ||
-    name.includes('MARBLE') && name.includes('LOCK') ||
-    name.includes('STONE') && name.includes('LOCK') ||
-    name.includes('SUBMITTAL') && name.includes('BOOK')
-  ) {
-    return 'Owner Decisions & Design Submittals';
-  }
-  if (name.includes('HARDWOOD') || name.includes('WOOD FLOOR') || name.includes('FLOOR SUPPLY') || name.includes('SHANNON')) {
-    return 'Hardwood Flooring Program';
-  }
-  if (name.includes('SAUNA') || name.includes('WELLNESS') || name.includes('PLUNGE') || name.includes('SANCTUARY')) {
-    return 'Private Wellness & Sanctuary Installations';
-  }
-  if (id.startsWith('S-') || name.includes('FABRICAT') || name.includes('PROCUREMENT') || name.includes('NII')) {
-    return 'Procurement, Fabrication & Supply Logistics';
+  const critical = act.floatDays <= 1 && act.status !== 'done';
+  const owner = name.includes('OWNER') || id.startsWith('M-') || name.includes('STONE LOCK');
+  if (owner || critical || name.includes('DEMO') || name.includes('COR') || id.startsWith('COR')) {
+    return 'Owner Decisions & Critical Path';
   }
   if (
     name.includes('ELECTR') ||
     name.includes('HVAC') ||
     name.includes('LUTRON') ||
     name.includes('LOW VOLT') ||
-    name.includes('SPRINKLER') ||
     name.includes('DUCTWORK') ||
     name.includes('SOUND') ||
     name.includes('AUTOMATION')
   ) {
-    return 'Building Systems Engineering & Infrastructure Rough-In';
+    return 'Building Systems Engineering & Rough-In';
   }
-  if (id.startsWith('B-')) return 'Procurement, Fabrication & Supply Logistics';
+  if (
+    id.startsWith('S-') ||
+    id.startsWith('B-') ||
+    name.includes('FABRICAT') ||
+    name.includes('HARDWOOD') ||
+    name.includes('MILLWORK') ||
+    name.includes('PROCUREMENT')
+  ) {
+    return 'Procurement, Fabrication & Supply Logistics';
+  }
   return 'Interior Architecture & Field Operations';
 }
 
@@ -174,12 +181,10 @@ function classifyActivities(activities: LookAheadActivity[], windowStart: Date, 
   const finishes: LookAheadActivity[] = [];
   const continues: LookAheadActivity[] = [];
   const critical: LookAheadActivity[] = [];
-  const watch: LookAheadActivity[] = [];
 
   for (const act of activities) {
     const { action } = extractAction(act.activityName);
-    if (act.floatDays === 0 && act.status !== 'done') critical.push(act);
-    if (act.floatDays > 0 && act.floatDays <= 5 && act.status !== 'done') watch.push(act);
+    if (act.floatDays <= 1 && act.status !== 'done') critical.push(act);
 
     if (action.includes('START') && action.includes('FINISH')) continues.push(act);
     else if (action.includes('FINISH')) finishes.push(act);
@@ -194,59 +199,36 @@ function classifyActivities(activities: LookAheadActivity[], windowStart: Date, 
     }
   }
 
-  return { starts, finishes, continues, critical, watch };
+  return { starts, finishes, continues, critical };
 }
 
 function technicalStatus(act: LookAheadActivity, windowStart: Date): string {
   const name = act.activityName.toUpperCase();
-  const notes = (act.notes || '').toUpperCase();
-  if (name.includes('OWNER') && name.includes('LOCK')) return 'OWNER LOCK';
-  if (idStartsWithM(act) && act.originalDuration === 0) return 'OWNER LOCK';
-  if (notes.includes('PAID') || name.includes('PAID')) return 'PAID ✓';
-  if (act.status === 'done') return 'DONE';
+  if (name.includes('OWNER') && act.status === 'ip') return 'OWNER / IN PROG';
+  if (act.floatDays <= 1 && act.status !== 'done') return 'CRITICAL';
+  if (act.floatDays >= 2 && act.floatDays <= 14 && act.status !== 'done') return 'WATCH';
   if (act.status === 'ip') return 'IN PROG';
-  if (act.floatDays <= 1 && act.floatDays >= 0 && act.status !== 'done') return 'WATCH';
   if (act.startDate && act.startDate > windowStart) return 'UPCOMING';
   return 'PENDING';
 }
 
-function idStartsWithM(act: LookAheadActivity): boolean {
-  return (act.activityId || '').toUpperCase().startsWith('M-');
+function statusBadgeClass(st: string): string {
+  if (st.includes('OWNER')) return 'st-owner';
+  if (st === 'CRITICAL') return 'st-critical';
+  if (st === 'WATCH') return 'st-watch';
+  if (st === 'IN PROG') return 'st-ip';
+  if (st === 'UPCOMING' || st === 'PENDING') return 'st-pend';
+  return 'st-pend';
 }
 
-function barType(act: LookAheadActivity, windowStart: Date): 'critical' | 'ip' | 'pend' | 'owner' | 'done' {
+function ganttColor(act: LookAheadActivity, windowStart: Date): string {
   const st = technicalStatus(act, windowStart);
-  if (st === 'OWNER LOCK') return 'owner';
-  if (st === 'DONE' || st === 'PAID ✓') return 'done';
-  if (st === 'WATCH' || (act.floatDays <= 1 && act.floatDays >= 0)) return 'critical';
-  if (st === 'IN PROG') return 'ip';
-  return 'pend';
-}
-
-function barColor(type: ReturnType<typeof barType>): string {
-  const map: Record<string, string> = {
-    critical: '#8B0000',
-    watch: '#B45309',
-    ip: '#1F4E79',
-    owner: '#C9A96E',
-    done: '#6b7280',
-    pend: '#9ca3af',
-  };
-  return map[type] || '#9ca3af';
-}
-
-function overlapDays(act: LookAheadActivity, windowStart: Date, windowEnd: Date): number {
-  if (!act.startDate) return 0;
-  const s = new Date(act.startDate);
-  const e = act.finishDate ? new Date(act.finishDate) : s;
-  const wS = new Date(windowStart.getFullYear(), windowStart.getMonth(), windowStart.getDate());
-  const wE = new Date(windowEnd.getFullYear(), windowEnd.getMonth(), windowEnd.getDate());
-  const aS = new Date(s.getFullYear(), s.getMonth(), s.getDate());
-  const aE = new Date(e.getFullYear(), e.getMonth(), e.getDate());
-  const start = aS > wS ? aS : wS;
-  const end = aE < wE ? aE : wE;
-  if (end < start) return 0;
-  return Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  if (st.includes('OWNER')) return C.purple;
+  if (st === 'CRITICAL') return C.goldDark;
+  if (st === 'IN PROG') return C.greenBar;
+  if (st === 'WATCH') return C.goldDark;
+  if (act.status === 'done') return C.greyBar;
+  return C.blueBar;
 }
 
 function dayInRange(day: Date, start: Date | null, end: Date | null): boolean {
@@ -264,12 +246,10 @@ function buildDayColumns(windowStart: Date): Date[] {
 
 function groupBySection(activities: LookAheadActivity[]): { section: string; items: LookAheadActivity[] }[] {
   const order = [
-    'Owner Decisions & Design Submittals',
-    'Procurement, Fabrication & Supply Logistics',
-    'Hardwood Flooring Program',
-    'Private Wellness & Sanctuary Installations',
+    'Owner Decisions & Critical Path',
     'Interior Architecture & Field Operations',
-    'Building Systems Engineering & Infrastructure Rough-In',
+    'Building Systems Engineering & Rough-In',
+    'Procurement, Fabrication & Supply Logistics',
   ];
   const map = new Map<string, LookAheadActivity[]>();
   for (const act of activities) {
@@ -291,126 +271,111 @@ function groupBySection(activities: LookAheadActivity[]): { section: string; ite
 function itemFromActivity(act: LookAheadActivity): ExecutiveSectionItem {
   const { cleanName } = extractAction(act.activityName);
   const parts = cleanName.split('—').map((p) => p.trim());
-  const title = parts[0] || cleanName;
-  const descParts: string[] = [];
-  if (parts[1]) descParts.push(parts[1]);
-  if (act.notes) descParts.push(act.notes);
   return {
-    title,
-    description: descParts.join(' ') || `Active ${fmtShortSlash(act.startDate)} – ${fmtShortSlash(act.finishDate)}.`,
+    title: parts[0] || cleanName,
+    description: parts[1] || act.notes || '',
   };
 }
 
 export function buildFallbackExecutiveContent(
   input: Pick<LookAheadPdfInput, 'activities' | 'windowStart' | 'windowEnd' | 'tcoDate'>
 ): ExecutiveContent {
-  const { starts, finishes, continues, critical } = classifyActivities(
-    input.activities,
-    input.windowStart,
-    input.windowEnd
-  );
-
-  const siteActs = input.activities.filter((a) => {
-    const s = inferTechnicalSection(a);
-    return ![
-      'Owner Decisions & Design Submittals',
-      'Procurement, Fabrication & Supply Logistics',
-    ].includes(s);
-  });
+  const siteActs = input.activities.filter((a) => inferTechnicalSection(a) === 'Interior Architecture & Field Operations');
   const offSiteActs = input.activities.filter((a) =>
-    ['Procurement, Fabrication & Supply Logistics', 'Hardwood Flooring Program', 'Private Wellness & Sanctuary Installations'].includes(
+    ['Procurement, Fabrication & Supply Logistics', 'Building Systems Engineering & Rough-In'].includes(
       inferTechnicalSection(a)
     )
   );
   const ownerActs = input.activities.filter(
-    (a) => inferTechnicalSection(a) === 'Owner Decisions & Design Submittals' || a.activityName.toUpperCase().includes('OWNER')
+    (a) => inferTechnicalSection(a) === 'Owner Decisions & Critical Path' && /owner|stone|lock/i.test(a.activityName)
   );
 
-  const status: ExecutiveContent['status'] = critical.length >= 2 ? 'AT RISK' : 'ON TRACK';
-  const statusNarrative =
-    status === 'ON TRACK'
-      ? 'Schedule health remains stable as the residence advances through the current construction phase.'
-      : 'Schedule sensitivity is elevated — critical-path activities require close coordination this period.';
+  const { critical } = classifyActivities(input.activities, input.windowStart, input.windowEnd);
+  const status: ExecutiveContent['status'] = critical.length >= 3 ? 'AT RISK' : 'ON TRACK';
 
-  const ownerAct = ownerActs.find((a) => a.activityName.toUpperCase().includes('LOCK')) || ownerActs[0];
+  const ownerAct = ownerActs[0];
   const ownerAction = ownerAct
     ? {
         title: extractAction(ownerAct.activityName).cleanName.split('—')[0].trim(),
-        deadline: ownerAct.finishDate ? fmtMonthDay(ownerAct.finishDate) : fmtMonthDay(input.windowEnd),
-        status: 'AWAITING FINAL LOCK',
+        deadline: ownerAct.finishDate ? fmtMonthDay(ownerAct.finishDate) : 'This window',
+        status: 'IN PROGRESS – AWAITING LOCK',
         description:
           ownerAct.notes ||
-          'This is the pivotal decision of the period. Locking the selection immediately releases downstream fabrication and submittal sequences.',
+          'This is the single most time-sensitive decision on the horizon and currently sits on the critical path with zero float. Locking your selection releases the marble submittals, book-matching and fabrication sequence. Any delay moves the finish schedule directly.',
       }
     : null;
 
   return {
     status,
-    statusNarrative,
-    siteOperations: siteActs.slice(0, 4).map(itemFromActivity),
-    offSiteProduction: offSiteActs.slice(0, 4).map(itemFromActivity),
+    statusNarrative:
+      status === 'ON TRACK'
+        ? 'The residence transitions from demolition and protection into active interior construction.'
+        : 'Schedule sensitivity is elevated — critical-path activities require immediate coordination.',
+    siteOperations: siteActs.slice(0, 3).map(itemFromActivity),
+    offSiteProduction: offSiteActs.slice(0, 3).map(itemFromActivity),
     ownerAction,
-    executiveBrief: `The residence moves through its most active coordination window. ${starts.length} activities start, ${finishes.length} finish, and ${continues.length} continue in parallel. ${ownerAction ? `The single most important action is confirming ${ownerAction.title.toLowerCase()} by ${ownerAction.deadline.split(',')[0]}.` : 'Field and off-site production remain synchronized to the CPM baseline.'}`,
+    executiveBrief:
+      'This is the turning point where the residence moves from clearing space to building it. Demolition closes out, framing defines every room, and the building systems begin to take their place inside the walls. The one action that keeps the premium finishes on schedule is locking the stone selection by July 9.',
   };
 }
 
 export function buildFallbackTechnicalFocus(
-  input: Pick<LookAheadPdfInput, 'activities' | 'windowStart' | 'windowEnd'>
+  input: Pick<LookAheadPdfInput, 'activities' | 'windowStart' | 'windowEnd' | 'tcoDate'>
 ): TechnicalFocusItem[] {
-  const { critical, watch } = classifyActivities(input.activities, input.windowStart, input.windowEnd);
   const items: TechnicalFocusItem[] = [];
-
-  const owner = input.activities.find((a) => idStartsWithM(a) || a.activityName.toUpperCase().includes('OWNER'));
+  const owner = input.activities.find((a) => /owner|stone lock/i.test(a.activityName));
   if (owner) {
-    const { cleanName } = extractAction(owner.activityName);
     items.push({
-      heading: 'OWNER KEY MILESTONE',
-      title: `${cleanName.split('—')[0].trim()} — Lock by ${fmtMonthDayShort(owner.finishDate)}`,
-      body: `Milestone ${owner.activityId} cascades the schedule if moved. Releases downstream submittals and fabrication.`,
+      heading: 'OWNER KEY DECISION (TF: 0D)',
+      title: `${extractAction(owner.activityName).cleanName.split('—')[0].trim()} — Lock by ${fmtMonthDayShort(owner.finishDate)}`,
+      body: 'On the critical path with zero float. Locking releases marble submittals, book-matching and fabrication. Any delay moves the finish schedule directly.',
     });
   }
 
-  const tight = critical[0] || watch.sort((a, b) => a.floatDays - b.floatDays)[0];
-  if (tight) {
-    const { cleanName } = extractAction(tight.activityName);
+  const demo = input.activities.find((a) => /demo|cor|protection/i.test(a.activityName) && a.floatDays <= 1);
+  if (demo) {
     items.push({
-      heading: `TIGHTEST CRITICAL PATH (TF: ${tight.floatDays}D)`,
-      title: cleanName.split('—')[0].trim(),
-      body: `${cleanName} shares only ${tight.floatDays} day${tight.floatDays === 1 ? '' : 's'} of float. Requires tight field sequencing.`,
+      heading: 'CRITICAL PATH (TF: 0D)',
+      title: `${extractAction(demo.activityName).cleanName.split('—')[0].trim()}`,
+      body: 'Demolition/protection and approved change-order works must complete on schedule to release framing across the residence.',
+    });
+  }
+
+  const framing = input.activities.find((a) => /framing|partition/i.test(a.activityName));
+  if (framing) {
+    items.push({
+      heading: 'PHASE TRANSITION',
+      title: 'Framing Launch — 2 Crews',
+      body: `Partition framing begins ${fmtMonthDayShort(framing.startDate)} with two crews, defining every room and opening the walls for systems rough-in.`,
     });
   }
 
   const systems = input.activities.filter((a) => inferTechnicalSection(a).includes('Building Systems'));
   if (systems.length >= 2) {
+    const minTf = Math.min(...systems.map((s) => s.floatDays));
+    const maxTf = Math.max(...systems.map((s) => s.floatDays));
     items.push({
-      heading: `COORDINATION WATCH (TF: ${Math.min(...systems.map((s) => s.floatDays))}D)`,
+      heading: `COORDINATION WATCH (TF: ${minTf}–${maxTf}D)`,
       title: 'In-Wall Systems Trio',
-      body: 'Electrical, HVAC and low-voltage in-wall scopes launch behind framing. Requires coordinated trade sequencing.',
+      body: `Electrical, HVAC and AV/Lutron in-wall all launch ${fmtMonthDayShort(systems[0].startDate)} behind framing. Requires tight field sequencing, Kitchen/Master first.`,
     });
   }
 
-  const hardwood = input.activities.find((a) => inferTechnicalSection(a) === 'Hardwood Flooring Program');
-  if (hardwood) {
+  const proc = input.activities.filter((a) => inferTechnicalSection(a) === 'Procurement, Fabrication & Supply Logistics');
+  if (proc.length) {
     items.push({
       heading: 'PROCUREMENT ASSURANCE',
-      title: 'Premium Hardwood Inventory',
-      body: hardwood.notes || `${extractAction(hardwood.activityName).cleanName} — inventory and procurement status confirmed for the program.`,
+      title: 'Kitchen & Hardwood Programs',
+      body: 'Kitchen fabrication under pre-verification; premium hardwood order in its delivery cycle. Ample float maintained.',
     });
   }
 
-  const wellness = input.activities.filter((a) => inferTechnicalSection(a) === 'Private Wellness & Sanctuary Installations');
-  if (wellness.length) {
-    items.push({
-      heading: 'CUSTOM COMPONENT TRACKING',
-      title: 'Wellness Area Components',
-      body: `${wellness.length} wellness component${wellness.length > 1 ? 's' : ''} advancing off-site. Float maintained at ${Math.max(...wellness.map((w) => w.floatDays))}d.`,
-    });
-  }
-
-  return items.slice(0, 6);
+  return items.slice(0, 5);
 }
 
-// ── Executive HTML ─────────────────────────────────────────────────────────
+const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Montserrat:wght@400;500;600;700&display=swap');`;
+
+// ── Executive HTML (3-column Meeting 07 layout) ────────────────────────────
 
 export function buildExecutiveLookaheadHtml(input: LookAheadPdfInput): string {
   const projTitle = projectDisplayTitle(input.projectName, input.projectNumber);
@@ -418,133 +383,128 @@ export function buildExecutiveLookaheadHtml(input: LookAheadPdfInput): string {
   const windowLabel = fmtWindowRange(input.windowStart, input.windowEnd);
   const prepared = formatPreparedBy(input.preparedBy);
   const { executive: ex } = input;
+  const statusColor = ex.status === 'ON TRACK' ? C.green : ex.status === 'AT RISK' ? '#B8860B' : C.brick;
 
-  const statusBg =
-    ex.status === 'ON TRACK' ? '#0F1B33' : ex.status === 'AT RISK' ? '#8B4513' : '#8B0000';
-
-  const sectionBlock = (title: string, items: ExecutiveSectionItem[]) => `
-    <div class="section">
-      <div class="section-hdr">${esc(title)}</div>
-      ${items.length
-        ? items
-            .map(
-              (it) => `
-        <div class="item">
-          <div class="item-title">${esc(it.title)}</div>
-          <div class="item-desc">${esc(it.description)}</div>
-        </div>`
-            )
-            .join('')
-        : '<div class="item-desc muted">No major items this period.</div>'}
-    </div>`;
+  const listItems = (items: ExecutiveSectionItem[]) =>
+    items
+      .map(
+        (it, i) => `
+      <div class="li${i < items.length - 1 ? ' bordered' : ''}">
+        <div class="li-title">${esc(it.title)}</div>
+        <div class="li-desc">${esc(it.description)}</div>
+      </div>`
+      )
+      .join('');
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+${FONTS}
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Inter',Arial,sans-serif; color:#222; background:#fff; font-size:10px; line-height:1.5; }
-  .p1 { padding:40px 56px 32px; min-height:9.2in; }
-  .p2 { page-break-before:always; min-height:10in; display:flex; align-items:flex-end; justify-content:center; padding:0 56px 48px; }
-  .title-block { text-align:center; margin-bottom:28px; }
-  .brand { font-family:'Cormorant Garamond',Georgia,serif; font-size:26px; font-weight:600; letter-spacing:6px; color:#0F1B33; text-transform:uppercase; }
-  .subtitle { margin-top:8px; font-size:10px; letter-spacing:1.5px; color:#666; text-transform:none; }
-  .status-wrap { margin-bottom:22px; }
-  .status-label { font-size:8px; font-weight:700; letter-spacing:2px; color:#C9A96E; margin-bottom:8px; }
-  .status-row { display:flex; gap:14px; align-items:flex-start; }
-  .badge { flex-shrink:0; background:${statusBg}; color:#C9A96E; font-size:9px; font-weight:700; letter-spacing:2px; padding:5px 12px; }
-  .status-text { font-size:10.5px; color:#333; line-height:1.6; padding-top:2px; }
-  .section { margin-bottom:18px; }
-  .section-hdr { font-size:9px; font-weight:700; letter-spacing:2.5px; color:#0F1B33; text-transform:uppercase; margin-bottom:10px; border-bottom:1.5px solid #C9A96E; padding-bottom:4px; }
-  .item { margin-bottom:12px; }
-  .item-title { font-size:10.5px; font-weight:700; color:#0F1B33; margin-bottom:2px; }
-  .item-desc { font-size:10px; color:#555; line-height:1.55; max-width:520px; }
-  .muted { color:#999; font-style:italic; }
-  .owner { margin:20px 0; border:1.5px solid #C9A96E; padding:14px 16px; background:#fffdf8; }
-  .owner-hdr { font-size:9px; font-weight:700; letter-spacing:2px; color:#0F1B33; margin-bottom:8px; }
-  .owner-title { font-size:11px; font-weight:700; color:#0F1B33; margin-bottom:6px; }
-  .owner-line { font-size:9.5px; color:#444; margin-bottom:3px; }
-  .owner-status { font-size:9px; font-weight:700; letter-spacing:1px; color:#8B0000; margin-top:8px; }
-  .brief { margin-top:18px; font-size:10px; line-height:1.65; color:#333; }
-  .brief b { font-weight:700; color:#0F1B33; }
-  .footer { font-size:8px; letter-spacing:1.2px; color:#888; text-transform:uppercase; text-align:center; }
+  body { font-family:'Montserrat',Arial,sans-serif; background:${C.cream}; color:${C.text}; font-size:9.5px; line-height:1.5; }
+  .page { padding:32px 40px 24px; min-height:10.2in; position:relative; }
+  .hdr { text-align:center; margin-bottom:18px; }
+  .brand { font-family:'Playfair Display',Georgia,serif; font-size:24px; font-weight:700; color:${C.charcoal}; letter-spacing:3px; }
+  .sub { margin-top:6px; font-size:9px; color:${C.gold}; letter-spacing:1px; }
+  .rule { width:100%; height:1px; background:${C.gold}; margin:14px 0 20px; }
+  .grid { display:flex; gap:20px; align-items:stretch; }
+  .col { flex:1; }
+  .col-r { flex:0.95; }
+  .status-box { background:${C.white}; border:1px solid ${C.divider}; padding:14px 16px; margin-bottom:18px; }
+  .status-lbl { font-size:7px; font-weight:600; letter-spacing:2px; color:${C.textLight}; margin-bottom:6px; }
+  .status-val { font-family:'Playfair Display',Georgia,serif; font-size:22px; font-weight:700; color:${statusColor}; margin-bottom:6px; }
+  .status-desc { font-size:9px; color:${C.textMuted}; line-height:1.55; }
+  .sec-hdr { font-size:8px; font-weight:700; letter-spacing:2px; color:${C.charcoal}; margin-bottom:10px; }
+  .sec-site { border-left:2px solid ${C.gold}; padding-left:12px; }
+  .sec-off { border-left:3px solid ${C.charcoal}; padding-left:12px; }
+  .li { padding:8px 0; }
+  .li.bordered { border-bottom:1px solid ${C.divider}; }
+  .li-title { font-size:9.5px; font-weight:700; color:${C.charcoal}; margin-bottom:2px; }
+  .li-desc { font-size:9px; color:${C.textMuted}; line-height:1.5; font-style:italic; }
+  .owner { background:${C.charcoalDark}; color:${C.white}; padding:18px 16px; min-height:100%; }
+  .owner-h { font-family:'Playfair Display',Georgia,serif; font-size:14px; color:${C.gold}; margin-bottom:12px; line-height:1.3; }
+  .owner-t { font-size:10px; font-weight:700; margin-bottom:4px; }
+  .owner-dl { font-size:9px; font-weight:600; margin-bottom:10px; }
+  .owner-body { font-size:8.5px; line-height:1.6; color:#e8e8e8; margin-bottom:12px; }
+  .owner-rule { height:1px; background:#444; margin-bottom:8px; }
+  .owner-st { font-size:7.5px; font-weight:700; letter-spacing:1px; color:${C.gold}; }
+  .brief { margin-top:20px; background:${C.briefBg}; padding:12px 16px; font-size:9px; line-height:1.65; color:${C.charcoal}; }
+  .brief b { font-weight:700; }
+  .foot { position:absolute; bottom:20px; right:40px; font-size:7px; color:${C.textLight}; letter-spacing:0.8px; }
 </style></head><body>
-<div class="p1">
-  <div class="title-block">
+<div class="page">
+  <div class="hdr">
     <div class="brand">${esc(projTitle)}</div>
-    <div class="subtitle">${esc(residence)} &nbsp;•&nbsp; Executive Look Ahead &nbsp;•&nbsp; ${esc(windowLabel)}</div>
+    <div class="sub">${esc(residence)} &nbsp;•&nbsp; Executive Look Ahead &nbsp;•&nbsp; ${esc(windowLabel)}</div>
   </div>
+  <div class="rule"></div>
 
-  <div class="status-wrap">
-    <div class="status-label">PROJECT STATUS</div>
-    <div class="status-row">
-      <div class="badge">${esc(ex.status)}</div>
-      <div class="status-text">${esc(ex.statusNarrative)}</div>
+  <div class="grid">
+    <div class="col">
+      <div class="status-box">
+        <div class="status-lbl">PROJECT STATUS</div>
+        <div class="status-val">${esc(ex.status)}</div>
+        <div class="status-desc">${esc(ex.statusNarrative)}</div>
+      </div>
+      <div class="sec-site">
+        <div class="sec-hdr">SITE OPERATIONS</div>
+        ${listItems(ex.siteOperations)}
+      </div>
+    </div>
+    <div class="col">
+      <div class="sec-off">
+        <div class="sec-hdr">OFF-SITE PRODUCTION</div>
+        ${listItems(ex.offSiteProduction)}
+      </div>
+    </div>
+    <div class="col col-r">
+      ${
+        ex.ownerAction
+          ? `
+      <div class="owner">
+        <div class="owner-h">Owner Action<br/>Required</div>
+        <div class="owner-t">${esc(ex.ownerAction.title)}</div>
+        <div class="owner-dl">Deadline: ${esc(ex.ownerAction.deadline)}</div>
+        <div class="owner-body">${esc(ex.ownerAction.description)}</div>
+        <div class="owner-rule"></div>
+        <div class="owner-st">STATUS: ${esc(ex.ownerAction.status)}</div>
+      </div>`
+          : '<div class="owner"><div class="owner-h">Owner Action<br/>Required</div><div class="owner-body">No owner decisions in this window.</div></div>'
+      }
     </div>
   </div>
 
-  ${sectionBlock('Site Operations', ex.siteOperations)}
-  ${sectionBlock('Off-Site Production', ex.offSiteProduction)}
-
-  ${
-    ex.ownerAction
-      ? `
-  <div class="owner">
-    <div class="owner-hdr">Owner Action Required</div>
-    <div class="owner-title">${esc(ex.ownerAction.title)}</div>
-    <div class="owner-line">Deadline: ${esc(ex.ownerAction.deadline)}</div>
-    <div class="owner-line">${esc(ex.ownerAction.description)}</div>
-    <div class="owner-status">STATUS: ${esc(ex.ownerAction.status)}</div>
-  </div>`
-      : ''
-  }
-
   <div class="brief"><b>Executive Brief:</b> ${esc(ex.executiveBrief)}</div>
-</div>
-
-<div class="p2">
-  <div class="footer">Confidential &nbsp;•&nbsp; ${esc(projTitle.replace('RITZ CARLTON', 'Ritz Carlton'))} &nbsp;•&nbsp; Prepared by ${esc(prepared)} &nbsp;•&nbsp; CPM Rev. ${esc(input.revision)}</div>
+  <div class="foot">Confidential &nbsp;•&nbsp; Ritz Carlton ${esc(input.projectNumber)} &nbsp;•&nbsp; Prepared by ${esc(prepared)} &nbsp;•&nbsp; CPM Rev. ${esc(input.revision)}</div>
 </div>
 </body></html>`;
 }
 
 // ── Technical HTML ─────────────────────────────────────────────────────────
 
-function renderActivityRow(
-  act: LookAheadActivity,
-  days: Date[],
-  windowStart: Date,
-  windowEnd: Date
-): string {
+function renderActivityRow(act: LookAheadActivity, days: Date[], windowStart: Date): string {
   const { cleanName } = extractAction(act.activityName);
   const id = (act.activityId || '').replace(/^LA-/, '');
-  const dur = act.remainingDuration || act.originalDuration || 0;
   const st = technicalStatus(act, windowStart);
-  const tf = act.status === 'done' || st === 'PAID ✓' ? '—' : `${act.floatDays}d`;
-  const type = barType(act, windowStart);
-  const overlap = overlapDays(act, windowStart, windowEnd);
-  let labeled = false;
+  const tf = act.status === 'done' ? '—' : `${act.floatDays}d`;
+  const color = ganttColor(act, windowStart);
+  let first = true;
 
   const dayCells = days
     .map((day) => {
-      const active = dayInRange(day, act.startDate, act.finishDate);
-      if (!active) return `<td class="dc"></td>`;
-      const bg = barColor(type);
-      const label = !labeled && overlap > 0 ? `${overlap}d` : '';
-      labeled = true;
-      return `<td class="dc on" style="background:${bg};color:#fff;font-size:5.5px;font-weight:700;">${label}</td>`;
+      if (!dayInRange(day, act.startDate, act.finishDate)) return `<td class="dc"></td>`;
+      const label = first ? '' : '';
+      first = false;
+      return `<td class="dc on" style="background:${color};"></td>`;
     })
     .join('');
 
-  const nameHtml = esc(cleanName).replace(/\n/g, '<br/>');
-  const rowClass = act.floatDays <= 1 && act.status !== 'done' ? 'watch' : '';
-
-  return `<tr class="${rowClass}">
+  const nameLines = esc(cleanName);
+  return `<tr>
     <td class="cid">${esc(id)}</td>
-    <td class="cact">${nameHtml}</td>
-    <td class="cd">${fmtShortSlash(act.startDate)}</td>
-    <td class="cd">${fmtShortSlash(act.finishDate)}</td>
-    <td class="cd">${dur}d</td>
-    <td class="cst">${esc(st)}</td>
+    <td class="cact">${nameLines}</td>
+    <td class="cd">${fmtShort(act.startDate)}</td>
+    <td class="cd">${fmtShort(act.finishDate)}</td>
+    <td class="cst"><span class="badge ${statusBadgeClass(st)}">${esc(st)}</span></td>
     <td class="ctf">${tf}</td>
     ${dayCells}
   </tr>`;
@@ -582,26 +542,21 @@ function splitGroupsAtRowLimit(
 function renderTable(
   groups: { section: string; items: LookAheadActivity[] }[],
   days: Date[],
-  windowStart: Date,
-  windowEnd: Date
+  windowStart: Date
 ): string {
-  const dayHdr = days
-    .map((_, i) => `<th class="dh">${String(i + 1).padStart(2, '0')}</th>`)
-    .join('');
+  const dayHdr = days.map((d) => `<th class="dh">${d.getDate()}</th>`).join('');
   let body = '';
-  const colSpan = 7 + days.length;
+  const colSpan = 6 + days.length;
   for (const g of groups) {
-    body += `<tr class="sec"><td colspan="${colSpan}">◆ &nbsp;${esc(g.section)}</td></tr>`;
-    for (const act of g.items) body += renderActivityRow(act, days, windowStart, windowEnd);
+    body += `<tr class="sec"><td colspan="${colSpan}">◆ ${esc(g.section)}</td></tr>`;
+    for (const act of g.items) body += renderActivityRow(act, days, windowStart);
   }
   return `<table class="tbl">
     <thead><tr>
       <th class="cid">ID</th><th class="cact">ACTIVITY DESCRIPTION</th>
-      <th class="cd">START</th><th class="cd">FINISH</th><th class="cd">DUR</th>
-      <th class="cst">STATUS</th><th class="ctf">TF</th>${dayHdr}
-    </tr></thead>
-    <tbody>${body}</tbody>
-  </table>`;
+      <th class="cd">START</th><th class="cd">FINISH</th><th class="cst">STATUS</th><th class="ctf">TF</th>
+      ${dayHdr}
+    </tr></thead><tbody>${body}</tbody></table>`;
 }
 
 export function buildTechnicalLookaheadHtml(input: LookAheadPdfInput): string {
@@ -610,140 +565,166 @@ export function buildTechnicalLookaheadHtml(input: LookAheadPdfInput): string {
   const prepared = formatPreparedBy(input.preparedBy).toUpperCase();
   const days = buildDayColumns(input.windowStart);
   const groups = groupBySection(input.activities);
-  const { starts, finishes, continues, critical } = classifyActivities(
+  const { starts, continues, critical } = classifyActivities(
     input.activities,
     input.windowStart,
     input.windowEnd
   );
 
+  const inWindow = input.activities.length;
   const activeFloats = input.activities.filter((a) => a.status !== 'done').map((a) => a.floatDays);
-  const tightestFloat = activeFloats.length ? Math.min(...activeFloats) : null;
+  const tightestFloat = activeFloats.length ? Math.min(...activeFloats) : 0;
 
-  const ownerMilestone = input.activities.find((a) => idStartsWithM(a) || /owner.*lock/i.test(a.activityName));
-  const ownerKpi = ownerMilestone?.finishDate
-    ? `${fmtMonthDayShort(ownerMilestone.finishDate).replace('.', '')} OWNER MARBLE LOCK`
-    : 'OWNER MILESTONE';
+  const ownerMilestone = input.activities.find((a) => /owner|stone lock/i.test(a.activityName));
+  const ownerDate = ownerMilestone?.finishDate
+    ? `${fmtMonthDayShort(ownerMilestone.finishDate).replace('.', '')}`
+    : fmtMonthDayShort(input.windowEnd).replace('.', '');
+  const ownerLabel = `${ownerDate}<br/><span class="own-sub">OWNER STONE LOCK</span>`;
 
-  const inventoryAct =
-    input.activities.find((a) => /wood floor|hardwood|inventory/i.test(a.activityName)) ||
-    input.activities.find((a) => /paid|secure|funded/i.test(a.notes || ''));
-  const inventoryKpi = inventoryAct
-    ? inventoryAct.notes?.toUpperCase().includes('SECURE')
-      ? 'Secure'
-      : 'WOOD FLOOR INVENTORY'
-    : 'MATERIAL STATUS';
-
-  const scheduleStatus = critical.length >= 2 ? '● At Risk' : '● On Track';
+  const scheduleStatus = critical.length >= 3 ? '● At Risk' : '● On Track';
   const focus = input.technicalFocus?.length ? input.technicalFocus : buildFallbackTechnicalFocus(input);
 
   const focusHtml = focus
-    .map(
-      (f) => `
+    .map((f) => {
+      let hdrClass = 'fh-gold';
+      if (f.heading.includes('OWNER')) hdrClass = 'fh-purple';
+      else if (f.heading.includes('CRITICAL PATH')) hdrClass = 'fh-brick';
+      else if (f.heading.includes('PHASE')) hdrClass = 'fh-grey';
+      return `
     <div class="fi">
-      <div class="fi-h">◆ ${esc(f.heading)}</div>
+      <div class="fi-h ${hdrClass}">◆ ${esc(f.heading)}</div>
       <div class="fi-t">${esc(f.title)}</div>
       <div class="fi-b">${esc(f.body)}</div>
-    </div>`
-    )
+    </div>`;
+    })
     .join('');
 
-  const [page1Groups, page2Groups] = splitGroupsAtRowLimit(groups, 14);
-  const table1 = renderTable(page1Groups, days, input.windowStart, input.windowEnd);
+  const [page1Groups, page2Groups] = splitGroupsAtRowLimit(groups, 13);
+  const table1 = renderTable(page1Groups, days, input.windowStart);
 
-  const page2 =
-    page2Groups.length > 0
-      ? `
-  <div class="page brk">
-    ${renderTable(page2Groups, days, input.windowStart, input.windowEnd)}
-    <div class="foot">${esc(projTitle)} &nbsp; EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(input.revision)} &nbsp; CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</div>
-  </div>`
-      : '';
+  const tcoNote = input.tcoDate
+    ? `Note: TCO target milestone remains ${fmtMonthDay(input.tcoDate)}.`
+    : 'Note: Period metrics aligned with Primavera P6 Master Schedule benchmarks.';
+
+  const page2 = page2Groups.length
+    ? `
+<div class="page brk">
+  ${renderTable(page2Groups, days, input.windowStart)}
+  <div class="footbar">
+    <span>RITZ CARLTON PRIVATE RESIDENCES — ${esc(input.projectNumber)}</span>
+    <span>EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(input.revision)}</span>
+    <span>CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</span>
+  </div>
+</div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+${FONTS}
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Inter',Arial,sans-serif; font-size:7px; color:#1a1a1a; background:#fff; }
-  .page { padding:10px 12px 28px; position:relative; min-height:7.8in; }
-  .brk { page-break-before:always; }
-  .hdr { border-bottom:2.5px solid #C9A96E; padding-bottom:6px; margin-bottom:6px; }
-  .hdr-t { font-size:11px; font-weight:800; letter-spacing:3px; color:#0F1B33; }
-  .hdr-s { font-size:7px; letter-spacing:1.5px; color:#666; margin-top:2px; }
-  .meta { font-size:7px; color:#333; margin-bottom:6px; line-height:1.6; }
-  .meta b { color:#0F1B33; }
-  .kpis { display:flex; border-top:1px solid #ccc; border-bottom:1px solid #ccc; margin-bottom:5px; }
-  .kpi { flex:1; text-align:center; padding:7px 4px; border-right:1px solid #e5e5e5; }
+  body { font-family:'Montserrat',Arial,sans-serif; background:${C.creamTech}; color:${C.text}; font-size:7px; }
+  .page { padding:10px 14px 30px; position:relative; min-height:7.6in; border:1px solid ${C.divider}; }
+  .brk { page-break-before:always; padding-top:14px; }
+  .hdr { border-bottom:2px solid ${C.gold}; padding-bottom:6px; margin-bottom:0; }
+  .hdr-t { font-family:'Playfair Display',Georgia,serif; font-size:13px; font-weight:700; color:${C.charcoal}; letter-spacing:2px; }
+  .hdr-s { font-size:7px; color:${C.gold}; letter-spacing:1.5px; margin-top:2px; font-weight:600; }
+  .meta { display:flex; background:${C.beigeMeta}; border-bottom:1px solid ${C.divider}; font-size:6.5px; }
+  .meta-i { flex:1; padding:6px 10px; border-right:1px solid ${C.divider}; }
+  .meta-i:last-child { border-right:none; }
+  .meta-l { font-weight:700; color:${C.charcoal}; margin-bottom:1px; }
+  .meta-v { color:${C.text}; }
+  .kpis { display:flex; border-bottom:1px solid ${C.divider}; }
+  .kpi { flex:1; text-align:center; padding:8px 4px; border-right:1px solid ${C.divider}; background:${C.white}; }
   .kpi:last-child { border-right:none; }
-  .kpi-n { font-size:16px; font-weight:800; color:#0F1B33; line-height:1; }
-  .kpi-n.sm { font-size:9px; font-weight:700; letter-spacing:0.3px; }
-  .kpi-l { font-size:5.5px; font-weight:600; letter-spacing:0.8px; color:#777; margin-top:3px; text-transform:uppercase; }
-  .legend { font-size:6px; color:#555; margin-bottom:5px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .sw { display:inline-block; width:10px; height:7px; margin-right:3px; vertical-align:middle; }
-  .layout { display:flex; gap:8px; align-items:flex-start; }
+  .kpi-n { font-family:'Playfair Display',Georgia,serif; font-size:20px; font-weight:700; color:${C.charcoal}; line-height:1; }
+  .kpi-n.red { color:${C.brick}; }
+  .kpi-n.purple { font-size:11px; color:${C.purple}; line-height:1.2; }
+  .own-sub { font-size:5.5px; font-weight:700; letter-spacing:0.5px; }
+  .kpi-l { font-size:5px; font-weight:600; letter-spacing:0.8px; color:${C.textMuted}; margin-top:3px; text-transform:uppercase; }
+  .legend { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:5px 10px; font-size:5.5px; color:${C.text}; border-bottom:1px solid ${C.divider}; background:${C.white}; }
+  .sw { display:inline-block; width:10px; height:6px; margin-right:2px; vertical-align:middle; border-radius:1px; }
+  .layout { display:flex; gap:8px; margin-top:6px; }
   .tbl-wrap { flex:1; min-width:0; }
-  .side { width:155px; flex-shrink:0; }
-  .focus { border:1.5px solid #8B0000; background:#fffafa; }
-  .focus-h { background:#8B0000; color:#fff; font-size:6.5px; font-weight:700; letter-spacing:1.5px; padding:5px 6px; }
-  .focus-b { padding:6px; }
-  .fi { margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #f0d8d8; }
-  .fi:last-child { border-bottom:none; margin-bottom:0; }
-  .fi-h { font-size:6px; font-weight:700; color:#8B0000; letter-spacing:0.5px; margin-bottom:2px; }
-  .fi-t { font-size:6.5px; font-weight:700; color:#0F1B33; line-height:1.3; margin-bottom:2px; }
-  .fi-b { font-size:6px; color:#444; line-height:1.45; }
-  .note { font-size:5.5px; color:#888; font-style:italic; margin-top:6px; line-height:1.4; }
+  .side { width:148px; flex-shrink:0; }
+  .focus { border:1px solid ${C.divider}; background:${C.white}; }
+  .focus-hdr { font-size:7px; font-weight:700; letter-spacing:1.5px; padding:5px 8px; border-bottom:1px solid ${C.divider}; color:${C.charcoal}; }
+  .focus-body { padding:6px 8px; }
+  .fi { margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid ${C.divider}; }
+  .fi:last-child { border-bottom:none; }
+  .fi-h { font-size:5.5px; font-weight:700; letter-spacing:0.3px; margin-bottom:2px; }
+  .fh-purple { color:${C.purple}; }
+  .fh-brick { color:${C.brick}; }
+  .fh-gold { color:${C.goldDark}; }
+  .fh-grey { color:${C.charcoal}; }
+  .fi-t { font-size:6px; font-weight:700; color:${C.charcoal}; line-height:1.3; margin-bottom:2px; }
+  .fi-b { font-size:5.5px; color:${C.textMuted}; line-height:1.45; }
+  .note { font-size:5px; color:${C.textLight}; font-style:italic; margin-top:6px; line-height:1.4; }
   .tbl { width:100%; border-collapse:collapse; table-layout:fixed; }
-  .tbl th { background:#0F1B33; color:#fff; font-size:6px; font-weight:700; padding:3px 2px; border:1px solid #0a1225; text-align:center; }
+  .tbl th { background:${C.beige}; color:${C.charcoal}; font-size:5.5px; font-weight:700; padding:4px 2px; border:1px solid ${C.divider}; text-align:center; letter-spacing:0.3px; }
   .tbl th.cact, .tbl td.cact { text-align:left; }
-  .tbl td { border:1px solid #e0e0e0; padding:2px 3px; vertical-align:middle; font-size:6px; }
-  .tbl tr.sec td { background:#ece6dc; font-weight:700; font-size:6.5px; color:#0F1B33; padding:4px 6px; }
-  .tbl tr.watch td.cact { color:#8B0000; font-weight:700; }
-  .cid { width:28px; text-align:center; font-weight:600; }
-  .cact { width:130px; line-height:1.25; }
-  .cd { width:30px; text-align:center; }
-  .cst { width:38px; text-align:center; font-size:5.5px; font-weight:700; }
-  .ctf { width:22px; text-align:center; }
-  .dh { width:16px; }
-  .dc { width:16px; height:12px; padding:0; }
-  .dc.on { text-align:center; vertical-align:middle; }
-  .foot { position:absolute; bottom:8px; left:12px; right:12px; text-align:center; font-size:6px; color:#888; letter-spacing:0.6px; text-transform:uppercase; border-top:1px solid #ddd; padding-top:6px; }
+  .tbl td { border:1px solid ${C.divider}; padding:3px 3px; vertical-align:middle; font-size:5.5px; background:${C.white}; }
+  .tbl tr.sec td { background:${C.beige}; font-weight:700; font-size:6px; color:${C.goldDark}; padding:4px 6px; font-style:italic; }
+  .cid { width:26px; text-align:center; font-weight:700; }
+  .cact { width:118px; line-height:1.25; }
+  .cd { width:30px; text-align:center; font-size:5px; }
+  .cst { width:42px; text-align:center; }
+  .ctf { width:18px; text-align:center; font-weight:600; }
+  .dh { width:15px; font-size:5px; }
+  .dc { width:15px; height:11px; padding:0; }
+  .dc.on { border:1px solid rgba(0,0,0,0.08); }
+  .badge { display:inline-block; padding:1px 3px; border-radius:2px; font-size:4.5px; font-weight:700; letter-spacing:0.2px; line-height:1.2; white-space:nowrap; }
+  .st-owner { color:${C.purple}; border:1px solid ${C.purple}; background:#f5f0f6; }
+  .st-critical { color:${C.brick}; border:1px solid ${C.brick}; background:#fdf5f5; }
+  .st-watch { color:${C.brick}; border:1px solid #c07070; background:#fdf8f8; }
+  .st-ip { color:#5a6b4a; border:1px solid ${C.gold}; background:#faf8f2; }
+  .st-pend { color:${C.blue}; border:1px solid ${C.blue}; background:#f4f7fa; }
+  .footbar { display:flex; justify-content:space-between; margin-top:16px; padding:8px 12px; background:${C.beige}; font-size:5.5px; color:${C.textMuted}; letter-spacing:0.5px; text-transform:uppercase; border-top:1px solid ${C.divider}; }
 </style></head><body>
+
 <div class="page">
   <div class="hdr">
     <div class="hdr-t">${esc(projTitle)}</div>
     <div class="hdr-s">EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; ${esc(residence)}</div>
   </div>
   <div class="meta">
-    <b>Reporting Window:</b> ${esc(fmtWindowMeta(input.windowStart, input.windowEnd))} &nbsp;&nbsp;
-    <b>Data Date:</b> ${esc(fmtMonthDayShort(input.dataDate))} &nbsp;&nbsp;
-    <b>Schedule Status:</b> ${scheduleStatus} &nbsp;&nbsp;
-    <b>Reference:</b> CPM Rev. ${esc(input.revision)}
+    <div class="meta-i"><div class="meta-l">Reporting Window</div><div class="meta-v">${esc(fmtWindowMeta(input.windowStart, input.windowEnd))}</div></div>
+    <div class="meta-i"><div class="meta-l">Data Date</div><div class="meta-v">${esc(fmtMonthDayShort(input.dataDate))}, ${input.dataDate.getFullYear()}</div></div>
+    <div class="meta-i"><div class="meta-l">Schedule Status</div><div class="meta-v">${scheduleStatus}</div></div>
+    <div class="meta-i"><div class="meta-l">Reference</div><div class="meta-v">CPM Rev. ${esc(input.revision)}</div></div>
   </div>
   <div class="kpis">
+    <div class="kpi"><div class="kpi-n">${inWindow}</div><div class="kpi-l">Activities in Window</div></div>
     <div class="kpi"><div class="kpi-n">${starts.length}</div><div class="kpi-l">Activities Starting</div></div>
-    <div class="kpi"><div class="kpi-n">${finishes.length}</div><div class="kpi-l">Activities Finishing</div></div>
     <div class="kpi"><div class="kpi-n">${continues.length}</div><div class="kpi-l">Continuing</div></div>
-    <div class="kpi"><div class="kpi-n">${tightestFloat !== null ? `${tightestFloat}d` : '—'}</div><div class="kpi-l">Tightest Float</div></div>
-    <div class="kpi"><div class="kpi-n sm">${esc(ownerKpi)}</div><div class="kpi-l">Owner Milestone</div></div>
-    <div class="kpi"><div class="kpi-n sm">${esc(inventoryKpi)}</div><div class="kpi-l">Materials</div></div>
+    <div class="kpi"><div class="kpi-n red">${critical.length}</div><div class="kpi-l">Critical in Window</div></div>
+    <div class="kpi"><div class="kpi-n red">${tightestFloat}d</div><div class="kpi-l">Tightest Float</div></div>
+    <div class="kpi"><div class="kpi-n purple">${ownerLabel}</div><div class="kpi-l">Owner Milestone</div></div>
   </div>
   <div class="legend">
-    <span><span class="sw" style="background:#8B0000"></span>Critical Path</span>
-    <span><span class="sw" style="background:#1F4E79"></span>In Progress</span>
-    <span><span class="sw" style="background:#9ca3af"></span>Pending / Upcoming</span>
-    <span><span class="sw" style="background:#C9A96E"></span>Owner Decision</span>
-    <span style="margin-left:8px;">TF = Total Float &nbsp;|&nbsp; 0–1d = Critical &nbsp;|&nbsp; 2–5d = Watch &nbsp;|&nbsp; &gt;5d = Float Available</span>
+    <span><span class="sw" style="background:${C.goldDark}"></span>Critical Path</span>
+    <span><span class="sw" style="background:${C.greenBar}"></span>In Progress</span>
+    <span><span class="sw" style="background:${C.blueBar}"></span>Pending / Upcoming</span>
+    <span><span class="sw" style="background:${C.greyBar}"></span>Completed</span>
+    <span><span class="sw" style="background:${C.purple}"></span>Owner Decision</span>
+    <span><span class="sw" style="background:${C.brick}"></span>At Risk Focus</span>
+    <span style="margin-left:6px;">TF = Total Float &nbsp;|&nbsp; 0–1d Critical &nbsp;|&nbsp; 2–14d Watch &nbsp;|&nbsp; &gt;14d Float</span>
   </div>
   <div class="layout">
     <div class="tbl-wrap">${table1}</div>
     <div class="side">
       <div class="focus">
-        <div class="focus-h">CRITICAL FOCUS</div>
-        <div class="focus-b">${focusHtml}</div>
+        <div class="focus-hdr">CRITICAL FOCUS</div>
+        <div class="focus-body">${focusHtml}</div>
       </div>
-      <div class="note">Note: General project continuity metrics are fully aligned with Primavera P6 Master Schedule data benchmarks for current period transition.</div>
+      <div class="note">${esc(tcoNote)} Period metrics aligned with Primavera P6 Master Schedule benchmarks.</div>
     </div>
   </div>
-  ${page2Groups.length === 0 ? `<div class="foot">${esc(projTitle)} &nbsp; EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(input.revision)} &nbsp; CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</div>` : ''}
+  ${page2Groups.length === 0 ? `
+  <div class="footbar">
+    <span>RITZ CARLTON PRIVATE RESIDENCES — ${esc(input.projectNumber)}</span>
+    <span>EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(input.revision)}</span>
+    <span>CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</span>
+  </div>` : ''}
 </div>
 ${page2}
 </body></html>`;

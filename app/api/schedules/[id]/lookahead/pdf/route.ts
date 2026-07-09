@@ -65,18 +65,17 @@ async function generateExecutiveContent(
 ): Promise<ExecutiveContent> {
   const fallback = buildFallbackExecutiveContent(input);
   const parsed = await callLlmJson<Partial<ExecutiveContent>>(
-    `You write Ritz-Carlton residence executive 2-week look-ahead annexes for ultra-high-net-worth owners.
+    `You write Ritz-Carlton residence executive look-ahead annexes matching the Meeting 07 reference format exactly.
 Output JSON only:
 {
   "status": "ON TRACK" | "AT RISK" | "DELAYED",
-  "statusNarrative": "1-2 elegant sentences",
-  "siteOperations": [{"title": "3-5 word punchy title", "description": "1-2 sentences"}],
-  "offSiteProduction": [{"title": "3-5 word punchy title", "description": "1-2 sentences"}],
-  "ownerAction": {"title": "...", "deadline": "Month D, YYYY", "status": "AWAITING FINAL LOCK", "description": "2-3 sentences on cascade impact"} or null,
-  "executiveBrief": "one flowing paragraph, no label prefix"
+  "statusNarrative": "1-2 sentences, owner-facing",
+  "siteOperations": [{"title": "Short Headline", "description": "1-2 sentences italic tone"}],
+  "offSiteProduction": [{"title": "Short Headline", "description": "1-2 sentences"}],
+  "ownerAction": {"title": "...", "deadline": "Month D, YYYY", "status": "IN PROGRESS – AWAITING LOCK", "description": "3-4 sentences on cascade impact"} or null,
+  "executiveBrief": "one paragraph, no prefix"
 }
-Titles must read like magazine headlines (e.g. "Partition Framing Rises", "Main Kitchen Fabrication") — never raw CPM IDs.
-Use 3-4 site items and 2-3 off-site items. Tone: confident, Ritz-level, owner-facing.`,
+Use exactly 3 site items and 3 off-site items. Titles like "Partition Framing Begins", "Main Kitchen Fabrication". Never use activity IDs.`,
     `Project: ${input.projectName}
 Owner: ${input.client || 'Owner'}
 CPM: ${input.revision}
@@ -114,11 +113,10 @@ async function generateTechnicalFocus(
 ): Promise<TechnicalFocusItem[]> {
   const fallback = buildFallbackTechnicalFocus(input);
   const parsed = await callLlmJson<TechnicalFocusItem[]>(
-    `You write CRITICAL FOCUS sidebar items for a Ritz-Carlton technical look-ahead annex.
-Output JSON array of 4-6 items:
-[{"heading": "OWNER KEY MILESTONE", "title": "...", "body": "2-3 sentences"}]
-Headings should be like: OWNER KEY MILESTONE, TIGHTEST CRITICAL PATH (TF: 1D), COORDINATION WATCH (TF: 4D), PROCUREMENT ASSURANCE, CUSTOM COMPONENT TRACKING.
-Be specific to the activities. Owner-facing but technical.`,
+    `You write CRITICAL FOCUS sidebar for Ritz-Carlton technical look-ahead (Meeting 07 reference).
+Output JSON array of 4-5 items:
+[{"heading": "OWNER KEY DECISION (TF: 0D)", "title": "...", "body": "2-3 sentences"}]
+Use headings: OWNER KEY DECISION (TF: 0D), CRITICAL PATH (TF: 0D), PHASE TRANSITION, COORDINATION WATCH (TF: X–YD), PROCUREMENT ASSURANCE.`,
     `Project: ${input.projectName}
 Window: ${fmtDayRange(input.windowStart, input.windowEnd)}
 
