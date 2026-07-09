@@ -47,6 +47,17 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         if (status === 'authenticated') {
+          if (!sessionStorage.getItem('kodu_locale_migrated')) {
+            try {
+              const mig = await fetch('/api/internal/migrate-user-locale', {
+                method: 'POST',
+                credentials: 'include',
+              });
+              if (mig.ok) sessionStorage.setItem('kodu_locale_migrated', '1');
+            } catch {
+              // migration endpoint optional until DB column exists
+            }
+          }
           const res = await fetch('/api/user/profile', { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
