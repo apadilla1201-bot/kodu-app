@@ -481,27 +481,27 @@ ${FONTS}
 
 // ── Technical HTML ─────────────────────────────────────────────────────────
 
+function countTableRows(groups: { section: string; items: LookAheadActivity[] }[]): number {
+  return groups.reduce((sum, g) => sum + 1 + g.items.length, 0);
+}
+
 function renderActivityRow(act: LookAheadActivity, days: Date[], windowStart: Date): string {
   const { cleanName } = extractAction(act.activityName);
   const id = (act.activityId || '').replace(/^LA-/, '');
   const st = technicalStatus(act, windowStart);
   const tf = act.status === 'done' ? '—' : `${act.floatDays}d`;
   const color = ganttColor(act, windowStart);
-  let first = true;
 
   const dayCells = days
     .map((day) => {
       if (!dayInRange(day, act.startDate, act.finishDate)) return `<td class="dc"></td>`;
-      const label = first ? '' : '';
-      first = false;
       return `<td class="dc on" style="background:${color};"></td>`;
     })
     .join('');
 
-  const nameLines = esc(cleanName);
-  return `<tr>
+  return `<tr class="data-row">
     <td class="cid">${esc(id)}</td>
-    <td class="cact">${nameLines}</td>
+    <td class="cact">${esc(cleanName)}</td>
     <td class="cd">${fmtShort(act.startDate)}</td>
     <td class="cd">${fmtShort(act.finishDate)}</td>
     <td class="cst"><span class="badge ${statusBadgeClass(st)}">${esc(st)}</span></td>
@@ -539,24 +539,45 @@ function splitGroupsAtRowLimit(
   return [page1, page2];
 }
 
-function renderTable(
+function renderTableHead(days: Date[]): string {
+  const dayHdr = days.map((d) => `<th class="dh">${d.getDate()}</th>`).join('');
+  return `<thead><tr>
+    <th class="cid">ID</th><th class="cact">ACTIVITY DESCRIPTION</th>
+    <th class="cd">START</th><th class="cd">FINISH</th><th class="cst">STATUS</th><th class="ctf">TF</th>
+    ${dayHdr}
+  </tr></thead>`;
+}
+
+function renderTableBody(
   groups: { section: string; items: LookAheadActivity[] }[],
   days: Date[],
   windowStart: Date
 ): string {
-  const dayHdr = days.map((d) => `<th class="dh">${d.getDate()}</th>`).join('');
-  let body = '';
   const colSpan = 6 + days.length;
+  let body = '';
   for (const g of groups) {
     body += `<tr class="sec"><td colspan="${colSpan}">◆ ${esc(g.section)}</td></tr>`;
     for (const act of g.items) body += renderActivityRow(act, days, windowStart);
   }
-  return `<table class="tbl">
-    <thead><tr>
-      <th class="cid">ID</th><th class="cact">ACTIVITY DESCRIPTION</th>
-      <th class="cd">START</th><th class="cd">FINISH</th><th class="cst">STATUS</th><th class="ctf">TF</th>
-      ${dayHdr}
-    </tr></thead><tbody>${body}</tbody></table>`;
+  return body;
+}
+
+function renderTable(
+  groups: { section: string; items: LookAheadActivity[] }[],
+  days: Date[],
+  windowStart: Date,
+  fullWidth = false
+): string {
+  const cls = fullWidth ? 'tbl tbl-full' : 'tbl';
+  return `<table class="${cls}">${renderTableHead(days)}<tbody>${renderTableBody(groups, days, windowStart)}</tbody></table>`;
+}
+
+function renderFootbar(projectNumber: string, revision: string, prepared: string): string {
+  return `<div class="footbar">
+    <span>RITZ CARLTON PRIVATE RESIDENCES — ${esc(projectNumber)}</span>
+    <span>EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(revision)}</span>
+    <span>CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</span>
+  </div>`;
 }
 
 export function buildTechnicalLookaheadHtml(input: LookAheadPdfInput): string {
@@ -599,89 +620,101 @@ export function buildTechnicalLookaheadHtml(input: LookAheadPdfInput): string {
     })
     .join('');
 
-  const [page1Groups, page2Groups] = splitGroupsAtRowLimit(groups, 13);
-  const table1 = renderTable(page1Groups, days, input.windowStart);
+  const totalRows = countTableRows(groups);
+  // ~19 data rows fit on page 1 with sidebar; beyond that, continue on page 2 full-width
+  const page1RowBudget = 19;
+  const needsPage2 = totalRows > page1RowBudget;
+  const [page1Groups, page2Groups] = needsPage2
+    ? splitGroupsAtRowLimit(groups, page1RowBudget)
+    : [groups, [] as { section: string; items: LookAheadActivity[] }[]];
+
+  const table1 = renderTable(page1Groups, days, input.windowStart, false);
 
   const tcoNote = input.tcoDate
     ? `Note: TCO target milestone remains ${fmtMonthDay(input.tcoDate)}.`
     : 'Note: Period metrics aligned with Primavera P6 Master Schedule benchmarks.';
 
-  const page2 = page2Groups.length
-    ? `
-<div class="page brk">
-  ${renderTable(page2Groups, days, input.windowStart)}
-  <div class="footbar">
-    <span>RITZ CARLTON PRIVATE RESIDENCES — ${esc(input.projectNumber)}</span>
-    <span>EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(input.revision)}</span>
-    <span>CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</span>
-  </div>
-</div>`
-    : '';
+  const footbar = renderFootbar(input.projectNumber, input.revision, prepared);
+
+  const page2 =
+    page2Groups.length > 0
+      ? `
+<section class="continuation">
+  <div class="cont-label">${esc(projTitle)} &nbsp;·&nbsp; Executive Technical Look Ahead — Continued</div>
+  ${renderTable(page2Groups, days, input.windowStart, true)}
+  ${footbar}
+</section>`
+      : '';
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 ${FONTS}
+  @page { size: 17in 11in; margin: 5mm 4mm; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Montserrat',Arial,sans-serif; background:${C.creamTech}; color:${C.text}; font-size:7px; }
-  .page { padding:10px 14px 30px; position:relative; min-height:7.6in; border:1px solid ${C.divider}; }
-  .brk { page-break-before:always; padding-top:14px; }
-  .hdr { border-bottom:2px solid ${C.gold}; padding-bottom:6px; margin-bottom:0; }
-  .hdr-t { font-family:'Playfair Display',Georgia,serif; font-size:13px; font-weight:700; color:${C.charcoal}; letter-spacing:2px; }
-  .hdr-s { font-size:7px; color:${C.gold}; letter-spacing:1.5px; margin-top:2px; font-weight:600; }
-  .meta { display:flex; background:${C.beigeMeta}; border-bottom:1px solid ${C.divider}; font-size:6.5px; }
-  .meta-i { flex:1; padding:6px 10px; border-right:1px solid ${C.divider}; }
+  html, body { font-family:'Montserrat',Arial,sans-serif; background:${C.creamTech}; color:${C.text}; font-size:7px; }
+  .sheet { padding:0; }
+  .hdr { border-bottom:2px solid ${C.gold}; padding-bottom:5px; margin-bottom:0; }
+  .hdr-t { font-family:'Playfair Display',Georgia,serif; font-size:12px; font-weight:700; color:${C.charcoal}; letter-spacing:2px; }
+  .hdr-s { font-size:6.5px; color:${C.gold}; letter-spacing:1.5px; margin-top:2px; font-weight:600; }
+  .meta { display:flex; background:${C.beigeMeta}; border-bottom:1px solid ${C.divider}; font-size:6px; }
+  .meta-i { flex:1; padding:5px 8px; border-right:1px solid ${C.divider}; }
   .meta-i:last-child { border-right:none; }
   .meta-l { font-weight:700; color:${C.charcoal}; margin-bottom:1px; }
   .meta-v { color:${C.text}; }
   .kpis { display:flex; border-bottom:1px solid ${C.divider}; }
-  .kpi { flex:1; text-align:center; padding:8px 4px; border-right:1px solid ${C.divider}; background:${C.white}; }
+  .kpi { flex:1; text-align:center; padding:6px 3px; border-right:1px solid ${C.divider}; background:${C.white}; }
   .kpi:last-child { border-right:none; }
-  .kpi-n { font-family:'Playfair Display',Georgia,serif; font-size:20px; font-weight:700; color:${C.charcoal}; line-height:1; }
+  .kpi-n { font-family:'Playfair Display',Georgia,serif; font-size:17px; font-weight:700; color:${C.charcoal}; line-height:1; }
   .kpi-n.red { color:${C.brick}; }
-  .kpi-n.purple { font-size:11px; color:${C.purple}; line-height:1.2; }
-  .own-sub { font-size:5.5px; font-weight:700; letter-spacing:0.5px; }
-  .kpi-l { font-size:5px; font-weight:600; letter-spacing:0.8px; color:${C.textMuted}; margin-top:3px; text-transform:uppercase; }
-  .legend { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:5px 10px; font-size:5.5px; color:${C.text}; border-bottom:1px solid ${C.divider}; background:${C.white}; }
-  .sw { display:inline-block; width:10px; height:6px; margin-right:2px; vertical-align:middle; border-radius:1px; }
-  .layout { display:flex; gap:8px; margin-top:6px; }
+  .kpi-n.purple { font-size:10px; color:${C.purple}; line-height:1.15; }
+  .own-sub { font-size:5px; font-weight:700; letter-spacing:0.4px; display:block; margin-top:1px; }
+  .kpi-l { font-size:4.8px; font-weight:600; letter-spacing:0.7px; color:${C.textMuted}; margin-top:2px; text-transform:uppercase; }
+  .legend { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:4px 8px; font-size:5.2px; color:${C.text}; border-bottom:1px solid ${C.divider}; background:${C.white}; }
+  .sw { display:inline-block; width:9px; height:5px; margin-right:2px; vertical-align:middle; border-radius:1px; }
+  .layout { display:flex; gap:7px; align-items:flex-start; margin-top:4px; }
   .tbl-wrap { flex:1; min-width:0; }
-  .side { width:148px; flex-shrink:0; }
+  .side { width:142px; flex-shrink:0; }
   .focus { border:1px solid ${C.divider}; background:${C.white}; }
-  .focus-hdr { font-size:7px; font-weight:700; letter-spacing:1.5px; padding:5px 8px; border-bottom:1px solid ${C.divider}; color:${C.charcoal}; }
-  .focus-body { padding:6px 8px; }
-  .fi { margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid ${C.divider}; }
-  .fi:last-child { border-bottom:none; }
-  .fi-h { font-size:5.5px; font-weight:700; letter-spacing:0.3px; margin-bottom:2px; }
+  .focus-hdr { font-size:6.5px; font-weight:700; letter-spacing:1.2px; padding:4px 7px; border-bottom:1px solid ${C.divider}; color:${C.charcoal}; }
+  .focus-body { padding:5px 7px; }
+  .fi { margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid ${C.divider}; }
+  .fi:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+  .fi-h { font-size:5.2px; font-weight:700; letter-spacing:0.2px; margin-bottom:2px; }
   .fh-purple { color:${C.purple}; }
   .fh-brick { color:${C.brick}; }
   .fh-gold { color:${C.goldDark}; }
   .fh-grey { color:${C.charcoal}; }
-  .fi-t { font-size:6px; font-weight:700; color:${C.charcoal}; line-height:1.3; margin-bottom:2px; }
-  .fi-b { font-size:5.5px; color:${C.textMuted}; line-height:1.45; }
-  .note { font-size:5px; color:${C.textLight}; font-style:italic; margin-top:6px; line-height:1.4; }
+  .fi-t { font-size:5.8px; font-weight:700; color:${C.charcoal}; line-height:1.25; margin-bottom:2px; }
+  .fi-b { font-size:5.2px; color:${C.textMuted}; line-height:1.4; }
+  .note { font-size:4.8px; color:${C.textLight}; font-style:italic; margin-top:5px; line-height:1.35; }
   .tbl { width:100%; border-collapse:collapse; table-layout:fixed; }
-  .tbl th { background:${C.beige}; color:${C.charcoal}; font-size:5.5px; font-weight:700; padding:4px 2px; border:1px solid ${C.divider}; text-align:center; letter-spacing:0.3px; }
+  .tbl-full { width:100%; }
+  .tbl thead { display:table-header-group; }
+  .tbl th { background:${C.beige}; color:${C.charcoal}; font-size:5.2px; font-weight:700; padding:3px 2px; border:1px solid ${C.divider}; text-align:center; letter-spacing:0.2px; }
   .tbl th.cact, .tbl td.cact { text-align:left; }
-  .tbl td { border:1px solid ${C.divider}; padding:3px 3px; vertical-align:middle; font-size:5.5px; background:${C.white}; }
-  .tbl tr.sec td { background:${C.beige}; font-weight:700; font-size:6px; color:${C.goldDark}; padding:4px 6px; font-style:italic; }
-  .cid { width:26px; text-align:center; font-weight:700; }
-  .cact { width:118px; line-height:1.25; }
-  .cd { width:30px; text-align:center; font-size:5px; }
-  .cst { width:42px; text-align:center; }
-  .ctf { width:18px; text-align:center; font-weight:600; }
-  .dh { width:15px; font-size:5px; }
-  .dc { width:15px; height:11px; padding:0; }
-  .dc.on { border:1px solid rgba(0,0,0,0.08); }
-  .badge { display:inline-block; padding:1px 3px; border-radius:2px; font-size:4.5px; font-weight:700; letter-spacing:0.2px; line-height:1.2; white-space:nowrap; }
+  .tbl td { border:1px solid ${C.divider}; padding:2px 2px; vertical-align:middle; font-size:5.2px; background:${C.white}; }
+  .tbl tr.sec td { background:${C.beige}; font-weight:700; font-size:5.8px; color:${C.goldDark}; padding:3px 5px; font-style:italic; }
+  .tbl tr.data-row { page-break-inside:avoid; break-inside:avoid; }
+  .cid { width:24px; text-align:center; font-weight:700; }
+  .cact { width:112px; line-height:1.2; }
+  .cd { width:28px; text-align:center; font-size:4.8px; }
+  .cst { width:40px; text-align:center; }
+  .ctf { width:16px; text-align:center; font-weight:600; }
+  .dh { width:14px; font-size:4.8px; }
+  .dc { width:14px; height:9px; padding:0; }
+  .dc.on { border:1px solid rgba(0,0,0,0.06); }
+  .badge { display:inline-block; padding:1px 2px; border-radius:2px; font-size:4.2px; font-weight:700; letter-spacing:0.1px; line-height:1.15; white-space:nowrap; }
   .st-owner { color:${C.purple}; border:1px solid ${C.purple}; background:#f5f0f6; }
   .st-critical { color:${C.brick}; border:1px solid ${C.brick}; background:#fdf5f5; }
-  .st-watch { color:${C.brick}; border:1px solid #c07070; background:#fdf8f8; }
+  .st-watch { color:${C.brick}; border:1px solid #c07070; background:#fdf8f5; }
   .st-ip { color:#5a6b4a; border:1px solid ${C.gold}; background:#faf8f2; }
   .st-pend { color:${C.blue}; border:1px solid ${C.blue}; background:#f4f7fa; }
-  .footbar { display:flex; justify-content:space-between; margin-top:16px; padding:8px 12px; background:${C.beige}; font-size:5.5px; color:${C.textMuted}; letter-spacing:0.5px; text-transform:uppercase; border-top:1px solid ${C.divider}; }
+  .footbar { display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:${C.beige}; font-size:5.2px; color:${C.textMuted}; letter-spacing:0.4px; text-transform:uppercase; border-top:1px solid ${C.divider}; }
+  .continuation { page-break-before:always; break-before:page; padding-top:0; margin-top:0; }
+  .cont-label { font-size:5.5px; color:${C.textMuted}; letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; padding-bottom:3px; border-bottom:1px solid ${C.divider}; }
 </style></head><body>
 
-<div class="page">
+<section class="sheet">
   <div class="hdr">
     <div class="hdr-t">${esc(projTitle)}</div>
     <div class="hdr-s">EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; ${esc(residence)}</div>
@@ -707,7 +740,7 @@ ${FONTS}
     <span><span class="sw" style="background:${C.greyBar}"></span>Completed</span>
     <span><span class="sw" style="background:${C.purple}"></span>Owner Decision</span>
     <span><span class="sw" style="background:${C.brick}"></span>At Risk Focus</span>
-    <span style="margin-left:6px;">TF = Total Float &nbsp;|&nbsp; 0–1d Critical &nbsp;|&nbsp; 2–14d Watch &nbsp;|&nbsp; &gt;14d Float</span>
+    <span style="margin-left:4px;">TF = Total Float &nbsp;|&nbsp; 0–1d Critical &nbsp;|&nbsp; 2–14d Watch &nbsp;|&nbsp; &gt;14d Float</span>
   </div>
   <div class="layout">
     <div class="tbl-wrap">${table1}</div>
@@ -719,13 +752,8 @@ ${FONTS}
       <div class="note">${esc(tcoNote)} Period metrics aligned with Primavera P6 Master Schedule benchmarks.</div>
     </div>
   </div>
-  ${page2Groups.length === 0 ? `
-  <div class="footbar">
-    <span>RITZ CARLTON PRIVATE RESIDENCES — ${esc(input.projectNumber)}</span>
-    <span>EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(input.revision)}</span>
-    <span>CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</span>
-  </div>` : ''}
-</div>
+  ${page2Groups.length === 0 ? footbar : ''}
+</section>
 ${page2}
 </body></html>`;
 }

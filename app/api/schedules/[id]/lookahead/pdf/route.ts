@@ -273,9 +273,9 @@ export async function POST(
       landscape: reportType === 'technical',
       margin:
         reportType === 'technical'
-          ? { top: '4mm', right: '3mm', bottom: '4mm', left: '3mm' }
+          ? { top: '3mm', right: '3mm', bottom: '3mm', left: '3mm' }
           : { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
-      scale: reportType === 'technical' ? 0.88 : 1,
+      scale: reportType === 'technical' ? 0.95 : 1,
     });
 
     const safeName = lookaheadPdfFilename(
