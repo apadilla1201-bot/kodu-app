@@ -8,6 +8,7 @@ import {
   Loader2, FileSpreadsheet, Download, Upload, ArrowLeftRight,
   Check, X, AlertTriangle, ArrowRight, Minus,
 } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
 
 const ScheduleGantt = dynamic(() => import('@/components/schedule-gantt'), { ssr: false });
 
@@ -73,6 +74,7 @@ function fmtShort(d: string | null): string {
 
 /* ── Component ────────────────────────────────────────────────── */
 export default function ScheduleManager({ schedules, projectId, approvedCORs = [] }: Props) {
+  const { t } = useI18n();
   const [view, setView] = useState<'gantt' | 'versions' | 'compare' | 'lookahead'>('gantt');
   const [allSchedules, setAllSchedules] = useState<ScheduleData[]>(schedules);
   const activeSchedule = useMemo(() => allSchedules.find(s => s.status === 'Active') ?? allSchedules[0] ?? null, [allSchedules]);
@@ -96,15 +98,15 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
 
   // Sub-tabs styling
   const subTabs = [
-    { key: 'gantt', label: 'Gantt Chart', icon: CalendarDays },
-    { key: 'lookahead', label: '2-Week Look-Ahead', icon: Clock },
-    { key: 'compare', label: 'Fragnet / Compare', icon: GitCompare },
-    { key: 'versions', label: 'Version History', icon: FileSpreadsheet },
+    { key: 'gantt', label: t('schedules.ganttChart'), icon: CalendarDays },
+    { key: 'lookahead', label: t('schedules.twoWeekLookahead'), icon: Clock },
+    { key: 'compare', label: t('schedules.fragnetCompareTab'), icon: GitCompare },
+    { key: 'versions', label: t('schedules.versionHistory'), icon: FileSpreadsheet },
   ] as const;
 
   // ── Compare ────────────────────────────────────────
   const runComparison = async () => {
-    if (!baseId || !compareId) { toast.error('Selecciona dos versiones'); return; }
+    if (!baseId || !compareId) { toast.error(t('schedules.selectTwoVersions')); return; }
     setComparing(true);
     setDiffResult(null);
     try {
@@ -116,13 +118,13 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       if (!res.ok) throw new Error();
       const data = await res.json();
       setDiffResult(data);
-    } catch { toast.error('Error en comparación'); }
+    } catch { toast.error(t('schedules.compareError')); }
     finally { setComparing(false); }
   };
 
   // ── Clone ─────────────────────────────────────────
   const handleClone = async (sourceId: string) => {
-    if (!cloneRevision.trim()) { toast.error('Escribe el nombre de la revisión'); return; }
+    if (!cloneRevision.trim()) { toast.error(t('schedules.revisionNameRequired')); return; }
     setCloning(true);
     try {
       const res = await fetch(`/api/schedules/${sourceId}/clone`, {
@@ -131,7 +133,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         body: JSON.stringify({ revision: cloneRevision, dataDate: new Date().toISOString() }),
       });
       if (!res.ok) throw new Error();
-      toast.success(`Revisión ${cloneRevision} creada`);
+      toast.success(t('schedules.revisionCreated', { name: cloneRevision }));
       setCloneRevision('');
       // Refresh schedules
       const listRes = await fetch(`/api/schedules?projectId=${projectId}`);
@@ -140,7 +142,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         // Need to fetch full data with activities for each
         window.location.reload();
       }
-    } catch { toast.error('Error al clonar'); }
+    } catch { toast.error(t('schedules.cloneError')); }
     finally { setCloning(false); }
   };
 
@@ -154,7 +156,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       if (!res.ok) throw new Error();
       const data = await res.json();
       setLaData(data);
-    } catch { toast.error('Error cargando look-ahead'); }
+    } catch { toast.error(t('schedules.laLoadError')); }
     finally { setLaLoading(false); }
   };
 
@@ -191,7 +193,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
     a.download = `LookAhead_2wk_${fmtDate(laData.windowStart).replace(/[^\w]/g, '')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Excel exportado');
+    toast.success(t('schedules.laExcelExported'));
   };
 
   // ── Look-Ahead Excel Import ────────────────────────
@@ -264,7 +266,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       }
 
       if (importActivities.length === 0) {
-        toast.info('No hay actividades nuevas de look-ahead para importar');
+        toast.info(t('schedules.laNoNewActivities'));
         setLaImporting(false);
         return;
       }
@@ -276,10 +278,10 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       });
       if (!res.ok) throw new Error();
       const result = await res.json();
-      toast.success(`${result.imported} actividades de look-ahead importadas`);
+      toast.success(t('schedules.laImportedCount', { count: result.imported }));
       await loadLookAhead(); // Refresh
     } catch (err) {
-      toast.error('Error importando CSV');
+      toast.error(t('schedules.laCsvImportError'));
     } finally {
       setLaImporting(false);
       e.target.value = '';
@@ -313,8 +315,8 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         document.body.removeChild(a);
       };
       reader.readAsDataURL(blob);
-      toast.success('PDF descargado');
-    } catch { toast.error('Error generando PDF'); }
+      toast.success(t('schedules.laPdfDownloaded'));
+    } catch { toast.error(t('schedules.laPdfError')); }
     finally { setLaPdfLoading(false); }
   };
 
@@ -338,7 +340,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       // Reload page to refresh schedule list
       window.location.reload();
     } catch (err: any) {
-      toast.error(err.message || 'Error importando CPM');
+      toast.error(err.message || t('schedules.cpmImportError'));
     } finally {
       setExcelImporting(false);
       e.target.value = '';
@@ -349,8 +351,8 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
     return (
       <div className="bg-card rounded-xl border border-border p-12 text-center">
         <CalendarDays className="mx-auto h-12 w-12 text-muted-foreground/40 mb-4" />
-        <h3 className="text-lg font-semibold text-foreground mb-2">No Schedule Yet</h3>
-        <p className="text-muted-foreground text-sm">Import a CPM schedule to get started.</p>
+        <h3 className="text-lg font-semibold text-foreground mb-2">{t('schedules.noScheduleYet')}</h3>
+        <p className="text-muted-foreground text-sm">{t('schedules.noScheduleHint')}</p>
       </div>
     );
   }
@@ -389,19 +391,19 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         <div className="bg-card rounded-xl border border-border">
           <div className="p-4 border-b border-border flex items-center justify-between">
             <h3 className="font-semibold flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-[#C9A96E]" /> Historial de Versiones
+              <FileSpreadsheet className="w-4 h-4 text-[#C9A96E]" /> {t('schedules.versionHistoryTitle')}
             </h3>
           </div>
 
           {/* Import Excel section */}
           <div className="p-4 bg-gradient-to-r from-[#0F1B33]/5 to-[#C9A96E]/10 border-b border-border">
             <p className="text-xs font-semibold text-[#0F1B33] mb-2 flex items-center gap-1">
-              <Upload className="w-3.5 h-3.5 text-[#C9A96E]" /> Importar CPM desde Excel
+              <Upload className="w-3.5 h-3.5 text-[#C9A96E]" /> {t('schedules.importCpmExcel')}
             </p>
-            <p className="text-[10px] text-muted-foreground mb-2">Sube tu Excel interactivo con hojas CPM y Look-Ahead. Las versiones anteriores se conservan automáticamente.</p>
+            <p className="text-[10px] text-muted-foreground mb-2">{t('schedules.uploadHint')}</p>
             <div className="flex items-center gap-2 flex-wrap">
               <label className="px-3 py-1.5 bg-[#C9A96E] text-white rounded-md text-xs font-medium flex items-center gap-1 cursor-pointer hover:bg-[#B8975D] transition-colors">
-                <Upload className="w-3 h-3" /> Seleccionar Excel
+                <Upload className="w-3 h-3" /> {t('schedules.selectExcel')}
                 <input
                   type="file"
                   accept=".xlsx,.xls"
@@ -411,7 +413,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
               </label>
               {excelImporting && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Importando...
+                  <Loader2 className="w-3 h-3 animate-spin" /> {t('schedules.importing')}
                 </span>
               )}
             </div>
@@ -420,11 +422,11 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
           {/* Clone section */}
           {activeSchedule && (
             <div className="p-4 bg-[#C9A96E]/10 border-b border-border">
-              <p className="text-xs text-muted-foreground mb-2">O crear nueva revisión clonando la activa ({activeSchedule.revision}):</p>
+              <p className="text-xs text-muted-foreground mb-2">{t('schedules.cloneHint', { revision: activeSchedule.revision })}</p>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="Ej: Rev.6"
+                  placeholder={t('schedules.revisionPlaceholder')}
                   value={cloneRevision}
                   onChange={e => setCloneRevision(e.target.value)}
                   className="px-3 py-1.5 border border-border rounded-md text-sm w-40 outline-none focus:border-[#C9A96E]"
@@ -435,7 +437,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                   className="px-3 py-1.5 bg-[#0F1B33] text-white rounded-md text-xs font-medium flex items-center gap-1 disabled:opacity-50 hover:bg-[#0a1225]"
                 >
                   {cloning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                  Crear Revisión
+                  {t('schedules.createRevision')}
                 </button>
               </div>
             </div>
@@ -455,11 +457,17 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                     <div>
                       <div className="font-semibold text-sm flex items-center gap-2">
                         {s.revision}
-                        {s.status === 'Active' && <span className="text-[10px] bg-[#0F1B33] text-white px-1.5 py-0.5 rounded">ACTIVO</span>}
-                        {s.status === 'Superseded' && <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">ANTERIOR</span>}
+                        {s.status === 'Active' && <span className="text-[10px] bg-[#0F1B33] text-white px-1.5 py-0.5 rounded">{t('schedules.active')}</span>}
+                        {s.status === 'Superseded' && <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">{t('schedules.superseded')}</span>}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Data Date: {fmtDate(s.dataDate)} · {tasks.length} actividades · {critCount} críticas · {doneCount} completadas · {avgPct}% progreso
+                        {t('schedules.dataDateSummary', {
+                          date: fmtDate(s.dataDate),
+                          tasks: tasks.length,
+                          critical: critCount,
+                          done: doneCount,
+                          progress: avgPct,
+                        })}
                       </div>
                     </div>
                   </div>
@@ -478,17 +486,17 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         <div className="bg-card rounded-xl border border-border">
           <div className="p-4 border-b border-border">
             <h3 className="font-semibold flex items-center gap-2 mb-3">
-              <GitCompare className="w-4 h-4 text-[#C9A96E]" /> Comparación Fragnet / Delta
+              <GitCompare className="w-4 h-4 text-[#C9A96E]" /> {t('schedules.fragnetCompare')}
             </h3>
             <div className="flex items-center gap-3 flex-wrap">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">CPM Base (anterior)</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('schedules.cpmBase')}</label>
                 <select
                   value={baseId}
                   onChange={e => setBaseId(e.target.value)}
                   className="px-3 py-1.5 border border-border rounded-md text-sm min-w-[180px] outline-none"
                 >
-                  <option value="">Seleccionar...</option>
+                  <option value="">{t('schedules.select')}</option>
                   {allSchedules.map(s => (
                     <option key={s.id} value={s.id}>{s.revision} — {fmtDate(s.dataDate)}</option>
                   ))}
@@ -496,13 +504,13 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
               </div>
               <ArrowLeftRight className="w-4 h-4 text-muted-foreground mt-4" />
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">CPM Comparar (nuevo)</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('schedules.cpmCompare')}</label>
                 <select
                   value={compareId}
                   onChange={e => setCompareId(e.target.value)}
                   className="px-3 py-1.5 border border-border rounded-md text-sm min-w-[180px] outline-none"
                 >
-                  <option value="">Seleccionar...</option>
+                  <option value="">{t('schedules.select')}</option>
                   {allSchedules.map(s => (
                     <option key={s.id} value={s.id}>{s.revision} — {fmtDate(s.dataDate)}</option>
                   ))}
@@ -514,7 +522,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                 className="mt-4 px-4 py-1.5 bg-[#0F1B33] text-white rounded-md text-xs font-medium flex items-center gap-1 disabled:opacity-50 hover:bg-[#0a1225]"
               >
                 {comparing ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitCompare className="w-3 h-3" />}
-                Comparar
+                {t('schedules.compare')}
               </button>
             </div>
           </div>
@@ -525,10 +533,10 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
               {/* Summary bar */}
               <div className="flex items-center gap-4 px-4 py-3 bg-[#F7F7F5] border-b border-border text-xs">
                 <span className="font-semibold">{diffResult.base.revision} vs {diffResult.compare.revision}</span>
-                <span className="flex items-center gap-1 text-green-700"><Plus className="w-3 h-3" /> {diffResult.summary.added} nuevas</span>
-                <span className="flex items-center gap-1 text-red-600"><Minus className="w-3 h-3" /> {diffResult.summary.deleted} eliminadas</span>
-                <span className="flex items-center gap-1 text-amber-600"><AlertTriangle className="w-3 h-3" /> {diffResult.summary.modified} modificadas</span>
-                <span className="text-muted-foreground">{diffResult.summary.unchanged} sin cambio</span>
+                <span className="flex items-center gap-1 text-green-700"><Plus className="w-3 h-3" /> {t('schedules.addedCount', { count: diffResult.summary.added })}</span>
+                <span className="flex items-center gap-1 text-red-600"><Minus className="w-3 h-3" /> {t('schedules.deletedCount', { count: diffResult.summary.deleted })}</span>
+                <span className="flex items-center gap-1 text-amber-600"><AlertTriangle className="w-3 h-3" /> {t('schedules.modifiedCount', { count: diffResult.summary.modified })}</span>
+                <span className="text-muted-foreground">{t('schedules.unchangedCount', { count: diffResult.summary.unchanged })}</span>
               </div>
 
               {/* Diff table */}
@@ -537,10 +545,10 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-[#D9D9D9] text-[10px]">
-                        <th className="px-2 py-1.5 text-left font-bold">ID</th>
-                        <th className="px-2 py-1.5 text-left font-bold">Activity</th>
-                        <th className="px-2 py-1.5 text-center font-bold">Tipo</th>
-                        <th className="px-2 py-1.5 text-left font-bold">Cambios</th>
+                        <th className="px-2 py-1.5 text-left font-bold">{t('schedules.colId')}</th>
+                        <th className="px-2 py-1.5 text-left font-bold">{t('schedules.colActivity')}</th>
+                        <th className="px-2 py-1.5 text-center font-bold">{t('schedules.colType')}</th>
+                        <th className="px-2 py-1.5 text-left font-bold">{t('schedules.colChanges')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -558,31 +566,31 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                             {d.activityName}
                           </td>
                           <td className="px-2 py-1.5 text-center">
-                            {d.changeType === 'added' && <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[10px] font-bold">NUEVA</span>}
-                            {d.changeType === 'deleted' && <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[10px] font-bold">ELIMINADA</span>}
-                            {d.changeType === 'modified' && <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">MODIFICADA</span>}
+                            {d.changeType === 'added' && <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[10px] font-bold">{t('schedules.changeAdded')}</span>}
+                            {d.changeType === 'deleted' && <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[10px] font-bold">{t('schedules.changeDeleted')}</span>}
+                            {d.changeType === 'modified' && <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">{t('schedules.changeModified')}</span>}
                           </td>
                           <td className="px-2 py-1.5">
                             {d.changeType === 'added' && d.compare && (
                               <span className="text-green-700">
-                                Start: {fmtShort(d.compare.startDate)} → Finish: {fmtShort(d.compare.finishDate)} ({d.compare.originalDuration}d)
+                                Start: {fmtShort(d.compare.startDate)} → {t('schedules.fieldFinish')}: {fmtShort(d.compare.finishDate)} ({d.compare.originalDuration}d)
                               </span>
                             )}
                             {d.changeType === 'deleted' && d.base && (
                               <span className="text-red-500">
-                                Era: {fmtShort(d.base.startDate)} – {fmtShort(d.base.finishDate)} ({d.base.originalDuration}d, {d.base.percentComplete}%)
+                                {t('schedules.wasLabel')} {fmtShort(d.base.startDate)} – {fmtShort(d.base.finishDate)} ({d.base.originalDuration}d, {d.base.percentComplete}%)
                               </span>
                             )}
                             {d.changeType === 'modified' && (
                               <div className="flex flex-wrap gap-2">
                                 {d.changes.map((c, ci) => {
-                                  const label = c.field === 'startDate' ? 'Start' :
-                                    c.field === 'finishDate' ? 'Finish' :
-                                    c.field === 'originalDuration' ? 'Dur' :
+                                  const label = c.field === 'startDate' ? t('schedules.fieldStart') :
+                                    c.field === 'finishDate' ? t('schedules.fieldFinish') :
+                                    c.field === 'originalDuration' ? t('schedules.fieldDur') :
                                     c.field === 'percentComplete' ? '%' :
-                                    c.field === 'status' ? 'Status' :
-                                    c.field === 'isCritical' ? 'Critical' :
-                                    c.field === 'activityName' ? 'Name' : c.field;
+                                    c.field === 'status' ? t('schedules.fieldStatus') :
+                                    c.field === 'isCritical' ? t('schedules.fieldCritical') :
+                                    c.field === 'activityName' ? t('schedules.fieldName') : c.field;
                                   const from = c.field.includes('Date') ? fmtShort(c.from) : String(c.from);
                                   const to = c.field.includes('Date') ? fmtShort(c.to) : String(c.to);
                                   return (
@@ -600,14 +608,14 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                   </table>
                 </div>
               ) : (
-                <div className="p-8 text-center text-muted-foreground text-sm">No hay diferencias entre las versiones seleccionadas.</div>
+                <div className="p-8 text-center text-muted-foreground text-sm">{t('schedules.noDiffs')}</div>
               )}
             </div>
           )}
 
           {!diffResult && !comparing && (
             <div className="p-8 text-center text-muted-foreground text-sm">
-              Selecciona dos versiones del CPM para comparar los cambios (fragnet/delta).
+              {t('schedules.selectTwoToCompare')}
             </div>
           )}
         </div>
@@ -618,7 +626,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         <div className="bg-card rounded-xl border border-border">
           <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-2">
             <h3 className="font-semibold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-[#C9A96E]" /> 2-Week Look-Ahead
+              <Clock className="w-4 h-4 text-[#C9A96E]" /> {t('schedules.twoWeekLookahead')}
               {laData && (
                 <span className="text-xs font-normal text-muted-foreground ml-2">
                   {fmtDate(laData.windowStart)} — {fmtDate(laData.windowEnd)}
@@ -627,7 +635,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <CalendarDays className="w-3 h-3" /> Semana inicio:
+                <CalendarDays className="w-3 h-3" /> {t('schedules.weekStart')}
                 <input
                   type="date"
                   value={laStartDate}
@@ -641,22 +649,22 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                   <button
                     onClick={() => { setLaStartDate(''); setLaData(null); }}
                     className="text-muted-foreground hover:text-foreground"
-                    title="Usar Data Date"
+                    title={t('schedules.useDataDate')}
                   >
                     <X className="w-3 h-3" />
                   </button>
                 )}
               </label>
               <button onClick={exportLookAheadExcel} disabled={!laData} className="px-3 py-1.5 border border-border rounded-md text-xs font-medium flex items-center gap-1 hover:bg-muted/60 disabled:opacity-50">
-                <Download className="w-3 h-3" /> Export Excel
+                <Download className="w-3 h-3" /> {t('schedules.exportExcel')}
               </button>
               <label className="px-3 py-1.5 border border-border rounded-md text-xs font-medium flex items-center gap-1 hover:bg-muted/60 cursor-pointer">
-                <Upload className="w-3 h-3" /> Import Excel
+                <Upload className="w-3 h-3" /> {t('schedules.importExcelBtn')}
                 <input type="file" accept=".csv,.xlsx,.xls" onChange={handleLAImport} className="hidden" />
               </label>
               <button onClick={exportLookAheadPDF} disabled={laPdfLoading || !laData} className="px-3 py-1.5 bg-[#0F1B33] text-white rounded-md text-xs font-medium flex items-center gap-1 hover:bg-[#0a1225] disabled:opacity-50">
                 {laPdfLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                PDF
+                {t('schedules.exportPdf')}
               </button>
               <button onClick={loadLookAhead} disabled={laLoading} className="px-2 py-1.5 border border-border rounded-md text-xs hover:bg-muted/60">
                 {laLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : '↻'}
@@ -671,17 +679,17 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-[#0F1B33] text-white text-[10px]">
-                    <th className="px-2 py-2 text-left font-bold">ID</th>
-                    <th className="px-2 py-2 text-left font-bold w-[240px]">Activity Name</th>
-                    <th className="px-2 py-2 text-center font-bold">Dur</th>
-                    <th className="px-2 py-2 text-center font-bold">Rem</th>
-                    <th className="px-2 py-2 text-center font-bold">%</th>
-                    <th className="px-2 py-2 text-center font-bold">Start</th>
-                    <th className="px-2 py-2 text-center font-bold">Finish</th>
-                    <th className="px-2 py-2 text-center font-bold">Status</th>
+                    <th className="px-2 py-2 text-left font-bold">{t('schedules.colId')}</th>
+                    <th className="px-2 py-2 text-left font-bold w-[240px]">{t('schedules.activityName')}</th>
+                    <th className="px-2 py-2 text-center font-bold">{t('schedules.colDur')}</th>
+                    <th className="px-2 py-2 text-center font-bold">{t('schedules.colRem')}</th>
+                    <th className="px-2 py-2 text-center font-bold">{t('schedules.colPct')}</th>
+                    <th className="px-2 py-2 text-center font-bold">{t('schedules.colStart')}</th>
+                    <th className="px-2 py-2 text-center font-bold">{t('schedules.colFinish')}</th>
+                    <th className="px-2 py-2 text-center font-bold">{t('schedules.colStatus')}</th>
                     <th className="px-2 py-2 text-center font-bold">★</th>
-                    <th className="px-2 py-2 text-left font-bold">Resource</th>
-                    <th className="px-2 py-2 text-left font-bold">Notes</th>
+                    <th className="px-2 py-2 text-left font-bold">{t('schedules.colResource')}</th>
+                    <th className="px-2 py-2 text-left font-bold">{t('schedules.colNotes')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -701,7 +709,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                           a.status === 'done' ? 'bg-green-100 text-green-800' :
                           a.status === 'ip' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-600'
-                        }`}>{a.status === 'done' ? 'Done' : a.status === 'ip' ? 'IP' : 'Pend'}</span>
+                        }`}>{a.status === 'done' ? t('schedules.statusDone') : a.status === 'ip' ? t('schedules.statusIp') : t('schedules.statusPend')}</span>
                       </td>
                       <td className="px-2 py-1.5 text-center">{a.isCritical ? '★' : ''}</td>
                       <td className="px-2 py-1.5 text-[10px] truncate max-w-[120px]" title={a.resourceName}>{a.resourceName}</td>
@@ -712,7 +720,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                   {laData.detailActivities.length > 0 && (
                     <>
                       <tr className="bg-[#1B2A4A] text-white">
-                        <td colSpan={11} className="px-2 py-1.5 font-bold text-[10px]">Look-Ahead Detail Activities (imported)</td>
+                        <td colSpan={11} className="px-2 py-1.5 font-bold text-[10px]">{t('schedules.laDetailActivities')}</td>
                       </tr>
                       {laData.detailActivities.map((a, i) => (
                         <tr key={a.id} className={`border-b border-border/30 bg-amber-50/50 ${i % 2 === 0 ? '' : 'bg-amber-50'}`}>
@@ -728,7 +736,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                           <td className="px-2 py-1.5 text-center">{fmtShort(a.finishDate)}</td>
                           <td className="px-2 py-1.5 text-center">
                             <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                              {a.status === 'done' ? 'Done' : a.status === 'ip' ? 'IP' : 'Pend'}
+                              {a.status === 'done' ? t('schedules.statusDone') : a.status === 'ip' ? t('schedules.statusIp') : t('schedules.statusPend')}
                             </span>
                           </td>
                           <td className="px-2 py-1.5 text-center">{a.isCritical ? '★' : ''}</td>
@@ -741,7 +749,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                 </tbody>
               </table>
               {laData.activities.length === 0 && laData.detailActivities.length === 0 && (
-                <div className="p-8 text-center text-muted-foreground text-sm">No hay actividades en la ventana de 2 semanas.</div>
+                <div className="p-8 text-center text-muted-foreground text-sm">{t('schedules.noActivitiesInWindow')}</div>
               )}
             </div>
           ) : null}

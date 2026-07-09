@@ -6,6 +6,7 @@ import { GC_ADDRESS_FULL, GC_NAME_UPPER } from '@/lib/gc-branding';
 import { formatLogDate } from '@/lib/daily-log';
 import { guessMimeType } from '@/lib/storage';
 import { photoLocationLine, photoTagLabel } from '@/lib/site-photos';
+import { createTranslator, type AppLocale } from '@/lib/i18n';
 
 export type FieldReportPhoto = {
   id: string;
@@ -250,9 +251,10 @@ export function autoActionItems(rfis: FieldReportRfi[], logs: FieldReportLog[]):
   return items;
 }
 
-export function formatTcoTarget(d: Date | null | undefined): string | null {
+export function formatTcoTarget(d: Date | null | undefined, locale: AppLocale = 'en'): string | null {
   if (!d) return null;
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const dateLocale = locale === 'es' ? 'es-US' : 'en-US';
+  return d.toLocaleDateString(dateLocale, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 async function photoToDataUrl(photo: FieldReportPhoto): Promise<string | null> {
@@ -275,7 +277,7 @@ async function embedPhotos(photos: FieldReportPhoto[]): Promise<PhotoWithData[]>
   return out;
 }
 
-function photoCaption(p: FieldReportPhoto): string {
+function photoCaption(p: FieldReportPhoto, locale: AppLocale): string {
   const area = p.area?.trim();
   const cap = p.caption?.trim();
   if (area && cap) return `${area} — ${cap}`;
@@ -283,11 +285,12 @@ function photoCaption(p: FieldReportPhoto): string {
   if (area) return area;
   const loc = photoLocationLine(p);
   if (loc) return loc;
-  return photoTagLabel(p.tag) || 'Site photo';
+  return photoTagLabel(p.tag, locale) || 'Site photo';
 }
 
-function fieldStatusBullet(log: FieldReportLog): string {
-  const day = new Date(log.logDate).toLocaleDateString('en-US', {
+function fieldStatusBullet(log: FieldReportLog, locale: AppLocale): string {
+  const dateLocale = locale === 'es' ? 'es-US' : 'en-US';
+  const day = new Date(log.logDate).toLocaleDateString(dateLocale, {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -304,14 +307,14 @@ function fieldStatusBullet(log: FieldReportLog): string {
   return `<li><strong>${esc(day)}:</strong> ${esc(text)}</li>`;
 }
 
-function photoCell(p: PhotoWithData): string {
+function photoCell(p: PhotoWithData, locale: AppLocale): string {
   const img = p.dataUrl
     ? `<img src="${p.dataUrl}" alt="" class="photo-img"/>`
     : `<div class="photo-missing">Image unavailable</div>`;
   return `
     <div class="photo-cell">
       ${img}
-      <div class="photo-cap">${esc(photoCaption(p))}</div>
+      <div class="photo-cap">${esc(photoCaption(p, locale))}</div>
     </div>`;
 }
 
@@ -382,7 +385,11 @@ function actionItemsTable(items: FieldReportActionItem[]): string {
     </table>`;
 }
 
-export async function buildFieldReportHtml(data: FieldReportData): Promise<string> {
+export async function buildFieldReportHtml(data: FieldReportData, locale: AppLocale = 'en'): Promise<string> {
+  const t = createTranslator(locale);
+  const pdf = (key: string, params?: Record<string, string | number | undefined>) =>
+    t(`pdf.fieldReport.${key}`, params);
+
   const allPhotos = data.photosByDay.flatMap((d) => d.photos);
   const embedded = await embedPhotos(allPhotos);
 
@@ -394,14 +401,14 @@ export async function buildFieldReportHtml(data: FieldReportData): Promise<strin
     : data.projectName;
 
   const fieldBullets = data.logs.length
-    ? data.logs.map(fieldStatusBullet).join('')
+    ? data.logs.map((log) => fieldStatusBullet(log, locale)).join('')
     : '<li class="dim">No daily logs in this date range.</li>';
 
   const photoIntro = data.photoIntro?.trim() || autoPhotoIntro();
   const photoRows: string[] = [];
   for (let i = 0; i < embedded.length; i += 2) {
     const pair = embedded.slice(i, i + 2);
-    photoRows.push(`<div class="photo-row">${pair.map(photoCell).join('')}</div>`);
+    photoRows.push(`<div class="photo-row">${pair.map((p) => photoCell(p, locale)).join('')}</div>`);
   }
 
   return `<!DOCTYPE html>
@@ -531,54 +538,54 @@ export async function buildFieldReportHtml(data: FieldReportData): Promise<strin
 </head>
 <body>
 <div class="doc">
-  <div class="doc-title">Project Report &nbsp; ${esc(titleDate)}</div>
+  <div class="doc-title">${esc(pdf('docTitle'))} &nbsp; ${esc(titleDate)}</div>
   <div class="doc-subtitle">${esc(subtitle)}</div>
 
   <div class="meta-grid">
-    <div class="meta-cell"><label>Location</label><span>${esc(data.location || '—')}</span></div>
-    <div class="meta-cell"><label>Report Date</label><span>${esc(reportDate)}</span></div>
-    <div class="meta-cell"><label>Prepared By</label><span>${esc(data.preparedBy)} — ${esc(GC_NAME_UPPER)}</span></div>
-    <div class="meta-cell"><label>TCO Target</label><span>${esc(data.tcoTarget || 'See master schedule')}</span></div>
+    <div class="meta-cell"><label>${esc(pdf('location'))}</label><span>${esc(data.location || '—')}</span></div>
+    <div class="meta-cell"><label>${esc(pdf('reportDate'))}</label><span>${esc(reportDate)}</span></div>
+    <div class="meta-cell"><label>${esc(pdf('preparedBy'))}</label><span>${esc(data.preparedBy)} — ${esc(GC_NAME_UPPER)}</span></div>
+    <div class="meta-cell"><label>${esc(pdf('tcoTarget'))}</label><span>${esc(data.tcoTarget || pdf('tcoDefault'))}</span></div>
   </div>
 
   <div class="section">
-    <div class="sec-hdr">1. Project Overview</div>
+    <div class="sec-hdr">${esc(pdf('overview'))}</div>
     <div class="sec-body"><p>${esc(data.overview)}</p></div>
   </div>
 
   <div class="section">
-    <div class="sec-hdr">2. Field Status — Week of ${esc(weekLabel)}</div>
+    <div class="sec-hdr">${esc(pdf('fieldStatus', { week: weekLabel }))}</div>
     <div class="sec-body">
       <ul class="field-list">${fieldBullets}</ul>
     </div>
   </div>
 
   <div class="section${allPhotos.length ? ' break-before' : ''}">
-    <div class="sec-hdr">3. Field Photography — Week of ${esc(weekLabel)}</div>
+    <div class="sec-hdr">${esc(pdf('photography', { week: weekLabel }))}</div>
     <div class="sec-body">
       <p class="photo-intro">${esc(photoIntro)}</p>
-      ${allPhotos.length ? photoRows.join('') : '<p class="dim">No site photos in this date range.</p>'}
+      ${allPhotos.length ? photoRows.join('') : `<p class="dim">${esc(pdf('noPhotos'))}</p>`}
     </div>
   </div>
 
   <div class="section break-before">
-    <div class="sec-hdr">4. Key Milestones This Week</div>
+    <div class="sec-hdr">${esc(pdf('milestones'))}</div>
     <div class="sec-body">${milestonesHtml(data.milestones)}</div>
   </div>
 
   <div class="section">
-    <div class="sec-hdr">5. Open Items — Decisions Required</div>
+    <div class="sec-hdr">${esc(pdf('openItems'))}</div>
     <div class="sec-body">${openItemsTable(data.openItems)}</div>
   </div>
 
   <div class="section">
-    <div class="sec-hdr">6. Action Items</div>
+    <div class="sec-hdr">${esc(pdf('actionItems'))}</div>
     <div class="sec-body">${actionItemsTable(data.actionItems)}</div>
   </div>
 
   <div class="ftr">
     <span>${GC_NAME_UPPER} · ${GC_ADDRESS_FULL}</span>
-    <span>CONFIDENTIAL — PROJECT REPORT #${esc(data.projectNumber)}</span>
+    <span>${esc(pdf('confidential', { number: data.projectNumber }))}</span>
   </div>
 </div>
 </body></html>`;

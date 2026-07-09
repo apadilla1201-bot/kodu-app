@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
+import { createTranslator } from '@/lib/i18n';
+import { getSessionLocale } from '@/lib/i18n/server';
 
 /* ── Helpers ──────────────────────────────────────────────── */
 function esc(s: string) {
@@ -77,6 +79,10 @@ export async function POST(
       if (body.dateFrom) dateFrom = new Date(body.dateFrom);
       if (body.dateTo) dateTo = new Date(body.dateTo);
     } catch { /* no body is fine */ }
+
+    const locale = await getSessionLocale();
+    const t = createTranslator(locale);
+    const S = (key: string) => t(`schedules.${key}`);
 
     const schedule = await prisma.schedule.findFirst({
       where: { id: params.id, project: { companyId } },
@@ -291,7 +297,7 @@ export async function POST(
     });
 
     const projectName = schedule.project.projectName || '';
-    const filterLabel = filterType === 'all' ? 'All Activities' : filterType === 'crit' ? '★ Critical Path' : filterType === 'ip' ? 'In Progress' : filterType === 'done' ? 'Completed' : 'Pending';
+    const filterLabel = filterType === 'all' ? S('filterAll') : filterType === 'crit' ? S('filterCritical') : filterType === 'ip' ? S('filterInProgress') : filterType === 'done' ? S('filterCompleted') : S('filterPending');
     const dateRangeLabel = (dateFrom || dateTo) ? `Date Range: ${dateFrom ? fmtDate(dateFrom) : 'Start'} — ${dateTo ? fmtDate(dateTo) : 'End'}` : '';
 
     const html = `<!DOCTYPE html>
@@ -318,7 +324,7 @@ export async function POST(
     <span>Data Date: <b>${fmtDate(schedule.dataDate)}</b></span>
     ${tcoDate ? `<span>TCO: <b>${fmtDate(tcoDate)}</b></span>` : ''}
     <span>Progress: <b>${avgPct}%</b></span>
-    <span>Critical: <b>${critTasks}</b></span>
+    <span>${esc(S('critical'))}: <b>${critTasks}</b></span>
     ${daysToTCO !== null ? `<span>Days to TCO: <b>${daysToTCO}</b></span>` : ''}
   </div>
 </div>
@@ -327,7 +333,7 @@ export async function POST(
   <thead>
     <tr>
       <th style="background:#D9D9D9;font-weight:700;text-align:center;font-size:7px;width:38px;min-width:38px">ID</th>
-      <th style="background:#D9D9D9;font-weight:700;text-align:center;font-size:7px;width:240px;min-width:240px">Activity Name</th>
+      <th style="background:#D9D9D9;font-weight:700;text-align:center;font-size:7px;width:240px;min-width:240px">${esc(S('activityName'))}</th>
       <th style="background:#D9D9D9;font-weight:700;text-align:center;font-size:6.5px;width:28px;line-height:1.1">Orig<br>Dur</th>
       <th style="background:#D9D9D9;font-weight:700;text-align:center;font-size:6.5px;width:28px;line-height:1.1">Rem<br>Dur</th>
       <th style="background:#D9D9D9;font-weight:700;text-align:center;font-size:6.5px;width:34px;line-height:1.1">Dur%<br>Comp</th>
@@ -357,7 +363,7 @@ export async function POST(
   <div class="leg">
     <div><span class="sq" style="background:#4472C4"></span> Actual (Done/Billed)</div>
     <div><span class="sq" style="background:#C9A96E"></span> Remaining Work</div>
-    <div><span class="sq" style="background:#FF0000"></span> Critical Remaining</div>
+    <div><span class="sq" style="background:#FF0000"></span> ${esc(S('criticalRemaining'))}</div>
     <div>◆ Milestone</div>
     <div><span class="dd-line"></span> Data Date</div>
   </div>
@@ -366,7 +372,7 @@ export async function POST(
     <div style="font-size:8px;font-weight:700">${esc(schedule.revision)} | ${esc(schedule.notes || '')}</div>
   </div>
   <div style="text-align:right;min-width:100px;line-height:1.6">
-    ${schedule.projectFinish ? `<div>Project Finish: ${fmtDate(schedule.projectFinish)}</div>` : ''}
+    ${schedule.projectFinish ? `<div>${esc(S('projectFinish'))}: ${fmtDate(schedule.projectFinish)}</div>` : ''}
     <div>Data Date: ${fmtDate(schedule.dataDate)}</div>
     ${tcoDate ? `<div>TCO: ${fmtDate(tcoDate)}</div>` : ''}
     <div>Prepared: A. Padilla — PDG</div>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useI18n } from '@/hooks/use-i18n';
 
 interface ProjectOption {
   id: string;
@@ -55,6 +56,7 @@ const emptyLine = (): any => ({
 
 export default function NewPayAppForm({ projects, initialProjectId }: Props) {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<Step>('project');
   const [projectId, setProjectId] = useState(initialProjectId || '');
@@ -118,9 +120,9 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       if (sheets?.settings) parts.push('Settings');
       setImportSummary(`Sheets encontrados: ${parts.join(', ')} — ${data.lineItems?.length ?? 0} líneas extraídas`);
       setStep('review');
-      toast.success(`Excel importado: ${data.lineItems?.length ?? 0} líneas`);
+      toast.success(t('payApps.excelImported', { count: data.lineItems?.length ?? 0 }));
     } catch (e: any) {
-      toast.error(e.message || 'Error al importar Excel');
+      toast.error(e.message || t('payApps.excelImportError'));
     } finally {
       setImporting(false);
     }
@@ -148,7 +150,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
         if (data.headerData.applicationDate) { try { setApplicationDate(new Date(data.headerData.applicationDate).toISOString().split('T')[0]); } catch {} }
         if (data.headerData.periodFrom) { try { setPeriodFrom(new Date(data.headerData.periodFrom).toISOString().split('T')[0]); } catch {} }
         if (data.headerData.periodTo) { try { setPeriodTo(new Date(data.headerData.periodTo).toISOString().split('T')[0]); } catch {} }
-        toast.success('G702 header data extraído');
+        toast.success(t('payApps.g702Extracted'));
       }
 
       if (type === 'g703' && data.lineItems?.length > 0) {
@@ -161,7 +163,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
         setStep('review');
       }
     } catch (e: any) {
-      toast.error(e.message || 'Error al procesar PDF');
+      toast.error(e.message || t('payApps.pdfProcessError'));
     } finally {
       setImporting(false);
     }
@@ -211,7 +213,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       setStep('review');
       toast.success(`Clonadas ${lines.length} líneas de PA #${appNumber - 1}`);
     } catch (e: any) {
-      toast.error(e.message || 'Error al clonar');
+      toast.error(e.message || t('payApps.cloneError'));
     } finally {
       setImporting(false);
     }
@@ -278,10 +280,10 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
         throw new Error(err.error || 'Failed to create');
       }
       const created = await res.json();
-      toast.success('Pay Application creada correctamente');
+      toast.success(t('payApps.createdSuccess'));
       router.push(`/dashboard/pay-apps/${created.id}`);
     } catch (e: any) {
-      toast.error(e.message || 'Error al crear Pay Application');
+      toast.error(e.message || t('payApps.createError'));
     } finally {
       setSaving(false);
     }
@@ -302,7 +304,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <Link href={backUrl} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground gap-1">
-          <ArrowLeft className="w-4 h-4" /> Volver al Proyecto
+          <ArrowLeft className="w-4 h-4" /> {t('payApps.backToProject')}
         </Link>
       </div>
 
@@ -310,14 +312,14 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       {step === 'project' && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-[#C9A96E]" /> Nueva Pay Application</CardTitle>
-            <CardDescription>Paso 1: Seleccione el proyecto y período de facturación.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-[#C9A96E]" /> {t('payApps.newPayApp')}</CardTitle>
+            <CardDescription>{t('payApps.step1Desc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label>Proyecto *</Label>
               <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger><SelectValue placeholder="Seleccione un proyecto" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('payApps.selectProject')} /></SelectTrigger>
                 <SelectContent>
                   {projects.map(p => (
                     <SelectItem key={p.id} value={p.id}>#{p.projectNumber} — {p.projectName}</SelectItem>
@@ -329,20 +331,20 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
             {projectId && (
               <>
                 <div className="space-y-2">
-                  <Label>Número de Aplicación</Label>
+                  <Label>{t('payApps.appNumber')}</Label>
                   <Input value={`PA #${appNumber}`} disabled className="bg-muted" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Fecha de Aplicación</Label>
+                    <Label>{t('payApps.applicationDate')}</Label>
                     <Input type="date" value={applicationDate} onChange={e => setApplicationDate(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Período Desde</Label>
+                    <Label>{t('payApps.periodFrom')}</Label>
                     <Input type="date" value={periodFrom} onChange={e => setPeriodFrom(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Período Hasta</Label>
+                    <Label>{t('payApps.periodTo')}</Label>
                     <Input type="date" value={periodTo} onChange={e => setPeriodTo(e.target.value)} />
                   </div>
                 </div>
@@ -371,7 +373,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 <FileSpreadsheet className="w-6 h-6 text-green-700" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold">Importar desde Excel</p>
+                <p className="font-semibold">{t('payApps.importExcel')}</p>
                 <p className="text-xs text-muted-foreground">Workbook con hojas G702, G703 y PROJECT SETTINGS</p>
               </div>
               <input
@@ -395,8 +397,8 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 <FileText className="w-6 h-6 text-red-700" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold">Importar desde PDF</p>
-                <p className="text-xs text-muted-foreground">PDFs separados de G702 y G703 — extracción con AI</p>
+                <p className="font-semibold">{t('payApps.importPdf')}</p>
+                <p className="text-xs text-muted-foreground">{t('payApps.importPdfDesc')}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E]" />
             </button>
@@ -417,8 +419,8 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 <Pencil className="w-6 h-6 text-blue-700" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold">Entrada Manual</p>
-                <p className="text-xs text-muted-foreground">Crear PA vacía y agregar líneas manualmente</p>
+                <p className="font-semibold">{t('payApps.manualEntry')}</p>
+                <p className="text-xs text-muted-foreground">{t('payApps.manualEntryDesc')}</p>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E]" />
             </button>
@@ -435,7 +437,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold">Roll Forward de PA #{appNumber - 1}</p>
-                  <p className="text-xs text-muted-foreground">Clonar PA anterior y actualizar montos completados</p>
+                  <p className="text-xs text-muted-foreground">{t('payApps.clonePrevDesc')}</p>
                 </div>
                 {importing && method === 'clone' ? <Loader2 className="w-5 h-5 animate-spin" /> : <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E]" />}
               </button>
@@ -452,8 +454,8 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       {step === 'import' && method === 'pdf' && (
         <Card>
           <CardHeader>
-            <CardTitle>Subir Archivos PDF</CardTitle>
-            <CardDescription>Suba los PDFs de G702 y/o G703. La AI extraerá los datos.</CardDescription>
+            <CardTitle>{t('payApps.uploadPdfTitle')}</CardTitle>
+            <CardDescription>{t('payApps.uploadPdfDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* G703 Upload */}
@@ -465,7 +467,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               <label className="flex items-center gap-3 p-4 rounded-lg border-2 border-dashed border-border hover:border-[#C9A96E] cursor-pointer transition-all">
                 <FileText className="w-5 h-5 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  {g703File ? g703File.name : 'Click para seleccionar G703 PDF'}
+                  {g703File ? g703File.name : t('payApps.selectG703')}
                 </span>
                 <input
                   type="file"
@@ -490,7 +492,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               <label className="flex items-center gap-3 p-4 rounded-lg border-2 border-dashed border-border hover:border-[#C9A96E] cursor-pointer transition-all">
                 <FileText className="w-5 h-5 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  {g702File ? g702File.name : 'Click para seleccionar G702 PDF (opcional)'}
+                  {g702File ? g702File.name : t('payApps.selectG702')}
                 </span>
                 <input
                   type="file"
@@ -526,7 +528,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Check className="w-5 h-5 text-green-600" /> Revisar y Crear
+                <Check className="w-5 h-5 text-green-600" /> {t('payApps.reviewCreate')}
               </CardTitle>
               <CardDescription>
                 PA #{appNumber} para #{selectedProject?.projectNumber} — {selectedProject?.projectName}
@@ -748,7 +750,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               {nonSectionLines.length} líneas · {fmt(totalScheduled)} valor total
             </div>
             <Button onClick={handleCreate} disabled={saving} className="bg-[#2E7D32] hover:bg-[#256d29] text-white" size="lg">
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Creando...</> : <><FileText className="w-4 h-4 mr-2" /> Crear PA #{appNumber}</>}
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {t('payApps.creating')}</> : <><FileText className="w-4 h-4 mr-2" /> {t('payApps.createPa', { number: appNumber })}</>}
             </Button>
           </div>
         </div>

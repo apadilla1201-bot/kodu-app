@@ -1,6 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
 import { GC_ADDRESS_HTML, GC_NAME_UPPER } from '@/lib/gc-branding';
+import { createTranslator, type AppLocale } from '@/lib/i18n';
 
 export type RfiPdfAttachment = {
   fileName: string | null;
@@ -58,14 +59,16 @@ function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function fmtDate(d: Date | string | null | undefined): string {
+function fmtDate(d: Date | string | null | undefined, locale: AppLocale = 'en'): string {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const dateLocale = locale === 'es' ? 'es-US' : 'en-US';
+  return new Date(d).toLocaleDateString(dateLocale, { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-function fmtDateLong(d: Date | string | null | undefined): string {
+function fmtDateLong(d: Date | string | null | undefined, locale: AppLocale = 'en'): string {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const dateLocale = locale === 'es' ? 'es-US' : 'en-US';
+  return new Date(d).toLocaleDateString(dateLocale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -82,12 +85,24 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
   Low:    { bg: '#F3F4F6', text: '#6B7280' },
 };
 
-export function buildRfiPdfHtml(rfi: RfiPdfData, project: RfiProjectData, logoUrl: string): string {
+export function buildRfiPdfHtml(
+  rfi: RfiPdfData,
+  project: RfiProjectData,
+  logoUrl: string,
+  locale: AppLocale = 'en',
+): string {
+  const t = createTranslator(locale);
+  const L = (key: string, params?: Record<string, string | number | undefined>) =>
+    t(`pdf.rfi.${key}`, params);
+
   const sc = STATUS_COLORS[rfi.status] ?? STATUS_COLORS.Open;
   const pc = PRIORITY_COLORS[rfi.priority] ?? PRIORITY_COLORS.Normal;
 
   const isOverdue = rfi.dateDue && !['Answered', 'Closed'].includes(rfi.status) && new Date(rfi.dateDue) < new Date();
   const daysOpen = Math.floor((Date.now() - new Date(rfi.dateSubmitted).getTime()) / 86400000);
+  const daysOpenLabel = daysOpen === 1
+    ? L('daysOpen', { count: daysOpen })
+    : L('daysOpenPlural', { count: daysOpen });
 
   const questionAttachments = (rfi.attachments ?? []).filter(a => a.attachmentType === 'question');
   const responseAttachments = (rfi.attachments ?? []).filter(a => a.attachmentType === 'response');
@@ -169,7 +184,7 @@ export function buildRfiPdfHtml(rfi: RfiPdfData, project: RfiProjectData, logoUr
       </div>
     </div>
     <div class="header-right">
-      <div class="rfi-label">Request for Information</div>
+      <div class="rfi-label">${esc(L('title'))}</div>
       <div class="rfi-num">RFI ${esc(rfi.rfiNumber)}</div>
     </div>
   </div>
@@ -177,56 +192,56 @@ export function buildRfiPdfHtml(rfi: RfiPdfData, project: RfiProjectData, logoUr
   <!-- Status Bar -->
   <div class="status-bar">
     <span class="badge" style="background:${sc.bg};color:${sc.text};border:1px solid ${sc.border}">${esc(rfi.status)}</span>
-    <span class="badge" style="background:${pc.bg};color:${pc.text}">${esc(rfi.priority)} Priority</span>
-    ${isOverdue ? '<span class="badge overdue-badge">⚠ OVERDUE</span>' : ''}
-    <span class="badge days-badge">${daysOpen} day${daysOpen !== 1 ? 's' : ''} open</span>
+    <span class="badge" style="background:${pc.bg};color:${pc.text}">${esc(rfi.priority)} ${esc(L('prioritySuffix'))}</span>
+    ${isOverdue ? `<span class="badge overdue-badge">⚠ ${esc(L('overdue'))}</span>` : ''}
+    <span class="badge days-badge">${esc(daysOpenLabel)}</span>
   </div>
 
   <!-- Info Grid -->
   <div class="info-grid">
     <div class="info-box">
-      <h4>Project Information</h4>
-      <div class="info-row"><span class="info-label">Project</span><span class="info-value">${esc(project.projectName ?? '')}</span></div>
-      <div class="info-row"><span class="info-label">Number</span><span class="info-value">#${esc(project.projectNumber ?? '')}</span></div>
-      <div class="info-row"><span class="info-label">Client</span><span class="info-value">${esc(project.client ?? '')}</span></div>
-      <div class="info-row"><span class="info-label">Location</span><span class="info-value">${esc(project.location ?? '')}</span></div>
+      <h4>${esc(L('projectInfo'))}</h4>
+      <div class="info-row"><span class="info-label">${esc(L('project'))}</span><span class="info-value">${esc(project.projectName ?? '')}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('number'))}</span><span class="info-value">#${esc(project.projectNumber ?? '')}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('client'))}</span><span class="info-value">${esc(project.client ?? '')}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('location'))}</span><span class="info-value">${esc(project.location ?? '')}</span></div>
     </div>
     <div class="info-box">
-      <h4>RFI Details</h4>
-      <div class="info-row"><span class="info-label">Submitted By</span><span class="info-value">${esc(rfi.submittedBy)}${rfi.submittedByRole ? ' (' + esc(rfi.submittedByRole) + ')' : ''}</span></div>
-      <div class="info-row"><span class="info-label">Assigned To</span><span class="info-value">${esc(rfi.assignedTo)}${rfi.assignedToRole ? ' (' + esc(rfi.assignedToRole) + ')' : ''}</span></div>
-      <div class="info-row"><span class="info-label">Date Submitted</span><span class="info-value">${fmtDate(rfi.dateSubmitted)}</span></div>
-      <div class="info-row"><span class="info-label">Due Date</span><span class="info-value" ${isOverdue ? 'style="color:#DC2626"' : ''}>${fmtDate(rfi.dateDue)}${isOverdue ? ' (OVERDUE)' : ''}</span></div>
-      <div class="info-row"><span class="info-label">Cost Impact</span><span class="info-value">${esc(rfi.costImpact)}</span></div>
-      <div class="info-row"><span class="info-label">Schedule Impact</span><span class="info-value">${esc(rfi.scheduleImpact)}${rfi.scheduleImpactDays ? ' (' + rfi.scheduleImpactDays + ' days)' : ''}</span></div>
+      <h4>${esc(L('rfiDetails'))}</h4>
+      <div class="info-row"><span class="info-label">${esc(L('submittedBy'))}</span><span class="info-value">${esc(rfi.submittedBy)}${rfi.submittedByRole ? ' (' + esc(rfi.submittedByRole) + ')' : ''}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('assignedTo'))}</span><span class="info-value">${esc(rfi.assignedTo)}${rfi.assignedToRole ? ' (' + esc(rfi.assignedToRole) + ')' : ''}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('dateSubmitted'))}</span><span class="info-value">${fmtDate(rfi.dateSubmitted, locale)}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('dueDate'))}</span><span class="info-value" ${isOverdue ? 'style="color:#DC2626"' : ''}>${fmtDate(rfi.dateDue, locale)}${isOverdue ? ` (${L('overdue')})` : ''}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('costImpact'))}</span><span class="info-value">${esc(rfi.costImpact)}</span></div>
+      <div class="info-row"><span class="info-label">${esc(L('scheduleImpact'))}</span><span class="info-value">${esc(rfi.scheduleImpact)}${rfi.scheduleImpactDays ? ' (' + rfi.scheduleImpactDays + ' days)' : ''}</span></div>
     </div>
   </div>
 
   <!-- Subject -->
   <div class="subject-banner">
-    <div class="label">Subject</div>
+    <div class="label">${esc(L('subject'))}</div>
     <div class="text">${esc(rfi.subject)}</div>
   </div>
 
   <!-- References -->
   ${(rfi.discipline || rfi.drawingReference || rfi.specReference) ? `
   <div class="section">
-    <div class="section-header">References</div>
+    <div class="section-header">${esc(L('references'))}</div>
     <div class="ref-grid">
-      ${rfi.discipline ? `<div class="ref-item"><div class="ref-label">Discipline</div><div class="ref-value">${esc(rfi.discipline)}</div></div>` : ''}
-      ${rfi.drawingReference ? `<div class="ref-item"><div class="ref-label">Drawing Reference</div><div class="ref-value">${esc(rfi.drawingReference)}</div></div>` : ''}
-      ${rfi.specReference ? `<div class="ref-item"><div class="ref-label">Spec Reference</div><div class="ref-value">${esc(rfi.specReference)}</div></div>` : ''}
+      ${rfi.discipline ? `<div class="ref-item"><div class="ref-label">${esc(L('discipline'))}</div><div class="ref-value">${esc(rfi.discipline)}</div></div>` : ''}
+      ${rfi.drawingReference ? `<div class="ref-item"><div class="ref-label">${esc(L('drawingReference'))}</div><div class="ref-value">${esc(rfi.drawingReference)}</div></div>` : ''}
+      ${rfi.specReference ? `<div class="ref-item"><div class="ref-label">${esc(L('specReference'))}</div><div class="ref-value">${esc(rfi.specReference)}</div></div>` : ''}
     </div>
   </div>
   ` : ''}
 
   <!-- Question -->
   <div class="section">
-    <div class="section-header">Question</div>
+    <div class="section-header">${esc(L('question'))}</div>
     <div class="section-body">${esc(rfi.question)}</div>
     ${questionAttachments.length > 0 ? `
     <div style="margin-top:8px">
-      <div style="font-size:7.5pt;color:#9CA3AF;text-transform:uppercase;font-weight:700;margin-bottom:4px">Attachments (${questionAttachments.length})</div>
+      <div style="font-size:7.5pt;color:#9CA3AF;text-transform:uppercase;font-weight:700;margin-bottom:4px">${esc(L('attachments', { count: questionAttachments.length }))}</div>
       <ul class="attach-list">
         ${questionAttachments.map(a => `<li>📎 ${esc(a.fileName ?? '')}</li>`).join('')}
       </ul>
@@ -235,23 +250,23 @@ export function buildRfiPdfHtml(rfi: RfiPdfData, project: RfiProjectData, logoUr
 
   <!-- Response -->
   <div class="section">
-    <div class="section-header">Response</div>
+    <div class="section-header">${esc(L('response'))}</div>
     ${rfi.responseText ? `
     <div class="response-box">
       <div class="resp-header">
         <span class="resp-by">✓ Responded by ${esc(rfi.responseBy ?? 'Unknown')}</span>
-        <span class="resp-date">${fmtDateLong(rfi.responseDate)}</span>
+        <span class="resp-date">${fmtDateLong(rfi.responseDate, locale)}</span>
       </div>
       <div class="resp-text">${esc(rfi.responseText)}</div>
       ${responseAttachments.length > 0 ? `
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid #BBF7D0">
-        <div style="font-size:7.5pt;color:#047857;text-transform:uppercase;font-weight:700;margin-bottom:4px">Response Attachments (${responseAttachments.length})</div>
+        <div style="font-size:7.5pt;color:#047857;text-transform:uppercase;font-weight:700;margin-bottom:4px">${esc(L('responseAttachments', { count: responseAttachments.length }))}</div>
         <ul class="attach-list">
           ${responseAttachments.map(a => `<li>📎 ${esc(a.fileName ?? '')}</li>`).join('')}
         </ul>
       </div>` : ''}
     </div>` : `
-    <div class="no-response">⏳ Awaiting Response</div>`}
+    <div class="no-response">⏳ ${esc(L('awaitingResponse'))}</div>`}
   </div>
 
   <!-- Notes -->
@@ -265,7 +280,7 @@ export function buildRfiPdfHtml(rfi: RfiPdfData, project: RfiProjectData, logoUr
   <div class="footer">
     <span>© Kodu GC · Confidential</span>
     <span>${GC_NAME_UPPER}</span>
-    <span>Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+    <span>Generated ${new Date().toLocaleDateString(locale === 'es' ? 'es-US' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
   </div>
 
 </div>

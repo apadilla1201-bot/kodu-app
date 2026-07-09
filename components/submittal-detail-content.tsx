@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/hooks/use-i18n';
 import { ArrowLeft, FileStack, CheckCircle2, RotateCcw } from 'lucide-react';
 
 interface SubmittalData {
@@ -51,6 +52,7 @@ function fmtDate(d: string | null) {
 export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(false);
 
   const setStatus = async (status: string) => {
@@ -62,20 +64,32 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
         credentials: 'include',
         body: JSON.stringify({ status, reviewedBy: 'Augusto Padilla' }),
       });
-      if (!res.ok) throw new Error('Error al actualizar');
-      toast({ title: `Estado: ${status}` });
+      if (!res.ok) throw new Error(t('submittals.updateError'));
+      toast({ title: t('submittals.statusUpdated', { status }) });
       router.refresh();
     } catch (e: any) {
-      toast({ title: e?.message ?? 'Error', variant: 'destructive' });
+      toast({ title: e?.message ?? t('common.error'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
+  const detailFields = [
+    [t('submittals.type'), submittal.submittalType],
+    [t('submittals.priority'), submittal.priority],
+    [t('submittals.section'), submittal.specSection ?? '—'],
+    [t('submittals.subcontractor'), submittal.subcontractor ?? '—'],
+    [t('submittals.colRequired'), fmtDate(submittal.requiredDate)],
+    [t('submittals.submittedBy'), submittal.submittedBy ?? '—'],
+    [t('submittals.assignedTo'), submittal.assignedTo ?? '—'],
+    [t('submittals.submittedDate'), fmtDate(submittal.submittedDate)],
+    [t('submittals.client'), submittal.project.client],
+  ] as const;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <Link href="/dashboard/submittals" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="w-4 h-4" /> Volver a Submittals
+        <ArrowLeft className="w-4 h-4" /> {t('submittals.backToSubmittals')}
       </Link>
 
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -94,7 +108,7 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
 
       {submittal.ballInCourt && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-          <p className="text-xs uppercase text-amber-700 font-medium">Ball in Court</p>
+          <p className="text-xs uppercase text-amber-700 font-medium">{t('submittals.ballInCourt')}</p>
           <p className="font-semibold text-amber-900">
             {submittal.ballInCourt}
             {submittal.ballInCourtRole ? ` (${submittal.ballInCourtRole})` : ''}
@@ -103,17 +117,7 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          ['Tipo', submittal.submittalType],
-          ['Prioridad', submittal.priority],
-          ['Sección', submittal.specSection ?? '—'],
-          ['Subcontratista', submittal.subcontractor ?? '—'],
-          ['Requerido', fmtDate(submittal.requiredDate)],
-          ['Enviado por', submittal.submittedBy ?? '—'],
-          ['Asignado a', submittal.assignedTo ?? '—'],
-          ['Fecha envío', fmtDate(submittal.submittedDate)],
-          ['Cliente', submittal.project.client],
-        ].map(([label, value]) => (
+        {detailFields.map(([label, value]) => (
           <div key={label} className="bg-card border rounded-lg p-4">
             <p className="text-xs text-muted-foreground uppercase">{label}</p>
             <p className="font-medium mt-1">{value}</p>
@@ -123,7 +127,7 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
 
       {submittal.description && (
         <div className="bg-card border rounded-xl p-6">
-          <h2 className="font-semibold mb-2">Descripción</h2>
+          <h2 className="font-semibold mb-2">{t('submittals.description')}</h2>
           <p className="text-sm whitespace-pre-wrap">{submittal.description}</p>
         </div>
       )}
@@ -131,16 +135,16 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
       <div className="flex flex-wrap gap-3">
         {submittal.status === 'Draft' && (
           <button disabled={loading} onClick={() => setStatus('Submitted')} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-            Marcar como Enviado
+            {t('submittals.markSubmitted')}
           </button>
         )}
         {(submittal.status === 'Submitted' || submittal.status === 'Under Review') && (
           <>
             <button disabled={loading} onClick={() => setStatus('Approved')} className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-              <CheckCircle2 className="w-4 h-4" /> Aprobar
+              <CheckCircle2 className="w-4 h-4" /> {t('submittals.approve')}
             </button>
             <button disabled={loading} onClick={() => setStatus('Revise and Resubmit')} className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-              <RotateCcw className="w-4 h-4" /> Reenviar
+              <RotateCcw className="w-4 h-4" /> {t('submittals.resubmit')}
             </button>
           </>
         )}

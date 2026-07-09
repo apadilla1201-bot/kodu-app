@@ -13,6 +13,7 @@ import {
   mergeRfiPdfWithAttachments,
   RfiPdfMergeError,
 } from '@/lib/rfi-pdf';
+import { getSessionLocale } from '@/lib/i18n/server';
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -35,7 +36,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const logoUrl = `${appBaseUrl()}/pdg_logo.png`;
-    const htmlContent = buildRfiPdfHtml(rfi, rfi.project, logoUrl);
+    const locale = await getSessionLocale();
+    const htmlContent = buildRfiPdfHtml(rfi, rfi.project, logoUrl, locale);
     const pdfBuffer = await htmlToPdf(htmlContent);
 
     let finalPdfBytes: Uint8Array;

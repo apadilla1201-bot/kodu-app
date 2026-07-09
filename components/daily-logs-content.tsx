@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/hooks/use-i18n';
 import {
   CalendarDays,
   Camera,
@@ -64,6 +65,7 @@ export function DailyLogsContent({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { t, locale } = useI18n();
   const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
   const [logDate, setLogDate] = useState(dateKey(new Date()));
   const [log, setLog] = useState<DailyLogRow | null>(null);
@@ -138,7 +140,7 @@ export function DailyLogsContent({
         setSelectedPhotoIds([]);
       }
     } catch {
-      toast({ title: 'Error al cargar daily log', variant: 'destructive' });
+      toast({ title: t('errors.loadDailyLog'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -186,12 +188,12 @@ export function DailyLogsContent({
       if (!res.ok) throw new Error(data.error || 'Failed');
 
       toast({
-        title: status === 'Submitted' ? 'Daily log enviado' : status === 'Approved' ? 'Daily log aprobado' : 'Borrador guardado',
+        title: status === 'Submitted' ? t('dailyLogs.logSubmitted') : status === 'Approved' ? t('dailyLogs.logApproved') : t('dailyLogs.draftSaved'),
       });
       await loadDay();
       await loadHistory();
     } catch (e: any) {
-      toast({ title: e?.message ?? 'Error', variant: 'destructive' });
+      toast({ title: e?.message ?? t('common.error'), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -200,11 +202,11 @@ export function DailyLogsContent({
   const startVoice = (targetField: 'workPerformed' | 'delays') => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
-      toast({ title: 'Voz no disponible en este navegador', variant: 'destructive' });
+      toast({ title: t('errors.voiceUnavailable'), variant: 'destructive' });
       return;
     }
     const rec = new SR();
-    rec.lang = 'en-US';
+    rec.lang = locale === 'es' ? 'es-US' : 'en-US';
     rec.interimResults = false;
     setListening(true);
     rec.onresult = (ev: any) => {
@@ -220,7 +222,7 @@ export function DailyLogsContent({
   const draftRfiFromDelays = () => {
     const note = form.delays || form.workPerformed;
     if (!note.trim()) {
-      toast({ title: 'Escribe algo en Delays o Work performed', variant: 'destructive' });
+      toast({ title: t('errors.writeDelaysOrWork'), variant: 'destructive' });
       return;
     }
     sessionStorage.setItem('kodu_rfi_draft_note', note);
@@ -244,7 +246,7 @@ export function DailyLogsContent({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || 'No se pudo generar el PDF');
+        throw new Error(data?.error || t('dailyLogs.pdfFailed'));
       }
       const blob = await res.blob();
       const proj = projects.find((p) => p.id === projectId);
@@ -257,9 +259,9 @@ export function DailyLogsContent({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast({ title: 'PDF generado — listo para enviar al owner' });
+      toast({ title: t('errors.pdfReady') });
     } catch (e: any) {
-      toast({ title: e?.message ?? 'Error al generar PDF', variant: 'destructive' });
+      toast({ title: e?.message ?? t('errors.generatePdf'), variant: 'destructive' });
     } finally {
       setGeneratingReport(false);
     }
@@ -272,10 +274,10 @@ export function DailyLogsContent({
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-[#C9A96E]" /> Daily Logs
+            <ClipboardList className="w-6 h-6 text-[#C9A96E]" /> {t('dailyLogs.title')}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Reporte diario de obra — conectado a Site Photos
+            {t('dailyLogs.subtitle')}
           </p>
         </div>
         <select
@@ -295,15 +297,15 @@ export function DailyLogsContent({
           <div>
             <h2 className="font-semibold text-sm flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#C9A96E]" />
-              Reporte semanal para Owner (PDF)
+              {t('dailyLogs.weeklyReport')}
             </h2>
             <p className="text-xs text-muted-foreground mt-1 max-w-lg">
-              Formato Ritz / PDG: Overview, Field Status, Photography, Milestones, Open Items y Action Items — auto desde daily logs, fotos y RFIs.
+              {t('dailyLogs.weeklyReportHint')}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <label className="text-[10px] font-medium text-muted-foreground uppercase">Desde</label>
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">{t('dailyLogs.from')}</label>
               <input
                 type="date"
                 value={reportFrom}
@@ -312,7 +314,7 @@ export function DailyLogsContent({
               />
             </div>
             <div>
-              <label className="text-[10px] font-medium text-muted-foreground uppercase">Hasta</label>
+              <label className="text-[10px] font-medium text-muted-foreground uppercase">{t('dailyLogs.to')}</label>
               <input
                 type="date"
                 value={reportTo}
@@ -330,7 +332,7 @@ export function DailyLogsContent({
               }}
               className="px-3 py-1.5 text-xs border rounded-lg hover:bg-muted"
             >
-              Última semana
+              {t('dailyLogs.lastWeek')}
             </button>
             <button
               type="button"
@@ -339,7 +341,7 @@ export function DailyLogsContent({
               className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
             >
               {generatingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              {generatingReport ? 'Generando…' : 'Descargar PDF'}
+              {generatingReport ? t('dailyLogs.generating') : t('dailyLogs.generatePdf')}
             </button>
           </div>
         </div>
@@ -348,31 +350,31 @@ export function DailyLogsContent({
           onClick={() => setReportOptionsOpen((o) => !o)}
           className="mt-3 text-xs text-[#0F1B33] font-medium underline-offset-2 hover:underline"
         >
-          {reportOptionsOpen ? 'Ocultar opciones Ritz' : 'Opciones Ritz (Overview, TCO)'}
+          {reportOptionsOpen ? t('dailyLogs.ritzOptionsHide') : t('dailyLogs.ritzOptionsShow')}
         </button>
         {reportOptionsOpen && (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="text-[10px] font-medium text-muted-foreground uppercase">
-                1. Project Overview (opcional — si vacío, se arma desde los daily logs)
+                {t('dailyLogs.executiveNarrative')}
               </label>
               <textarea
                 value={reportOverview}
                 onChange={(e) => setReportOverview(e.target.value)}
                 rows={3}
-                placeholder="Narrativa ejecutiva para el owner, estilo Ritz…"
+                placeholder={t('dailyLogs.executivePlaceholder')}
                 className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm resize-y"
               />
             </div>
             <div>
               <label className="text-[10px] font-medium text-muted-foreground uppercase">
-                TCO Target (opcional)
+                {t('dailyLogs.milestoneWeek')}
               </label>
               <input
                 type="text"
                 value={reportTcoTarget}
                 onChange={(e) => setReportTcoTarget(e.target.value)}
-                placeholder="ej. Last week of October 2026 · Zero float"
+                placeholder={t('dailyLogs.milestonePlaceholder')}
                 className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm"
               />
             </div>
@@ -413,22 +415,29 @@ export function DailyLogsContent({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium">Weather</label>
+                <label className="text-xs font-medium">{t('dailyLogs.weather')}</label>
                 <select value={form.weather} onChange={(e) => update('weather', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm">
                   <option value="">—</option>
                   {WEATHER_OPTIONS.map((w) => <option key={w} value={w}>{w}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium">Temp (°F)</label>
+                <label className="text-xs font-medium">{t('dailyLogs.temperature')}</label>
                 <input value={form.temperature} onChange={(e) => update('temperature', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm" placeholder="85" />
               </div>
             </div>
 
-            {(['workPerformed', 'crewNotes', 'deliveries', 'delays'] as const).map((field) => (
+            {(['workPerformed', 'crewNotes', 'deliveries', 'delays'] as const).map((field) => {
+              const fieldLabels: Record<typeof field, string> = {
+                workPerformed: t('dailyLogs.workPerformed'),
+                crewNotes: t('dailyLogs.crewNotes'),
+                deliveries: t('dailyLogs.deliveries'),
+                delays: t('dailyLogs.delays'),
+              };
+              return (
               <div key={field}>
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium capitalize">{field.replace(/([A-Z])/g, ' $1')}</label>
+                  <label className="text-xs font-medium">{fieldLabels[field]}</label>
                   {(field === 'workPerformed' || field === 'delays') && (
                     <button
                       type="button"
@@ -437,7 +446,7 @@ export function DailyLogsContent({
                       className="text-xs inline-flex items-center gap-1 text-[#C9A96E] hover:underline disabled:opacity-50"
                     >
                       {listening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                      Voz
+                      {t('dailyLogs.voice')}
                     </button>
                   )}
                 </div>
@@ -448,7 +457,7 @@ export function DailyLogsContent({
                   className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
                 />
               </div>
-            ))}
+            );})}
 
             {form.delays.trim() && (
               <button
@@ -456,21 +465,21 @@ export function DailyLogsContent({
                 onClick={draftRfiFromDelays}
                 className="inline-flex items-center gap-2 text-sm text-[#0F1B33] font-medium hover:underline"
               >
-                <FileQuestion className="w-4 h-4" /> Crear borrador RFI desde delays
+                <FileQuestion className="w-4 h-4" /> {t('dailyLogs.draftRfi')}
               </button>
             )}
 
             <div className="flex flex-wrap gap-2 pt-2">
               <button type="button" disabled={saving} onClick={() => save('Draft')} className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50">
-                <Save className="w-4 h-4" /> Guardar borrador
+                <Save className="w-4 h-4" /> {t('dailyLogs.saveDraft')}
               </button>
               <button type="button" disabled={saving} onClick={() => save('Submitted')} className="inline-flex items-center gap-2 px-4 py-2 bg-[#C9A96E] text-white rounded-lg text-sm font-semibold disabled:opacity-50">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Enviar al PM
+                {t('dailyLogs.sendToPm')}
               </button>
               {log?.status === 'Submitted' && (
                 <button type="button" disabled={saving} onClick={() => save('Approved')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                  Aprobar
+                  {t('dailyLogs.approve')}
                 </button>
               )}
             </div>
@@ -480,14 +489,14 @@ export function DailyLogsContent({
             <div className="bg-card border rounded-xl p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-sm flex items-center gap-2">
-                  <Camera className="w-4 h-4" /> Fotos del día
+                  <Camera className="w-4 h-4" /> {t('dailyLogs.photosOfDay')}
                 </h2>
                 <Link href={`/dashboard/photos?projectId=${projectId}`} className="text-xs text-[#C9A96E] hover:underline">
-                  + Subir
+                  + {t('dailyLogs.upload')}
                 </Link>
               </div>
               {dayPhotos.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No hay fotos para esta fecha. Sube en Site Photos.</p>
+                <p className="text-xs text-muted-foreground">{t('dailyLogs.noPhotosForDate')}</p>
               ) : (
                 <div className="grid grid-cols-3 gap-2">
                   {dayPhotos.map((p) => (
@@ -506,14 +515,14 @@ export function DailyLogsContent({
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground mt-2">
-                Toca para incluir en el daily log ({selectedPhotoIds.length} seleccionadas)
+                {t('dailyLogs.tapToInclude', { count: selectedPhotoIds.length })}
               </p>
             </div>
 
             <div className="bg-card border rounded-xl p-4 shadow-sm">
-              <h2 className="font-semibold text-sm mb-3">Historial reciente</h2>
+              <h2 className="font-semibold text-sm mb-3">{t('dailyLogs.recentHistory')}</h2>
               <ul className="space-y-2 max-h-64 overflow-y-auto">
-                {history.length === 0 && <li className="text-xs text-muted-foreground">Sin logs aún</li>}
+                {history.length === 0 && <li className="text-xs text-muted-foreground">{t('dailyLogs.noLogsYet')}</li>}
                 {history.map((h) => (
                   <li key={h.id}>
                     <button

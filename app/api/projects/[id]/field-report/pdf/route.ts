@@ -18,6 +18,7 @@ import {
   type FieldReportData,
   type FieldReportMilestone,
 } from '@/lib/field-report-pdf';
+import { getSessionLocale } from '@/lib/i18n/server';
 
 export async function POST(
   request: Request,
@@ -174,7 +175,9 @@ export async function POST(
       submittedDate: s.submittedDate,
     }));
 
-    const tcoFromSchedule = formatTcoTarget(schedule?.tcoDate ?? schedule?.projectFinish);
+    const locale = await getSessionLocale();
+
+    const tcoFromSchedule = formatTcoTarget(schedule?.tcoDate ?? schedule?.projectFinish, locale);
 
     const customMilestones = Array.isArray(body?.milestones)
       ? (body.milestones as FieldReportMilestone[]).filter((m) => m?.title?.trim())
@@ -204,13 +207,14 @@ export async function POST(
       openRfis: mappedRfis,
     };
 
-    const html = await buildFieldReportHtml(reportData);
+    const html = await buildFieldReportHtml(reportData, locale);
     const pdfBytes = await htmlToPdf(html, {
       format: 'Letter',
       margin: { top: '0.5in', right: '0.5in', bottom: '0.5in', left: '0.5in' },
     });
 
-    const reportDate = new Date(`${to}T12:00:00`).toLocaleDateString('en-US', {
+    const dateLocale = locale === 'es' ? 'es-US' : 'en-US';
+    const reportDate = new Date(`${to}T12:00:00`).toLocaleDateString(dateLocale, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

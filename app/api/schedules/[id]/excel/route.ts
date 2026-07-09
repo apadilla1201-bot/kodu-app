@@ -6,6 +6,8 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import ExcelJS from 'exceljs';
 import { GC_NAME_UPPER } from '@/lib/gc-branding';
+import { createTranslator } from '@/lib/i18n';
+import { getSessionLocale } from '@/lib/i18n/server';
 
 function fmtShort(d: Date | string | null) {
   if (!d) return '';
@@ -56,6 +58,10 @@ export async function POST(
       if (body.dateFrom) dateFrom = new Date(body.dateFrom);
       if (body.dateTo) dateTo = new Date(body.dateTo);
     } catch {}
+
+    const locale = await getSessionLocale();
+    const t = createTranslator(locale);
+    const C = (key: string) => t(`pdf.schedule.${key}`);
 
     const schedule = await prisma.schedule.findFirst({
       where: { id: params.id, project: { companyId } },
@@ -139,18 +145,18 @@ export async function POST(
 
     // ── Build Excel ──────────────────────────────────────────
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('CPM Schedule', { views: [{ state: 'frozen', xSplit: 8, ySplit: 3 }] });
+    const ws = wb.addWorksheet(C('cpmSchedule'), { views: [{ state: 'frozen', xSplit: 8, ySplit: 3 }] });
 
     // Fixed columns
     const fixedCols: Partial<ExcelJS.Column>[] = [
-      { header: 'ID', key: 'id', width: 10 },
-      { header: 'Activity Name', key: 'name', width: 42 },
-      { header: 'Orig Dur', key: 'origDur', width: 7 },
-      { header: 'Rem Dur', key: 'remDur', width: 7 },
-      { header: '% Comp', key: 'pctComp', width: 7 },
-      { header: 'Start', key: 'start', width: 10 },
-      { header: 'Finish', key: 'finish', width: 10 },
-      { header: 'Status', key: 'status', width: 9 },
+      { header: C('colId'), key: 'id', width: 10 },
+      { header: C('colActivityName'), key: 'name', width: 42 },
+      { header: C('colOrigDur'), key: 'origDur', width: 7 },
+      { header: C('colRemDur'), key: 'remDur', width: 7 },
+      { header: C('colPctComp'), key: 'pctComp', width: 7 },
+      { header: C('colStart'), key: 'start', width: 10 },
+      { header: C('colFinish'), key: 'finish', width: 10 },
+      { header: C('colStatus'), key: 'status', width: 9 },
     ];
     // Week columns
     const weekCols = weeks.map((w, i) => ({

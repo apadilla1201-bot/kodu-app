@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useI18n } from '@/hooks/use-i18n';
 import {
   Search, Filter, Download, Printer, ChevronDown, ChevronRight,
   Star, Clock, CheckCircle2, AlertTriangle, CalendarDays,
@@ -95,6 +96,7 @@ function getMonday(d: Date) {
 
 /* ── Component ─────────────────────────────────────────────────── */
 export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }: Props) {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<'all' | 'crit' | 'pend' | 'ip' | 'done'>('all');
   const [search, setSearch] = useState('');
   const [editingCell, setEditingCell] = useState<{ idx: number; field: string } | null>(null);
@@ -308,9 +310,9 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
       });
       if (!res.ok) throw new Error('Save failed');
       setHasChanges(false);
-      toast.success('Schedule guardado');
+      toast.success(t('schedules.saved'));
     } catch {
-      toast.error('Error al guardar');
+      toast.error(t('schedules.saveError'));
     } finally {
       setSaving(false);
     }
@@ -319,7 +321,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
   const handleReset = () => {
     setActivities(schedule.activities);
     setHasChanges(false);
-    toast.info('Cambios revertidos');
+    toast.info(t('schedules.changesReverted'));
   };
 
   const toggleGroup = (idx: number) => {
@@ -361,9 +363,9 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
         document.body.removeChild(a);
       };
       reader.readAsDataURL(blob);
-      toast.success('PDF descargado');
+      toast.success(t('schedules.laPdfDownloaded'));
     } catch {
-      toast.error('Error generando PDF');
+      toast.error(t('schedules.laPdfError'));
     } finally {
       setPrinting(false);
     }
@@ -392,9 +394,9 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
-      toast.success('Excel descargado');
+      toast.success(t('schedules.excelDownloaded'));
     } catch {
-      toast.error('Error exportando Excel');
+      toast.error(t('schedules.excelExportError'));
     } finally {
       setExporting(false);
     }
@@ -418,11 +420,11 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
 
   // Filters
   const filters: { key: typeof filter; label: string; icon?: any }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'crit', label: '★ Critical' },
-    { key: 'pend', label: 'Pending' },
-    { key: 'ip', label: 'In Progress' },
-    { key: 'done', label: 'Done' },
+    { key: 'all', label: t('schedules.filterAll') },
+    { key: 'crit', label: t('schedules.filterCritical') },
+    { key: 'pend', label: t('schedules.filterPending') },
+    { key: 'ip', label: t('schedules.filterInProgress') },
+    { key: 'done', label: t('schedules.filterCompleted') },
   ];
 
   return (
@@ -458,7 +460,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/50" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder={t('schedules.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-7 pr-2 py-1.5 bg-white/10 border border-white/30 rounded text-white text-[10px] w-40 outline-none placeholder:text-white/50"
@@ -466,7 +468,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
         </div>
         <div className="w-px h-5 bg-white/20" />
         <button onClick={handleExport} disabled={exporting} className="px-2 py-1.5 border border-white/30 rounded text-white text-[10px] font-bold hover:bg-[#C9A96E] hover:text-[#0F1B33] hover:border-[#C9A96E] transition-colors disabled:opacity-50 flex items-center gap-1">
-          {exporting ? <><Loader2 className="w-3 h-3 animate-spin" /> Exportando...</> : '📊 Excel'}
+          {exporting ? <><Loader2 className="w-3 h-3 animate-spin" /> {t('schedules.exporting')}</> : `📊 ${t('schedules.exportExcel')}`}
         </button>
         <button
           onClick={() => setShowDateRange(v => !v)}
@@ -476,7 +478,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
               : 'border-white/30 text-white hover:bg-[#C9A96E]/20'
           }`}
         >
-          <CalendarDays className="w-3 h-3" /> Rango
+          <CalendarDays className="w-3 h-3" /> {t('schedules.dateRange')}
         </button>
         {showDateRange && (
           <div className="flex items-center gap-1">
@@ -485,7 +487,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
               value={pdfDateFrom}
               onChange={e => setPdfDateFrom(e.target.value)}
               className="px-1.5 py-1 bg-white/10 border border-white/30 rounded text-white text-[10px] outline-none [color-scheme:dark]"
-              placeholder="Desde"
+              placeholder={t('common.from')}
             />
             <span className="text-white/50 text-[10px]">—</span>
             <input
@@ -493,13 +495,13 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
               value={pdfDateTo}
               onChange={e => setPdfDateTo(e.target.value)}
               className="px-1.5 py-1 bg-white/10 border border-white/30 rounded text-white text-[10px] outline-none [color-scheme:dark]"
-              placeholder="Hasta"
+              placeholder={t('common.to')}
             />
             {(pdfDateFrom || pdfDateTo) && (
               <button
                 onClick={() => { setPdfDateFrom(''); setPdfDateTo(''); }}
                 className="px-1.5 py-1 text-red-400 hover:text-red-300 text-[10px] font-bold"
-                title="Limpiar fechas"
+                title={t('schedules.clearDates')}
               >
                 ✕
               </button>
@@ -507,7 +509,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
           </div>
         )}
         <button onClick={handlePrint} disabled={printing} className="px-2 py-1.5 border border-white/30 rounded text-white text-[10px] font-bold hover:bg-[#C9A96E] hover:text-[#0F1B33] hover:border-[#C9A96E] transition-colors disabled:opacity-50 flex items-center gap-1">
-          {printing ? <><Loader2 className="w-3 h-3 animate-spin" /> Generando PDF...</> : '🖨 Print PDF'}
+          {printing ? <><Loader2 className="w-3 h-3 animate-spin" /> {t('schedules.generatingPdf')}</> : `🖨 ${t('schedules.printPdf')}`}
         </button>
 
         {/* Add Approved CORs button */}
@@ -517,7 +519,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
               const existingIds = new Set(activities.map(a => a.activityId));
               const newCORs = approvedCORs.filter(cor => !existingIds.has(`COR-${cor.corNumber}`));
               if (newCORs.length === 0) {
-                toast.info('Todos los CORs aprobados ya están en el schedule');
+                toast.info(t('schedules.allCorsAlreadyAdded'));
                 return;
               }
               const maxSort = activities.reduce((m, a) => Math.max(m, a.sortOrder), 0);
@@ -556,11 +558,11 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
               });
               setActivities(prev => [...prev, ...newActivities]);
               setHasChanges(true);
-              toast.success(`${newCORs.length} COR(s) agregados al schedule. Ajusta las fechas y duración, luego guarda.`);
+              toast.success(t('schedules.corsAdded', { count: newCORs.length }));
             }}
             className="px-2 py-1.5 border border-[#2E7D32]/60 rounded text-[#4CAF50] text-[10px] font-bold hover:bg-[#2E7D32]/20 transition-colors flex items-center gap-1"
           >
-            <Plus className="w-3 h-3" /> Add CORs ({approvedCORs.filter(c => !activities.some(a => a.activityId === `COR-${c.corNumber}`)).length})
+            <Plus className="w-3 h-3" /> {t('schedules.addCors', { count: approvedCORs.filter(c => !activities.some(a => a.activityId === `COR-${c.corNumber}`)).length })}
           </button>
         )}
 
@@ -568,7 +570,7 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
           <>
             <div className="w-px h-5 bg-white/20" />
             <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 bg-[#C9A96E] text-[#0F1B33] border border-[#C9A96E] rounded text-[10px] font-bold flex items-center gap-1 disabled:opacity-50">
-              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save
+              {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} {t('common.save')}
             </button>
             <button onClick={handleReset} className="px-2 py-1.5 border border-red-400/40 rounded text-red-300 text-[10px] font-bold hover:bg-red-500/20">
               <RotateCcw className="w-3 h-3" />
@@ -578,11 +580,11 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
 
         {/* Stats */}
         <div className="ml-auto text-white/70 text-[10px] font-medium flex items-center gap-3 flex-wrap">
-          <span>Data Date: <b className="text-[#C9A96E]">{fmtDate(schedule.dataDate)}</b></span>
-          {schedule.tcoDate && <span>TCO: <b className="text-[#C9A96E]">{fmtDate(schedule.tcoDate)}</b></span>}
-          <span>Progress: <b className="text-[#C9A96E]">{stats.pctTotal}%</b></span>
-          <span>Critical: <b className="text-[#C9A96E]">{stats.critical}</b></span>
-          {stats.daysToTCO !== null && <span>Days to TCO: <b className="text-[#C9A96E]">{stats.daysToTCO}</b></span>}
+          <span>{t('schedules.dataDateLabel')} <b className="text-[#C9A96E]">{fmtDate(schedule.dataDate)}</b></span>
+          {schedule.tcoDate && <span>{t('schedules.tcoLabel')} <b className="text-[#C9A96E]">{fmtDate(schedule.tcoDate)}</b></span>}
+          <span>{t('schedules.progressLabel')} <b className="text-[#C9A96E]">{stats.pctTotal}%</b></span>
+          <span>{t('schedules.critical')}: <b className="text-[#C9A96E]">{stats.critical}</b></span>
+          {stats.daysToTCO !== null && <span>{t('schedules.daysToTco')} <b className="text-[#C9A96E]">{stats.daysToTCO}</b></span>}
         </div>
       </div>
 
@@ -592,14 +594,14 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
           <thead className="sticky top-0 z-20">
             {/* Month row */}
             <tr>
-              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[8px] sticky left-0 z-30 w-[38px] min-w-[38px]">ID</th>
-              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[8px] sticky left-[38px] z-30 w-[240px] min-w-[240px]">Activity Name</th>
+              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[8px] sticky left-0 z-30 w-[38px] min-w-[38px]">{t('schedules.colId')}</th>
+              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[8px] sticky left-[38px] z-30 w-[240px] min-w-[240px]">{t('schedules.activityName')}</th>
               <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] leading-[1.1] w-[28px] min-w-[28px]">Orig<br/>Dur</th>
               <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] leading-[1.1] w-[28px] min-w-[28px]">Rem<br/>Dur</th>
               <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] leading-[1.1] w-[34px] min-w-[34px]">Dur%<br/>Comp</th>
-              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] w-[54px] min-w-[54px]">Start</th>
-              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] w-[54px] min-w-[54px]">Finish</th>
-              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] w-[52px] min-w-[52px]">Status</th>
+              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] w-[54px] min-w-[54px]">{t('schedules.colStart')}</th>
+              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] w-[54px] min-w-[54px]">{t('schedules.colFinish')}</th>
+              <th className="bg-[#D9D9D9] font-bold text-center h-4 text-[7px] w-[52px] min-w-[52px]">{t('schedules.colStatus')}</th>
               {months.map((m, i) => (
                 <th key={i} colSpan={m.span} className="bg-[#404040] text-white font-bold text-center h-4 text-[8px] border-r border-white/15" style={{ minWidth: m.span * WW }}>
                   {m.label}
@@ -747,9 +749,9 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
                         onChange={e => handleStatusChange(idx, e.target.value)}
                         className={`border-none bg-transparent text-[8px] font-bold w-full text-center cursor-pointer outline-none ${statusClass(a.status)}`}
                       >
-                        <option value="pend">Pend</option>
-                        <option value="ip">In Prog</option>
-                        <option value="done">Done</option>
+                        <option value="pend">{t('schedules.statusPend')}</option>
+                        <option value="ip">{t('schedules.statusInProg')}</option>
+                        <option value="done">{t('schedules.statusDone')}</option>
                       </select>
                     )}
                   </td>
@@ -792,22 +794,22 @@ export default function ScheduleGantt({ schedule, projectId, approvedCORs = [] }
       {/* Footer / Legend */}
       <div className="flex items-center justify-between px-3 py-2 border-t-2 border-[#595959] bg-white text-[8px] print:text-[7px] flex-wrap gap-2 rounded-b-lg">
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1"><span className="inline-block w-3.5 h-2 bg-[#4472C4] border border-gray-400" /> Actual (Done/Billed)</div>
-          <div className="flex items-center gap-1"><span className="inline-block w-3.5 h-2 bg-[#C9A96E] border border-gray-400" /> Remaining Work</div>
-          <div className="flex items-center gap-1"><span className="inline-block w-3.5 h-2 bg-[#FF0000] border border-gray-400" /> Critical Remaining</div>
-          <div className="flex items-center gap-1">◆ Milestone</div>
-          <div className="flex items-center gap-1"><span className="inline-block w-4 border-t-[1.5px] border-dashed border-[#B8973A]" /> Data Date</div>
-          <div className="text-[#C55A11] font-bold">Click dates / % / status to edit</div>
+          <div className="flex items-center gap-1"><span className="inline-block w-3.5 h-2 bg-[#4472C4] border border-gray-400" /> {t('schedules.legendActual')}</div>
+          <div className="flex items-center gap-1"><span className="inline-block w-3.5 h-2 bg-[#C9A96E] border border-gray-400" /> {t('schedules.legendRemaining')}</div>
+          <div className="flex items-center gap-1"><span className="inline-block w-3.5 h-2 bg-[#FF0000] border border-gray-400" /> {t('schedules.criticalRemaining')}</div>
+          <div className="flex items-center gap-1">◆ {t('schedules.legendMilestone')}</div>
+          <div className="flex items-center gap-1"><span className="inline-block w-4 border-t-[1.5px] border-dashed border-[#B8973A]" /> {t('schedules.legendDataDate')}</div>
+          <div className="text-[#C55A11] font-bold">{t('schedules.clickToEdit')}</div>
         </div>
         <div className="text-center flex-1">
-          <div className="text-xs font-bold">{schedule.project?.projectName || 'Ritz Carlton PH2201 — Slovin Residence'} | Interactive CPM</div>
+          <div className="text-xs font-bold">{schedule.project?.projectName || 'Ritz Carlton PH2201 — Slovin Residence'} | {t('schedules.interactiveCpm')}</div>
           <div className="text-[9px] font-bold">{schedule.revision} | {schedule.notes || ''}</div>
         </div>
         <div className="text-right min-w-[120px] leading-relaxed">
-          {schedule.projectFinish && <div>Project Finish: {fmtDate(schedule.projectFinish)}</div>}
-          <div>Data Date: {fmtDate(schedule.dataDate)}</div>
-          {schedule.tcoDate && <div>TCO: {fmtDate(schedule.tcoDate)}</div>}
-          <div>Prepared: A. Padilla — PDG</div>
+          {schedule.projectFinish && <div>{t('schedules.projectFinish')}: {fmtDate(schedule.projectFinish)}</div>}
+          <div>{t('schedules.dataDateLabel')} {fmtDate(schedule.dataDate)}</div>
+          {schedule.tcoDate && <div>{t('schedules.tcoLabel')} {fmtDate(schedule.tcoDate)}</div>}
+          <div>{t('schedules.preparedBy')}</div>
         </div>
       </div>
     </div>

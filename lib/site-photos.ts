@@ -71,8 +71,11 @@ export const TRADE_PRESETS = [
 
 export type PhotoTagId = (typeof PHOTO_TAGS)[number]['id'];
 
-export function photoTagLabel(tag: string): string {
-  return PHOTO_TAGS.find((t) => t.id === tag)?.labelEs ?? PHOTO_TAGS.find((t) => t.id === tag)?.label ?? tag;
+import type { AppLocale } from '@/lib/i18n/types';
+import { photoTagLabelForLocale } from '@/lib/i18n';
+
+export function photoTagLabel(tag: string, locale: AppLocale = 'en'): string {
+  return photoTagLabelForLocale(tag, locale);
 }
 
 export function photoTagStyle(tag: string): string {

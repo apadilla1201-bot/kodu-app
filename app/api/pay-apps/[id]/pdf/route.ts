@@ -7,19 +7,23 @@ import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { htmlToPdf } from '@/lib/pdf';
 import { GC_ADDRESS_FULL, GC_LICENSE, GC_NAME } from '@/lib/gc-branding';
+import { createTranslator, type AppLocale } from '@/lib/i18n';
+import { exportDateLocale, exportNumberLocale } from '@/lib/i18n/export-locale';
+import { getSessionLocale } from '@/lib/i18n/server';
 
 function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function fmt(n: number | null | undefined): string {
+function fmt(n: number | null | undefined, locale: AppLocale = 'en'): string {
   const v = n ?? 0;
-  if (v < 0) return `(${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
-  return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const loc = exportNumberLocale(locale);
+  if (v < 0) return `(${Math.abs(v).toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+  return v.toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fmtD(n: number | null | undefined): string {
-  return `$${fmt(n)}`;
+function fmtD(n: number | null | undefined, locale: AppLocale = 'en'): string {
+  return `$${fmt(n, locale)}`;
 }
 
 function fmtPct(n: number | null | undefined): string {
@@ -27,14 +31,14 @@ function fmtPct(n: number | null | undefined): string {
   return v === 0 ? '0%' : `${v.toFixed(1)}%`;
 }
 
-function fmtDate(d: Date | string | null | undefined): string {
+function fmtDate(d: Date | string | null | undefined, locale: AppLocale = 'en'): string {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  return new Date(d).toLocaleDateString(exportDateLocale(locale), { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-function fmtDateLong(d: Date | string | null | undefined): string {
+function fmtDateLong(d: Date | string | null | undefined, locale: AppLocale = 'en'): string {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(d).toLocaleDateString(exportDateLocale(locale), { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 interface LineItem {
@@ -56,7 +60,9 @@ interface LineItem {
   sectionTitle: string;
 }
 
-function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
+function buildG702Html(pa: any, project: any, lines: LineItem[], locale: AppLocale = 'en'): string {
+  const t = createTranslator(locale);
+  const L = (key: string) => t(`pdf.payApp.${key}`);
   // Compute G702 values from line items
   const regularLines = lines.filter((l: LineItem) => !l.isSection && !l.isBelowLine && !l.isFee);
   const feeLines = lines.filter((l: LineItem) => l.isFee);
@@ -133,13 +139,13 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>APPLICATION AND CERTIFICATE FOR PAYMENT</h1>
+      <h1>${esc(L('g702Title'))}</h1>
       <p>AIA Document G702 — ${esc(GC_NAME)}</p>
     </div>
     <div class="header-right">
       <div class="app-no">PA #${pa.applicationNumber}</div>
-      <div>Application Date: ${fmtDate(pa.applicationDate)}</div>
-      <div>Period: ${fmtDate(pa.periodFrom)} to ${fmtDate(pa.periodTo)}</div>
+      <div>${esc(L('applicationDate'))}: ${fmtDate(pa.applicationDate, locale)}</div>
+      <div>${esc(L('period'))}: ${fmtDate(pa.periodFrom, locale)} to ${fmtDate(pa.periodTo, locale)}</div>
     </div>
   </div>
   <div class="gold-bar">
@@ -148,9 +154,9 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
   </div>
 
   <div class="info-grid">
-    <div class="info-cell"><div class="info-label">TO (Owner)</div>${esc(pa.ownerName || '')}<br/>${esc(pa.ownerAddress || '')}<br/>${esc(pa.ownerCity || '')}</div>
-    <div class="info-cell right"><div class="info-label">FROM (Contractor)</div>${esc(GC_NAME)}<br/>Attn: ${esc(pa.contractorPrinted || 'Pedro Dominguez')}<br/>${esc(GC_ADDRESS_FULL)}</div>
-    <div class="info-cell"><div class="info-label">Project</div>${esc(pa.contractFor || project?.projectName || '')}</div>
+    <div class="info-cell"><div class="info-label">${esc(L('toOwner'))}</div>${esc(pa.ownerName || '')}<br/>${esc(pa.ownerAddress || '')}<br/>${esc(pa.ownerCity || '')}</div>
+    <div class="info-cell right"><div class="info-label">${esc(L('fromContractor'))}</div>${esc(GC_NAME)}<br/>Attn: ${esc(pa.contractorPrinted || 'Pedro Dominguez')}<br/>${esc(GC_ADDRESS_FULL)}</div>
+    <div class="info-cell"><div class="info-label">${esc(t('pdf.rfi.project'))}</div>${esc(pa.contractFor || project?.projectName || '')}</div>
     <div class="info-cell right"><div class="info-label">Architect</div>${esc(pa.architectName || '')}<br/>${esc(pa.architectAddress || '')}<br/>${esc(pa.architectCity || '')}</div>
     <div class="info-cell"><div class="info-label">Contract Date</div>${fmtDate(pa.contractDate)}</div>
     <div class="info-cell right"><div class="info-label">Contract For</div>${esc(pa.contractForm || '')}</div>
@@ -158,7 +164,7 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
 
   <div class="two-col">
     <div>
-      <div class="section-title">APPLICATION FOR PAYMENT</div>
+      <div class="section-title">${esc(L('applicationForPayment'))}</div>
       <table class="fin-table">
         <tr><td class="line-num">1.</td><td class="line-label">ORIGINAL CONTRACT SUM</td><td class="line-val">${fmtD(originalContractSum)}</td></tr>
         <tr><td class="line-num">2.</td><td class="line-label">Net Change by Change Orders</td><td class="line-val">${fmtD(allChanges)}</td></tr>
@@ -179,7 +185,7 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
     </div>
 
     <div>
-      <div class="section-title">CERTIFICATE FOR PAYMENT</div>
+      <div class="section-title">${esc(L('certificateForPayment'))}</div>
       <div style="padding:10px; border:1px solid #ccc; border-top:none; font-size:8pt; min-height:200px;">
         <p style="margin-bottom:8px;">In accordance with the Contract Documents, based on on-site observations and the data comprising the above application, the Architect certifies to the Owner that to the best of the Architect's knowledge, information and belief, the Work has progressed as indicated, the quality of the Work is in accordance with the Contract Documents, and the Contractor is entitled to payment of the <strong>AMOUNT CERTIFIED</strong>.</p>
         <div style="text-align:center; margin:16px 0;">
@@ -193,7 +199,7 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
 
   <div class="two-col" style="margin-top:12px;">
     <div class="sig-block">
-      <h3>CONTRACTOR</h3>
+      <h3>${esc(L('contractor'))}</h3>
       <div class="sig-line"></div>
       <div class="sig-label">Signature</div>
       <div style="margin-top:4px; font-size:8pt;"><strong>${esc(pa.contractorPrinted || '')}</strong><br/>${esc(pa.contractorTitle || '')}</div>
@@ -201,7 +207,7 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
       <div style="margin-top:2px;"><span class="sig-label">Notarized: </span>State of Florida, County of Miami-Dade</div>
     </div>
     <div class="sig-block">
-      <h3>OWNER</h3>
+      <h3>${esc(L('owner'))}</h3>
       <div class="sig-line"></div>
       <div class="sig-label">Signature</div>
       <div style="margin-top:4px; font-size:8pt;"><strong>${esc(pa.ownerPrinted || pa.ownerName || '')}</strong></div>
@@ -210,13 +216,15 @@ function buildG702Html(pa: any, project: any, lines: LineItem[]): string {
   </div>
 
   <div class="footer">
-    ${esc(GC_NAME)} &bull; ${esc(project?.projectNumber || '')} — ${esc(project?.projectName || '')} &bull; PA #${pa.applicationNumber} &bull; Generated ${new Date().toLocaleDateString('en-US')}
+    ${esc(GC_NAME)} &bull; ${esc(project?.projectNumber || '')} — ${esc(project?.projectName || '')} &bull; PA #${pa.applicationNumber} &bull; ${esc(L('generated'))} ${new Date().toLocaleDateString(exportDateLocale(locale))}
   </div>
 </div>
 </body></html>`;
 }
 
-function buildG703Html(pa: any, project: any, lines: LineItem[]): string {
+function buildG703Html(pa: any, project: any, lines: LineItem[], locale: AppLocale = 'en'): string {
+  const t = createTranslator(locale);
+  const L = (key: string) => t(`pdf.payApp.${key}`);
   const regularLines = lines.filter((l: LineItem) => !l.isFee && !l.isBelowLine);
   const feeLines = lines.filter((l: LineItem) => l.isFee);
   const belowLines = lines.filter((l: LineItem) => l.isBelowLine && !l.isSection);
@@ -358,16 +366,16 @@ function buildG703Html(pa: any, project: any, lines: LineItem[]): string {
 <div class="page">
   <div class="header">
     <div>
-      <h1>CONTINUATION SHEET — AIA G703</h1>
+      <h1>${esc(L('g703'))}</h1>
       <div class="sub">${esc(GC_NAME)} — ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')}</div>
     </div>
     <div class="right">
       <div class="app-no">PA #${pa.applicationNumber}</div>
-      <div>Period: ${fmtDate(pa.periodFrom)} to ${fmtDate(pa.periodTo)}</div>
+      <div>${esc(L('period'))}: ${fmtDate(pa.periodFrom, locale)} to ${fmtDate(pa.periodTo, locale)}</div>
     </div>
   </div>
   <div class="gold-bar">
-    <span>Application Date: ${fmtDate(pa.applicationDate)}</span>
+    <span>${esc(L('applicationDate'))}: ${fmtDate(pa.applicationDate, locale)}</span>
     <span>Contract: ${esc(pa.contractFor || project?.projectName || '')}</span>
   </div>
 
@@ -399,7 +407,7 @@ function buildG703Html(pa: any, project: any, lines: LineItem[]): string {
   </table>
 
   <div class="footer">
-    ${esc(GC_NAME)} &bull; PA #${pa.applicationNumber} &bull; ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')} &bull; Generated ${new Date().toLocaleDateString('en-US')}
+    ${esc(GC_NAME)} &bull; PA #${pa.applicationNumber} &bull; ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')} &bull; ${esc(L('generated'))} ${new Date().toLocaleDateString(exportDateLocale(locale))}
   </div>
 </div>
 </body></html>`;
@@ -446,12 +454,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
       sectionTitle: li.sectionTitle || '',
     }));
 
+    const locale = await getSessionLocale();
+
     const htmlPages: string[] = [];
     if (type === 'g702' || type === 'both') {
-      htmlPages.push(buildG702Html(pa, pa.project, lines));
+      htmlPages.push(buildG702Html(pa, pa.project, lines, locale));
     }
     if (type === 'g703' || type === 'both') {
-      htmlPages.push(buildG703Html(pa, pa.project, lines));
+      htmlPages.push(buildG703Html(pa, pa.project, lines, locale));
     }
 
     // Generate PDFs locally

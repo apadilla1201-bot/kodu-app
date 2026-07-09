@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { isAppLocale } from '@/lib/i18n/types';
 import bcrypt from 'bcryptjs';
 
 export async function GET() {
@@ -20,6 +21,7 @@ export async function GET() {
         name: true,
         email: true,
         role: true,
+        locale: true,
         companyId: true,
         company: { select: { id: true, name: true } },
       },
@@ -67,6 +69,13 @@ export async function PATCH(request: Request) {
       }
       data.password = await bcrypt.hash(String(body.password), 10);
     }
+    if (body.locale !== undefined) {
+      const locale = String(body.locale);
+      if (!isAppLocale(locale)) {
+        return NextResponse.json({ error: 'Invalid locale' }, { status: 400 });
+      }
+      data.locale = locale;
+    }
 
     const user = await prisma.user.update({
       where: { id: userId },
@@ -76,12 +85,21 @@ export async function PATCH(request: Request) {
         name: true,
         email: true,
         role: true,
+        locale: true,
         companyId: true,
         company: { select: { id: true, name: true } },
       },
     });
 
-    return NextResponse.json(user);
+    const response = NextResponse.json(user);
+    if (typeof data.locale === 'string') {
+      response.cookies.set('kodu_locale', data.locale, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: 'lax',
+      });
+    }
+    return response;
   } catch (error: any) {
     console.error('PATCH /api/user/profile error:', error);
     return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });

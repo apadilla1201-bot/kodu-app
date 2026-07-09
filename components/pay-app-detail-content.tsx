@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useI18n } from '@/hooks/use-i18n';
 import {
   ArrowLeft, Download, Pencil, Save, X, Loader2, Calendar, Building2,
   DollarSign, FileText, Receipt, Hash, User, Plus, Trash2,
@@ -35,6 +36,7 @@ const emptyLine = (sortOrder: number): any => ({
 
 export function PayAppDetailContent({ payApp }: { payApp: any }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -150,11 +152,11 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Failed to save');
-      toast.success('Pay Application guardada correctamente');
+      toast.success(t('payApps.savedSuccess'));
       setEditing(false);
       router.refresh();
     } catch (err: any) {
-      toast.error(err?.message ?? 'Error al guardar');
+      toast.error(err?.message ?? t('payApps.saveError'));
     } finally {
       setSaving(false);
     }
@@ -187,10 +189,10 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 2000);
-      toast.success(type === 'both' ? 'PDF completo generado (G702 + G703)' : `${type.toUpperCase()} PDF generado`);
+      toast.success(type === 'both' ? t('payApps.pdfFullGenerated') : t('payApps.pdfTypeGenerated', { type: type.toUpperCase() }));
     } catch (err: any) {
       console.error('PDF generation error:', err);
-      toast.error(err?.message || 'Error al generar PDF');
+      toast.error(err?.message || t('payApps.pdfGenerateError'));
     } finally {
       setGeneratingPdf(false);
     }
@@ -229,7 +231,7 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
   return (
     <div className="max-w-[1400px] mx-auto space-y-6">
       <Link href={projectId ? `/dashboard/projects/${projectId}` : '/dashboard/projects'} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-[#C9A96E]">
-        <ArrowLeft className="w-4 h-4" /> Volver al Proyecto
+        <ArrowLeft className="w-4 h-4" /> {t('payApps.backToProject')}
       </Link>
 
       {/* Header */}
@@ -239,7 +241,7 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
             <div>
               <h1 className="text-2xl font-display font-bold flex items-center gap-3">
                 <Receipt className="w-6 h-6 text-[#C9A96E]" />
-                Pay Application #{payApp.applicationNumber}
+                {t('payApps.payAppTitle', { number: payApp.applicationNumber })}
               </h1>
               <p className="text-sm text-gray-400 mt-1">#{payApp.project?.projectNumber} — {payApp.project?.projectName}</p>
             </div>
@@ -247,29 +249,29 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
               {editing ? (
                 <>
                   <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-white/20 text-white hover:bg-white/10 text-sm font-medium flex items-center gap-2">
-                    <X className="w-4 h-4" /> Cancelar
+                    <X className="w-4 h-4" /> {t('common.cancel')}
                   </button>
                   <button onClick={handleSave} disabled={saving} className="bg-[#2E7D32] hover:bg-[#256d29] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    {saving ? 'Guardando...' : 'Guardar'}
+                    {saving ? t('payApps.saving') : t('common.save')}
                   </button>
                 </>
               ) : (
                 <>
                   <button onClick={startEdit} className="border border-[#C9A96E] text-[#C9A96E] hover:bg-[#C9A96E]/10 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-                    <Pencil className="w-4 h-4" /> Editar
+                    <Pencil className="w-4 h-4" /> {t('payApps.edit')}
                   </button>
                   <button onClick={() => handleGeneratePdf('both')} disabled={generatingPdf} className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50">
                     {generatingPdf && pdfType === 'both' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                    PDF Completo (G702 + G703)
+                    {t('payApps.pdfFull')}
                   </button>
                   <button onClick={() => handleGeneratePdf('g702')} disabled={generatingPdf} className="bg-[#0F1B33] border border-[#C9A96E] text-[#C9A96E] hover:bg-[#C9A96E]/10 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
                     {generatingPdf && pdfType === 'g702' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                    Solo G702
+                    {t('payApps.g702Only')}
                   </button>
                   <button onClick={() => handleGeneratePdf('g703')} disabled={generatingPdf} className="bg-[#0F1B33] border border-[#C9A96E] text-[#C9A96E] hover:bg-[#C9A96E]/10 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-50">
                     {generatingPdf && pdfType === 'g703' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                    Solo G703
+                    {t('payApps.g703Only')}
                   </button>
                 </>
               )}
@@ -281,11 +283,11 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
         <div className="px-6 pt-4 pb-2 flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Calendar className="w-3.5 h-3.5" />
-            <span className="font-medium">Fecha:</span>
+            <span className="font-medium">{t('payApps.dateLabel')}</span>
             <span>{payApp.applicationDate ? new Date(payApp.applicationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
           </div>
           <div className="flex items-center gap-1.5 text-muted-foreground">
-            <span className="font-medium">Período:</span>
+            <span className="font-medium">{t('payApps.period')}:</span>
             <span>{payApp.periodFrom ? new Date(payApp.periodFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
             <span>—</span>
             <span>{payApp.periodTo ? new Date(payApp.periodTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
@@ -302,19 +304,19 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
         {/* G702 Summary */}
         <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-[#C9A96E]/5 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground">Contract Sum</p>
+            <p className="text-xs text-muted-foreground">{t('payApps.contractSum')}</p>
             <p className="font-mono font-bold text-lg">{fmt(totalRevised)}</p>
           </div>
           <div className="bg-[#2E7D32]/5 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground">Total Completed</p>
+            <p className="text-xs text-muted-foreground">{t('payApps.totalCompleted')}</p>
             <p className="font-mono font-bold text-lg text-[#2E7D32]">{fmt(totalCompleted)}</p>
           </div>
           <div className="bg-[#0F1B33]/5 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground">Current Payment Due</p>
+            <p className="text-xs text-muted-foreground">{t('payApps.currentPaymentDue')}</p>
             <p className="font-mono font-bold text-lg text-[#C9A96E]">{fmt(currentPaymentDue)}</p>
           </div>
           <div className="bg-muted/50 rounded-lg p-3">
-            <p className="text-xs text-muted-foreground">% Complete</p>
+            <p className="text-xs text-muted-foreground">{t('payApps.pctComplete')}</p>
             <p className="font-mono font-bold text-lg">{(pctComplete * 100).toFixed(1)}%</p>
           </div>
         </div>
@@ -323,75 +325,75 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
       {/* G702 Details (edit mode shows input fields) */}
       {editing && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-card rounded-lg p-6 shadow-[var(--shadow-sm)] space-y-4">
-          <h2 className="text-sm font-semibold flex items-center gap-2"><FileText className="w-4 h-4 text-[#C9A96E]" /> G702 Header Info</h2>
+          <h2 className="text-sm font-semibold flex items-center gap-2"><FileText className="w-4 h-4 text-[#C9A96E]" /> {t('payApps.g702HeaderInfo')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Owner Name</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.ownerName')}</label>
               <input value={editData.ownerName} onChange={e => setEditData({...editData, ownerName: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Owner Address</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.ownerAddress')}</label>
               <input value={editData.ownerAddress} onChange={e => setEditData({...editData, ownerAddress: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Owner City</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.ownerCity')}</label>
               <input value={editData.ownerCity} onChange={e => setEditData({...editData, ownerCity: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Architect Name</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.architectName')}</label>
               <input value={editData.architectName} onChange={e => setEditData({...editData, architectName: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Architect Address</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.architectAddress')}</label>
               <input value={editData.architectAddress} onChange={e => setEditData({...editData, architectAddress: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Architect City</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.architectCity')}</label>
               <input value={editData.architectCity} onChange={e => setEditData({...editData, architectCity: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Contract For</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.contractFor')}</label>
               <input value={editData.contractFor} onChange={e => setEditData({...editData, contractFor: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Fecha Aplicación</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.applicationDate')}</label>
               <input type="date" value={editData.applicationDate} onChange={e => setEditData({...editData, applicationDate: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Período Desde</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.periodFrom')}</label>
               <input type="date" value={editData.periodFrom} onChange={e => setEditData({...editData, periodFrom: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Período Hasta</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.periodTo')}</label>
               <input type="date" value={editData.periodTo} onChange={e => setEditData({...editData, periodTo: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Contract Date</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.contractDate')}</label>
               <input type="date" value={editData.contractDate} onChange={e => setEditData({...editData, contractDate: e.target.value})} className={inputClass} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Status</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('common.status')}</label>
               <select value={editData.status} onChange={e => setEditData({...editData, status: e.target.value})} className={inputClass}>
-                <option value="Draft">Draft</option>
-                <option value="Submitted">Submitted</option>
-                <option value="Approved">Approved</option>
+                <option value="Draft">{t('payApps.statusDraft')}</option>
+                <option value="Submitted">{t('payApps.statusSubmitted')}</option>
+                <option value="Approved">{t('payApps.statusApproved')}</option>
               </select>
             </div>
           </div>
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">Deducciones (G702 Líneas 7a, 7b, 7)</h3>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">{t('payApps.deductions')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">7a. Advance Payments</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.advancePayments')}</label>
               <input type="number" step="any" value={editData.advancePayments} onChange={e => setEditData({...editData, advancePayments: e.target.value})} className={inputClass} />
-              <input placeholder="Label (e.g. Invoice 176-10...)" value={editData.advancePaymentsLabel} onChange={e => setEditData({...editData, advancePaymentsLabel: e.target.value})} className={inputClass + ' mt-1'} />
+              <input placeholder={t('payApps.advanceLabelPlaceholder')} value={editData.advancePaymentsLabel} onChange={e => setEditData({...editData, advancePaymentsLabel: e.target.value})} className={inputClass + ' mt-1'} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">7b. Direct Payments</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.directPayments')}</label>
               <input type="number" step="any" value={editData.directPayments} onChange={e => setEditData({...editData, directPayments: e.target.value})} className={inputClass} />
-              <input placeholder="Label (e.g. SHANNON)" value={editData.directPaymentsLabel} onChange={e => setEditData({...editData, directPaymentsLabel: e.target.value})} className={inputClass + ' mt-1'} />
+              <input placeholder={t('payApps.directLabelPlaceholder')} value={editData.directPaymentsLabel} onChange={e => setEditData({...editData, directPaymentsLabel: e.target.value})} className={inputClass + ' mt-1'} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">7. Previous Certificates</label>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.previousCertificates')}</label>
               <input type="number" step="any" value={editData.previousCertificates} onChange={e => setEditData({...editData, previousCertificates: e.target.value})} className={inputClass} />
             </div>
           </div>
@@ -402,17 +404,17 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-lg shadow-[var(--shadow-sm)] overflow-hidden">
         <div className="bg-[#0F1B33] text-white px-6 py-3 flex items-center justify-between">
           <h2 className="font-display font-bold text-sm flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#C9A96E]" /> AIA G703 — Continuation Sheet
+            <FileText className="w-4 h-4 text-[#C9A96E]" /> {t('payApps.g703Continuation')}
           </h2>
           <div className="flex items-center gap-3">
-            <p className="text-xs text-gray-400">{displayLines.filter((l: any) => !l.isSection).length} line items</p>
+            <p className="text-xs text-gray-400">{t('payApps.lineItemsCount', { count: displayLines.filter((l: any) => !l.isSection).length })}</p>
             {editing && (
               <div className="flex gap-1">
                 <button onClick={() => addLine(true)} className="text-xs px-2 py-1 rounded border border-white/20 text-white hover:bg-white/10 flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> Sección
+                  <Plus className="w-3 h-3" /> {t('payApps.addSection')}
                 </button>
                 <button onClick={() => addLine(false)} className="text-xs px-2 py-1 rounded bg-[#C9A96E] text-white hover:bg-[#B8975D] flex items-center gap-1">
-                  <Plus className="w-3 h-3" /> Línea
+                  <Plus className="w-3 h-3" /> {t('payApps.addLine')}
                 </button>
               </div>
             )}
@@ -422,20 +424,20 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="bg-[#0F1B33] text-white">
-                <th className="px-2 py-2 text-left w-16 font-medium">Item #</th>
-                <th className="px-2 py-2 text-left font-medium min-w-[200px]">Descripción</th>
-                <th className="px-2 py-2 text-left w-20 font-medium">Sub</th>
-                <th className="px-2 py-2 text-right w-20 font-medium">Sched. Value</th>
-                <th className="px-2 py-2 text-right w-16 font-medium">Realloc.</th>
-                <th className="px-2 py-2 text-right w-16 font-medium">Prev Chg</th>
-                <th className="px-2 py-2 text-right w-16 font-medium">Curr Chg</th>
-                <th className="px-2 py-2 text-right w-20 font-medium">Revised</th>
-                <th className="px-2 py-2 text-right w-20 font-medium">Prev Compl.</th>
-                <th className={`px-2 py-2 text-right w-20 font-medium ${editing ? 'bg-[#C9A96E]/20' : ''}`}>{editing ? '✏️ Este Período' : 'Este Período'}</th>
-                <th className="px-2 py-2 text-right w-20 font-medium">Total Compl.</th>
+                <th className="px-2 py-2 text-left w-16 font-medium">{t('payApps.itemNumber')}</th>
+                <th className="px-2 py-2 text-left font-medium min-w-[200px]">{t('payApps.description')}</th>
+                <th className="px-2 py-2 text-left w-20 font-medium">{t('payApps.sub')}</th>
+                <th className="px-2 py-2 text-right w-20 font-medium">{t('payApps.schedValue')}</th>
+                <th className="px-2 py-2 text-right w-16 font-medium">{t('payApps.realloc')}</th>
+                <th className="px-2 py-2 text-right w-16 font-medium">{t('payApps.prevChg')}</th>
+                <th className="px-2 py-2 text-right w-16 font-medium">{t('payApps.currChg')}</th>
+                <th className="px-2 py-2 text-right w-20 font-medium">{t('payApps.revised')}</th>
+                <th className="px-2 py-2 text-right w-20 font-medium">{t('payApps.prevCompl')}</th>
+                <th className={`px-2 py-2 text-right w-20 font-medium ${editing ? 'bg-[#C9A96E]/20' : ''}`}>{editing ? t('payApps.thisPeriodEdit') : t('payApps.thisPeriod')}</th>
+                <th className="px-2 py-2 text-right w-20 font-medium">{t('payApps.totalCompl')}</th>
                 <th className="px-2 py-2 text-right w-12 font-medium">%</th>
-                <th className="px-2 py-2 text-right w-20 font-medium">Balance</th>
-                <th className="px-2 py-2 text-right w-16 font-medium">Retainage</th>
+                <th className="px-2 py-2 text-right w-20 font-medium">{t('payApps.balance')}</th>
+                <th className="px-2 py-2 text-right w-16 font-medium">{t('payApps.retainage')}</th>
                 {editing && <th className="px-1 py-2 w-8"></th>}
               </tr>
             </thead>
@@ -532,7 +534,7 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
               })}
               {/* Grand Total Row */}
               <tr className="bg-[#0F1B33] text-white font-bold">
-                <td className="px-2 py-2" colSpan={3}>GRAND TOTAL</td>
+                <td className="px-2 py-2" colSpan={3}>{t('payApps.grandTotal')}</td>
                 <td className="px-2 py-2 text-right font-mono">{fmt(totalScheduled)}</td>
                 <td colSpan={3}></td>
                 <td className="px-2 py-2 text-right font-mono">{fmt(totalRevised)}</td>
@@ -553,13 +555,13 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
       {editing && (
         <div className="sticky bottom-4 bg-card border border-border rounded-xl p-4 shadow-lg flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Editando PA #{payApp.applicationNumber} — <span className="font-semibold text-[#C9A96E]">{fmt(totalCompleted)}</span> completado de {fmt(totalRevised)}
+            {t('payApps.editingSummary', { number: payApp.applicationNumber, completed: fmt(totalCompleted), total: fmt(totalRevised) })}
           </p>
           <div className="flex gap-2">
-            <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium">Cancelar</button>
+            <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium">{t('common.cancel')}</button>
             <button onClick={handleSave} disabled={saving} className="bg-[#2E7D32] hover:bg-[#256d29] text-white px-6 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? 'Guardando...' : 'Guardar Cambios'}
+              {saving ? t('payApps.saving') : t('payApps.saveChanges')}
             </button>
           </div>
         </div>

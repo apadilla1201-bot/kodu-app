@@ -8,6 +8,7 @@ import {
   ChevronRight, Trash2, ArrowLeft, PackageOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useI18n } from '@/hooks/use-i18n';
 
 interface Props {
   projectId: string;
@@ -52,6 +53,7 @@ function fmtDate(d: string | null): string {
 }
 
 export default function BatchPAImport({ projectId, projectName, onComplete, onCancel }: Props) {
+  const { t } = useI18n();
   const [step, setStep] = useState<Step>('upload');
   const [files, setFiles] = useState<File[]>([]);
   const [previewing, setPreviewing] = useState(false);
@@ -66,7 +68,7 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
       f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
     );
     if (valid.length === 0) {
-      toast.error('Solo archivos Excel (.xlsx, .xls)');
+      toast.error(t('import.excelOnly'));
       return;
     }
     setFiles(prev => {
@@ -102,9 +104,9 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
       const data = await res.json();
       setPreviews(data.payApplications || []);
       setStep('preview');
-      toast.success(`${data.count} Pay Application${data.count !== 1 ? 's' : ''} detectadas`);
+      toast.success(t('import.detectedCount', { count: data.count }));
     } catch (e: any) {
-      toast.error(e.message || 'Error al analizar archivos');
+      toast.error(e.message || t('import.previewError'));
     } finally {
       setPreviewing(false);
     }
@@ -128,13 +130,13 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
       setResults(data.results || []);
       setStep('results');
       if (data.created > 0) {
-        toast.success(`${data.created} Pay Application${data.created !== 1 ? 's' : ''} importadas`);
+        toast.success(t('import.importedCount', { count: data.created }));
       }
       if (data.skipped > 0) {
-        toast.warning(`${data.skipped} omitidas (ya existían)`);
+        toast.warning(t('import.skipped', { count: data.skipped }));
       }
     } catch (e: any) {
-      toast.error(e.message || 'Error al importar');
+      toast.error(e.message || t('import.importError'));
       setStep('preview');
     } finally {
       setImporting(false);
@@ -154,7 +156,7 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h3 className="font-semibold text-lg">Importación Masiva de Pay Applications</h3>
+          <h3 className="font-semibold text-lg">{t('import.batchImport')}</h3>
           <p className="text-sm text-muted-foreground">{projectName}</p>
         </div>
       </div>
@@ -165,11 +167,10 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <PackageOpen className="w-5 h-5 text-[#C9A96E]" />
-              Suba los archivos Excel de cada Pay Application
+              {t('import.uploadTitle')}
             </CardTitle>
             <CardDescription>
-              Cada archivo Excel debe contener las hojas G703 (Schedule of Values), G702, y/o PROJECT SETTINGS.
-              El sistema detecta automáticamente el número de aplicación y período de cada archivo.
+              {t('import.uploadDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -183,8 +184,8 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
               onClick={() => fileRef.current?.click()}
             >
               <Upload className="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
-              <p className="text-sm font-medium">Arrastre los archivos Excel aquí</p>
-              <p className="text-xs text-muted-foreground mt-1">o haga click para seleccionar · .xlsx / .xls · Múltiples archivos permitidos</p>
+              <p className="text-sm font-medium">{t('import.dragFiles')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('import.clickToSelect')}</p>
               <input
                 ref={fileRef}
                 type="file"
@@ -199,8 +200,8 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
             {files.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{files.length} archivo{files.length !== 1 ? 's' : ''} seleccionado{files.length !== 1 ? 's' : ''}</p>
-                  <button onClick={() => setFiles([])} className="text-xs text-red-500 hover:underline">Limpiar todos</button>
+                  <p className="text-sm font-medium">{t('import.filesSelected', { count: files.length })}</p>
+                  <button onClick={() => setFiles([])} className="text-xs text-red-500 hover:underline">{t('import.clearAll')}</button>
                 </div>
                 <div className="max-h-48 overflow-y-auto space-y-1">
                   {files.map((f, i) => (
@@ -228,9 +229,9 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
                 size="lg"
               >
                 {previewing ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Analizando {files.length} archivos...</>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('import.analyzing', { count: files.length })}</>
                 ) : (
-                  <>Analizar y Previsualizar <ChevronRight className="w-4 h-4 ml-2" /></>
+                  <>{t('import.analyzePreview')} <ChevronRight className="w-4 h-4 ml-2" /></>
                 )}
               </Button>
             )}
@@ -243,10 +244,10 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
         <Card>
           <CardHeader>
             <CardTitle className="text-base">
-              Previsualización — {previews.length} Pay Application{previews.length !== 1 ? 's' : ''} Detectadas
+              {t('import.previewTitle', { count: previews.length })}
             </CardTitle>
             <CardDescription>
-              Revise la información extraída antes de importar. Las PAs se crearán en orden por número de aplicación.
+              {t('import.previewDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -254,15 +255,15 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-muted/50 rounded-lg p-3 text-center">
                 <p className="text-lg font-bold font-mono">{previews.length}</p>
-                <p className="text-xs text-muted-foreground">Pay Applications</p>
+                <p className="text-xs text-muted-foreground">{t('import.payApplications')}</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3 text-center">
                 <p className="text-lg font-bold font-mono">{totalLineItems}</p>
-                <p className="text-xs text-muted-foreground">Total Line Items</p>
+                <p className="text-xs text-muted-foreground">{t('import.totalLineItemsLabel')}</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3 text-center">
                 <p className="text-lg font-bold font-mono text-[#C9A96E]">{fmt(totalScheduled)}</p>
-                <p className="text-xs text-muted-foreground">Scheduled Value</p>
+                <p className="text-xs text-muted-foreground">{t('import.scheduledValue')}</p>
               </div>
             </div>
 
@@ -271,20 +272,20 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-2 px-2 font-semibold text-xs text-muted-foreground">PA #</th>
-                    <th className="text-left py-2 px-2 font-semibold text-xs text-muted-foreground">Archivo</th>
-                    <th className="text-left py-2 px-2 font-semibold text-xs text-muted-foreground">Período</th>
-                    <th className="text-right py-2 px-2 font-semibold text-xs text-muted-foreground">Líneas</th>
-                    <th className="text-right py-2 px-2 font-semibold text-xs text-muted-foreground">Prev. Completed</th>
-                    <th className="text-right py-2 px-2 font-semibold text-xs text-muted-foreground">This Period</th>
-                    <th className="text-center py-2 px-2 font-semibold text-xs text-muted-foreground">Sheets</th>
+                    <th className="text-left py-2 px-2 font-semibold text-xs text-muted-foreground">{t('import.colPaNumber')}</th>
+                    <th className="text-left py-2 px-2 font-semibold text-xs text-muted-foreground">{t('import.colFile')}</th>
+                    <th className="text-left py-2 px-2 font-semibold text-xs text-muted-foreground">{t('import.colPeriod')}</th>
+                    <th className="text-right py-2 px-2 font-semibold text-xs text-muted-foreground">{t('import.colLines')}</th>
+                    <th className="text-right py-2 px-2 font-semibold text-xs text-muted-foreground">{t('import.colPrevCompleted')}</th>
+                    <th className="text-right py-2 px-2 font-semibold text-xs text-muted-foreground">{t('import.colThisPeriod')}</th>
+                    <th className="text-center py-2 px-2 font-semibold text-xs text-muted-foreground">{t('import.colSheets')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {previews.map((pa, i) => (
                     <tr key={i} className="border-b border-border/50 hover:bg-muted/30">
                       <td className="py-2 px-2 font-mono font-semibold">
-                        {pa.applicationNumber ? `#${pa.applicationNumber}` : <span className="text-amber-500 text-xs">Auto</span>}
+                        {pa.applicationNumber ? `#${pa.applicationNumber}` : <span className="text-amber-500 text-xs">{t('import.auto')}</span>}
                       </td>
                       <td className="py-2 px-2 truncate max-w-[180px]">{pa.fileName}</td>
                       <td className="py-2 px-2 text-muted-foreground text-xs">
@@ -310,21 +311,21 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
             {previews.some(p => !p.applicationNumber) && (
               <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200 rounded-lg px-4 py-3 text-sm">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <p>Algunos archivos no tienen número de aplicación. Se asignarán automáticamente en secuencia.</p>
+                <p>{t('import.autoAssignWarning')}</p>
               </div>
             )}
 
             {/* Actions */}
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep('upload')} className="flex-1">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Volver
+                <ArrowLeft className="w-4 h-4 mr-2" /> {t('import.back')}
               </Button>
               <Button
                 onClick={handleImport}
                 className="flex-1 bg-[#C9A96E] hover:bg-[#B8975D] text-white"
                 size="lg"
               >
-                Importar {previews.length} Pay Application{previews.length !== 1 ? 's' : ''}
+                {t('import.importCount', { count: previews.length })}
                 <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -337,8 +338,8 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
         <Card>
           <CardContent className="p-12 text-center">
             <Loader2 className="w-10 h-10 mx-auto mb-4 animate-spin text-[#C9A96E]" />
-            <p className="text-lg font-semibold">Importando Pay Applications...</p>
-            <p className="text-sm text-muted-foreground mt-2">Creando {previews.length} registros con {totalLineItems} líneas totales</p>
+            <p className="text-lg font-semibold">{t('import.importingTitle')}</p>
+            <p className="text-sm text-muted-foreground mt-2">{t('import.creatingRecords', { count: previews.length, total: totalLineItems })}</p>
           </CardContent>
         </Card>
       )}
@@ -349,7 +350,7 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-              Importación Completada
+              {t('import.importComplete')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -357,15 +358,15 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-lg p-3 text-center">
                 <p className="text-lg font-bold font-mono text-emerald-600">{results.filter(r => r.status === 'created').length}</p>
-                <p className="text-xs text-muted-foreground">Creadas</p>
+                <p className="text-xs text-muted-foreground">{t('import.created')}</p>
               </div>
               <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 text-center">
                 <p className="text-lg font-bold font-mono text-amber-600">{results.filter(r => r.status === 'skipped').length}</p>
-                <p className="text-xs text-muted-foreground">Omitidas</p>
+                <p className="text-xs text-muted-foreground">{t('import.skippedLabel')}</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3 text-center">
                 <p className="text-lg font-bold font-mono">{results.reduce((s, r) => s + r.lineItems, 0)}</p>
-                <p className="text-xs text-muted-foreground">Line Items Totales</p>
+                <p className="text-xs text-muted-foreground">{t('import.totalLineItemsLabel')}</p>
               </div>
             </div>
 
@@ -383,7 +384,7 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
                   </div>
                   <div className="text-sm">
                     {r.status === 'created'
-                      ? <span className="text-emerald-600">{r.lineItems} líneas</span>
+                      ? <span className="text-emerald-600">{t('import.linesCount', { count: r.lineItems })}</span>
                       : <span className="text-amber-600">{r.reason}</span>
                     }
                   </div>
@@ -396,7 +397,7 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
               className="w-full bg-[#C9A96E] hover:bg-[#B8975D] text-white"
               size="lg"
             >
-              Listo — Volver al Proyecto
+              {t('import.doneBackToProject')}
             </Button>
           </CardContent>
         </Card>

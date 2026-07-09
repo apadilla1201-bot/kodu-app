@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useI18n } from '@/hooks/use-i18n';
 import {
   Camera,
   ImageIcon,
@@ -51,6 +52,7 @@ export function SitePhotosContent({
   initialProjectId?: string;
 }) {
   const { toast } = useToast();
+  const { t, locale } = useI18n();
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [projectId, setProjectId] = useState(initialProjectId || projects[0]?.id || '');
@@ -82,7 +84,7 @@ export function SitePhotosContent({
       const data = await res.json();
       setPhotos(data.photos || []);
     } catch {
-      toast({ title: 'No se pudieron cargar las fotos', variant: 'destructive' });
+      toast({ title: t('sitePhotos.loadFailed'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -108,8 +110,8 @@ export function SitePhotosContent({
     const caption = pendingCaption.trim();
     if (!area && !caption) {
       toast({
-        title: 'Falta identificación',
-        description: 'Indica al menos la ubicación (área) o qué muestra la foto.',
+        title: t('sitePhotos.missingId'),
+        description: t('sitePhotos.missingIdDesc'),
         variant: 'destructive',
       });
       return;
@@ -149,18 +151,18 @@ export function SitePhotosContent({
       }
       if (ok > 0) {
         setUploadStatus(null);
-        toast({ title: ok === 1 ? 'Foto subida' : `${ok} fotos subidas` });
+        toast({ title: ok === 1 ? t('sitePhotos.photoUploaded') : t('sitePhotos.photosUploaded', { count: ok }) });
         setPendingCaption('');
         setPendingArea('');
         setPendingTrade('');
         await load();
       } else if (skipped > 0) {
-        const msg = 'Usa JPG, PNG o HEIC desde la galería.';
+        const msg = t('sitePhotos.invalidFormat');
         setUploadError(msg);
         toast({ title: 'Formato no soportado', description: msg, variant: 'destructive' });
       }
     } catch (e: any) {
-      const msg = e?.message ?? 'Error al subir la foto';
+      const msg = e?.message ?? t('sitePhotos.uploadError');
       setUploadError(msg);
       setUploadStatus(null);
       toast({ title: msg, variant: 'destructive' });
@@ -208,7 +210,7 @@ export function SitePhotosContent({
   };
 
   const deletePhoto = async (photo: SitePhotoRow) => {
-    if (!confirm('¿Eliminar esta foto del sitio?')) return;
+    if (!confirm(t('sitePhotos.deleteConfirm'))) return;
     try {
       const res = await fetch(`/api/projects/${projectId}/photos/${photo.id}`, {
         method: 'DELETE',
@@ -219,7 +221,7 @@ export function SitePhotosContent({
       if (selected?.id === photo.id) setSelected(null);
       await load();
     } catch {
-      toast({ title: 'Error al eliminar', variant: 'destructive' });
+      toast({ title: t('sitePhotos.deleteError'), variant: 'destructive' });
     }
   };
 
@@ -230,10 +232,10 @@ export function SitePhotosContent({
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Camera className="w-6 h-6 text-[#C9A96E]" /> Site Photos
+            <Camera className="w-6 h-6 text-[#C9A96E]" /> {t('sitePhotos.title')}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Fotos diarias de obra — progreso, issues, safety, entregas
+            {t('sitePhotos.subtitle')}
           </p>
         </div>
         <select
@@ -263,7 +265,7 @@ export function SitePhotosContent({
         {/* Qué es */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Qué es
+            {t('sitePhotos.whatIsIt')}
           </label>
           <div className="flex flex-wrap gap-2">
             {PHOTO_TAGS.map((t) => (
@@ -284,7 +286,7 @@ export function SitePhotosContent({
         {/* Dónde */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> Dónde (área / ubicación) *
+            <MapPin className="w-3 h-3" /> {t('sitePhotos.whereArea')}
           </label>
           <input
             value={pendingArea}
@@ -311,7 +313,7 @@ export function SitePhotosContent({
         {/* Oficio */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Oficio / trade
+            {t('sitePhotos.tradeLabel')}
           </label>
           <input
             value={pendingTrade}
@@ -338,7 +340,7 @@ export function SitePhotosContent({
         {/* Descripción */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Qué muestra (descripción)
+            {t('sitePhotos.whatShowsDesc')}
           </label>
           <textarea
             value={pendingCaption}
@@ -427,7 +429,7 @@ export function SitePhotosContent({
       ) : photos.length === 0 ? (
         <div className="text-center py-16 bg-card border rounded-xl">
           <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="font-medium">Sin fotos todavía</p>
+          <p className="font-medium">{t('sitePhotos.noPhotosYet')}</p>
           <p className="text-sm text-muted-foreground mt-1">Sube la primera foto del sitio con el botón de arriba</p>
         </div>
       ) : (
@@ -455,7 +457,7 @@ export function SitePhotosContent({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
                     <span className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-semibold ${photoTagStyle(photo.tag)}`}>
-                      {photoTagLabel(photo.tag)}
+                      {photoTagLabel(photo.tag, locale)}
                     </span>
                     {(location || photo.caption) && (
                       <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-2 pt-8 space-y-0.5">
@@ -520,7 +522,7 @@ export function SitePhotosContent({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium">Oficio</label>
+                  <label className="text-xs font-medium">{t('sitePhotos.trade')}</label>
                   <input
                     value={editTrade}
                     onChange={(e) => setEditTrade(e.target.value)}
@@ -535,7 +537,7 @@ export function SitePhotosContent({
                   value={editCaption}
                   onChange={(e) => setEditCaption(e.target.value)}
                   rows={2}
-                  placeholder="Qué muestra la foto…"
+                  placeholder={t('sitePhotos.whatShows')}
                   className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
                 />
               </div>

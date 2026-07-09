@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useI18n } from '@/hooks/use-i18n';
 import { uploadFileToStorage, downloadStorageFile } from '@/lib/upload-client';
 import {
   ArrowLeft, Download, FileText, CheckCircle2, Clock, XCircle,
@@ -72,6 +73,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
   const [saving, setSaving] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const router = useRouter();
+  const { t } = useI18n();
   const sc = statusConfig?.[cor?.status ?? 'Pending'] ?? statusConfig.Pending;
   const StatusIcon = sc?.icon ?? Clock;
   const supplierTotal = (cor?.subtotal ?? 0) + (cor?.salesTax ?? 0);
@@ -170,7 +172,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== 'application/pdf') {
-      toast.error('Solo se permiten archivos PDF');
+      toast.error(t('cor.pdfOnlyError'));
       return;
     }
     setNewPdfFile(file);
@@ -179,7 +181,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
 
     // Extract data from the new PDF immediately
     setExtracting(true);
-    toast.info('Extrayendo datos del PDF...', { duration: 10000, id: 'extracting' });
+    toast.info(t('cor.extractingPdf'), { duration: 10000, id: 'extracting' });
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -219,19 +221,19 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
           setEditLineItems(extractedItems);
           setPdfExtracted(true);
           toast.dismiss('extracting');
-          toast.success(`PDF procesado: ${extractedItems.length} item(s) extra\u00eddos y recalculados`, { duration: 5000 });
+          toast.success(t('cor.pdfProcessed', { count: extractedItems.length }), { duration: 5000 });
         } else {
           toast.dismiss('extracting');
-          toast.warning('PDF procesado pero no se encontraron line items. Puedes editar el monto manualmente.', { duration: 5000 });
+          toast.warning(t('cor.pdfNoLineItems'), { duration: 5000 });
         }
       } else {
         toast.dismiss('extracting');
-        toast.warning('No se pudieron extraer datos del PDF. Puedes editar manualmente.', { duration: 5000 });
+        toast.warning(t('cor.pdfExtractFailed'), { duration: 5000 });
       }
     } catch (err: any) {
       console.error('PDF extraction error:', err);
       toast.dismiss('extracting');
-      toast.error('Error al procesar el PDF: ' + (err?.message ?? ''));
+      toast.error(t('cor.pdfProcessError', { message: err?.message ?? '' }));
     } finally {
       setExtracting(false);
     }
@@ -254,7 +256,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         isMaterial: li?.isMaterial !== false,
       }))
     );
-    toast.info('PDF eliminado. Los datos volver\u00e1n al estado original al guardar.');
+    toast.info(t('cor.pdfRemoved'));
   };
 
   const uploadNewPdf = async (): Promise<{ path: string; isPublic: boolean } | null> => {
@@ -265,7 +267,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
       return { path: uploaded.cloud_storage_path, isPublic: uploaded.isPublic };
     } catch (err: any) {
       console.error('PDF upload error:', err);
-      toast.error('Error al subir el PDF: ' + (err?.message ?? ''));
+      toast.error(t('cor.pdfUploadError', { message: err?.message ?? '' }));
       return null;
     } finally {
       setUploadingPdf(false);
@@ -278,12 +280,12 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
     try {
       await downloadStorageFile(pdfPath, `Sub_PDF_${cor?.corNumber ?? 'unknown'}.pdf`);
     } catch {
-      toast.error('No se pudo descargar el PDF. Vuelve a subir la cotización del subcontratista.');
+      toast.error(t('cor.pdfDownloadError'));
     }
   };
 
   const handleSave = async () => {
-    if (!editDesc.trim()) { toast.error('La descripci\u00f3n es requerida'); return; }
+    if (!editDesc.trim()) { toast.error(t('cor.descriptionRequired')); return; }
     setSaving(true);
     try {
       // Upload new PDF if selected
@@ -333,14 +335,14 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error || 'Failed to save');
       }
-      toast.success('Change Order actualizado y recalculado correctamente');
+      toast.success(t('cor.updateSuccess'));
       setEditing(false);
       setNewPdfFile(null);
       setPdfRemoved(false);
       setPdfExtracted(false);
       router.refresh();
     } catch (err: any) {
-      toast.error(err?.message ?? 'Error al actualizar el Change Order');
+      toast.error(err?.message ?? t('cor.updateError'));
     } finally { setSaving(false); }
   };
 
@@ -365,10 +367,10 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         setTimeout(() => document.body.removeChild(a), 2000);
       };
       reader.readAsDataURL(blob);
-      toast.success('PDF generado y descargado');
+      toast.success(t('cor.pdfGenerated'));
     } catch (err: any) {
       console.error('PDF generation error:', err);
-      toast.error(err?.message || 'Error al generar PDF');
+      toast.error(err?.message || t('cor.pdfGenerateError'));
     } finally { setGeneratingPdf(false); }
   };
 
@@ -381,9 +383,9 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error('Failed to update');
-      toast.success(`Status actualizado a ${newStatus}`);
+      toast.success(t('cor.statusUpdated', { status: newStatus }));
       router.refresh();
-    } catch { toast.error('Error al actualizar status'); }
+    } catch { toast.error(t('cor.statusUpdateError')); }
     finally { setUpdatingStatus(false); }
   };
 

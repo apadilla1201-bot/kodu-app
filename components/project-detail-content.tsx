@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useI18n } from '@/hooks/use-i18n';
 import {
   ArrowLeft, Plus, Search, FileText, CheckCircle2, Clock, XCircle,
   DollarSign, Download, Building2, MapPin, Hash,
@@ -152,10 +153,11 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [reordering, setReordering] = useState(false);
   const router = useRouter();
+  const { t } = useI18n();
 
   const handleDeleteAllPAs = async () => {
-    if (!confirm(`¿ELIMINAR TODAS las ${payApps.length} Pay Applications de este proyecto?\n\n⚠️ Esta acción NO se puede deshacer.\n\nDespués podrás re-importar con el Batch Import que ahora lee las fechas correctamente del G702.`)) return;
-    if (!confirm('¿Estás seguro? Se borrarán TODAS las PAs y sus line items.')) return;
+    if (!confirm(t('project.deleteAllPaConfirm', { count: payApps.length }))) return;
+    if (!confirm(t('project.deleteAllPaConfirm2'))) return;
     setReordering(true);
     try {
       const res = await fetch('/api/pay-apps/delete-all', {
@@ -165,10 +167,10 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete');
-      toast.success(`${data.deleted} Pay Application(s) eliminadas`);
+      toast.success(t('payApps.deletedCount', { count: data.deleted }));
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar');
+      toast.error(err.message || t('payApps.deleteError'));
     } finally {
       setReordering(false);
     }
@@ -193,9 +195,9 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
         document.body.removeChild(a);
       };
       reader.readAsDataURL(blob);
-      toast.success('Owner Equity Report generado');
+      toast.success(t('project.reportGenerated'));
     } catch {
-      toast.error('Error generando el reporte. Asegúrese de tener al menos 1 Pay Application.');
+      toast.error(t('project.reportError'));
     } finally {
       setGeneratingReport(false);
     }
@@ -204,7 +206,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
   const handleDeleteLastPA = async () => {
     const lastPA = [...payApps].sort((a: any, b: any) => b.applicationNumber - a.applicationNumber)[0];
     if (!lastPA) return;
-    if (!confirm(`¿Eliminar la última Pay Application #${lastPA.applicationNumber}?\n\nEsto es útil cuando recibes una versión revisada/aprobada y necesitas reemplazarla.\n\n⚠️ Esta acción NO se puede deshacer.`)) return;
+    if (!confirm(t('project.deleteLastPaConfirm', { number: lastPA.applicationNumber }))) return;
     setReordering(true);
     try {
       const res = await fetch('/api/pay-apps/delete-last', {
@@ -214,17 +216,17 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to delete');
-      toast.success(data.message || `PA #${lastPA.applicationNumber} eliminada`);
+      toast.success(data.message || t('payApps.deleteLastSuccess', { number: lastPA.applicationNumber }));
       router.refresh();
     } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar');
+      toast.error(err.message || t('payApps.deleteError'));
     } finally {
       setReordering(false);
     }
   };
 
   const handleReorderPAs = async () => {
-    if (!confirm('¿Re-numerar todas las Pay Applications por fecha (Period To)?\n\nEsto asignará PA #1 a la más antigua, PA #2 a la siguiente, etc.')) return;
+    if (!confirm(t('project.renumberConfirm'))) return;
     setReordering(true);
     try {
       const res = await fetch('/api/pay-apps/reorder', {
@@ -235,13 +237,13 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to reorder');
       if (data.changes?.length > 0) {
-        toast.success(`${data.changes.length} PA(s) re-numeradas correctamente`);
+        toast.success(t('payApps.renumberSuccess', { count: data.changes.length }));
         router.refresh();
       } else {
-        toast.info(data.message || 'Las PAs ya están en orden correcto');
+        toast.info(data.message || t('project.alreadyInOrder'));
       }
     } catch (err: any) {
-      toast.error(err.message || 'Error al re-numerar');
+      toast.error(err.message || t('payApps.renumberError'));
     } finally {
       setReordering(false);
     }
@@ -265,9 +267,9 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error();
-      toast.success(`Status updated to ${newStatus}`);
+      toast.success(t('project.statusUpdated', { status: newStatus }));
       router.refresh();
-    } catch { toast.error('Failed to update status'); }
+    } catch { toast.error(t('project.statusUpdateFailed')); }
     finally { setUpdatingId(''); }
   };
 
@@ -280,8 +282,8 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
       a.href = URL.createObjectURL(blob);
       a.download = `COR_Log_${project.projectNumber}.csv`;
       a.click();
-      toast.success('Log exported');
-    } catch { toast.error('Export failed'); }
+      toast.success(t('project.logExported'));
+    } catch { toast.error(t('project.exportFailed')); }
   };
 
   // COR stats

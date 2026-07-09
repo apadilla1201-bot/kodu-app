@@ -49,6 +49,7 @@ model User {
   password      String?
   image         String?
   role          String    @default("user")          // owner | pm | estimator | viewer
+  locale        String    @default("en")            // en | es — UI and export language
   accounts      Account[]
   sessions      Session[]
   projects      Project[]

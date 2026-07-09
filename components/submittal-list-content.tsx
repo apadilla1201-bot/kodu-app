@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useI18n } from '@/hooks/use-i18n';
 import { Search, Plus, FileStack, ChevronRight } from 'lucide-react';
 
 interface SubmittalItem {
@@ -44,6 +45,7 @@ export function SubmittalListContent({
   submittals: SubmittalItem[];
   projects: ProjectInfo[];
 }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [projectFilter, setProjectFilter] = useState('All');
@@ -77,13 +79,23 @@ export function SubmittalListContent({
     };
   }, [submittals]);
 
+  const tableHeaders = [
+    t('submittals.colNumber'),
+    t('submittals.colTitle'),
+    t('submittals.colType'),
+    t('submittals.colPriority'),
+    t('submittals.colStatus'),
+    t('submittals.colRequired'),
+    '',
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Submittals</h1>
+          <h1 className="text-2xl font-bold text-foreground">{t('submittals.title')}</h1>
           <p className="text-muted-foreground mt-1">
-            Gestión de shop drawings, muestras y documentación técnica
+            {t('submittals.subtitle')}
           </p>
         </div>
         <Link
@@ -91,18 +103,18 @@ export function SubmittalListContent({
           className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8944F] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors shadow-md"
         >
           <Plus className="w-4 h-4" />
-          Nuevo Submittal
+          {t('submittals.newSubmittal')}
         </Link>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: 'Total', value: stats.total, border: 'border-[#C9A96E]' },
-          { label: 'Draft', value: stats.draft, border: 'border-gray-400' },
-          { label: 'En Revisión', value: stats.review, border: 'border-amber-500' },
-          { label: 'Aprobados', value: stats.approved, border: 'border-green-500' },
-          { label: 'Reenviar', value: stats.resubmit, border: 'border-orange-500' },
-          { label: 'Vencidos', value: stats.overdue, border: 'border-red-500' },
+          { label: t('submittals.statTotal'), value: stats.total, border: 'border-[#C9A96E]' },
+          { label: t('submittals.statDraft'), value: stats.draft, border: 'border-gray-400' },
+          { label: t('submittals.inReview'), value: stats.review, border: 'border-amber-500' },
+          { label: t('submittals.statApproved'), value: stats.approved, border: 'border-green-500' },
+          { label: t('submittals.resubmit'), value: stats.resubmit, border: 'border-orange-500' },
+          { label: t('submittals.statOverdue'), value: stats.overdue, border: 'border-red-500' },
         ].map((c) => (
           <div key={c.label} className={`bg-card border-l-4 ${c.border} rounded-lg p-4 shadow-sm`}>
             <p className="text-xs text-muted-foreground uppercase tracking-wide">{c.label}</p>
@@ -116,7 +128,7 @@ export function SubmittalListContent({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Buscar por número, título, sección, subcontratista..."
+            placeholder={t('submittals.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border rounded-lg bg-background text-sm"
@@ -127,7 +139,7 @@ export function SubmittalListContent({
           onChange={(e) => setStatusFilter(e.target.value)}
           className="px-3 py-2.5 border rounded-lg bg-background text-sm"
         >
-          <option value="All">Todos los Estados</option>
+          <option value="All">{t('submittals.allStatuses')}</option>
           {['Draft', 'Submitted', 'Under Review', 'Approved', 'Revise and Resubmit', 'Rejected'].map((s) => (
             <option key={s} value={s}>{s}</option>
           ))}
@@ -137,7 +149,7 @@ export function SubmittalListContent({
           onChange={(e) => setProjectFilter(e.target.value)}
           className="px-3 py-2.5 border rounded-lg bg-background text-sm"
         >
-          <option value="All">Todos los Proyectos</option>
+          <option value="All">{t('submittals.allProjects')}</option>
           {(projects ?? []).map((p) => (
             <option key={p.id} value={p.projectNumber}>#{p.projectNumber} — {p.projectName}</option>
           ))}
@@ -148,8 +160,8 @@ export function SubmittalListContent({
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
-              {['Submittal #', 'Título', 'Tipo', 'Prioridad', 'Estado', 'Requerido', ''].map((h) => (
-                <th key={h} className="text-left px-4 py-3 font-semibold text-muted-foreground">{h}</th>
+              {tableHeaders.map((h) => (
+                <th key={h || 'actions'} className="text-left px-4 py-3 font-semibold text-muted-foreground">{h}</th>
               ))}
             </tr>
           </thead>
@@ -158,7 +170,7 @@ export function SubmittalListContent({
               <tr>
                 <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
                   <FileStack className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                  No hay submittals
+                  {t('submittals.empty')}
                 </td>
               </tr>
             ) : (
@@ -179,7 +191,7 @@ export function SubmittalListContent({
                   <td className="px-4 py-3">{fmtDate(s.requiredDate)}</td>
                   <td className="px-4 py-3">
                     <Link href={`/dashboard/submittals/${s.id}`} className="text-[#C9A96E] hover:underline inline-flex items-center gap-1">
-                      Ver <ChevronRight className="w-4 h-4" />
+                      {t('submittals.view')} <ChevronRight className="w-4 h-4" />
                     </Link>
                   </td>
                 </tr>
