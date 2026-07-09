@@ -14,15 +14,23 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
-  title: `COR Manager | ${GC_NAME}`,
-  description: 'Professional Change Order Management System',
+  title: `Kodu PM | ${GC_NAME}`,
+  description: 'Project controls — RFIs, daily logs, pay apps, and field reports',
+  applicationName: 'Kodu PM',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Kodu PM',
+    statusBarStyle: 'black-translucent',
+  },
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
+    apple: '/apple-touch-icon.png',
   },
   openGraph: {
-    title: `COR Manager | ${GC_NAME}`,
-    description: 'Professional Change Order Management System',
+    title: `Kodu PM | ${GC_NAME}`,
+    description: 'Project controls — RFIs, daily logs, pay apps, and field reports',
     images: ['/og-image.png'],
   },
 };
