@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
+import { askClaudeJSON } from '@/lib/ai';
 import { GC_ADDRESS_FULL, GC_NAME, GC_NAME_UPPER } from '@/lib/gc-branding';
 
 function esc(s: string) {
@@ -161,46 +162,26 @@ export async function POST(
     let criticalChainHtml = '';
     
     try {
-      const llmRes = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/llm-proxy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'generate', type: 'schedule-narrative' }),
-      }).catch(() => null);
-
-      // Direct LLM call
-      const apiKey = process.env.ABACUSAI_API_KEY;
-      if (apiKey) {
-        const llmResponse = await fetch('https://api.abacus.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-          body: JSON.stringify({
-            model: 'gpt-5.4-mini',
-            max_tokens: 1500,
-            messages: [{
-              role: 'system',
-              content: `You are a Senior Construction PM writing an executive schedule report for the Owner. Be concise, factual, direct. Use construction PM language. Output JSON only with these fields:
+      const parsed = await askClaudeJSON<{
+        summary?: string;
+        alert?: string;
+        criticalChain?: Array<{ id?: string; name?: string; dateRange?: string; tf?: number }>;
+      }>({
+        system: `You are a Senior Construction PM writing an executive schedule report for the Owner. Be concise, factual, direct. Use construction PM language. Output JSON only with these fields:
 - "summary": 2-3 sentence paragraph about the window's activities count, what starts/finishes, and critical path status. Reference the TCO date.
 - "alert": 1-2 sentence schedule alert if any critical path items exist or risk exists. If none, empty string.
-- "criticalChain": array of {id, name, dateRange, tf} for the top 3 critical chain activities (TF=0). If none, empty array.`
-            }, {
-              role: 'user',
-              content: `Project: ${projName}\nOwner: ${client}\nTCO Target: ${tcoDate}\nCPM: ${schedule.revision}\nData Date: ${fmtMonthDay(schedule.dataDate)}\nWindow: ${fmtDayRange(windowStart, windowEnd)}\n\n--- LOOK AHEAD ACTIVITIES (${windowActivities.length} total) ---\n${actSummary}\n\n--- CRITICAL PATH (CPM-wide, TF=0) ---\n${critSummary || 'None identified'}\n\nStarts: ${starts.length} | Finishes: ${finishes.length} | Continues: ${continues_.length} | Critical in window: ${criticalActs.length}`
-            }]
-          })
-        });
-        
-        if (llmResponse.ok) {
-          const llmData = await llmResponse.json();
-          const content = llmData.choices?.[0]?.message?.content || '';
-          // Extract JSON from possible markdown code block
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              const parsed = JSON.parse(jsonMatch[0]);
-              narrative = parsed.summary || '';
-              alertText = parsed.alert || '';
-              if (parsed.criticalChain && parsed.criticalChain.length > 0) {
-                criticalChainHtml = `
+- "criticalChain": array of {id, name, dateRange, tf} for the top 3 critical chain activities (TF=0). If none, empty array.`,
+        messages: [{
+          role: 'user',
+          content: `Project: ${projName}\nOwner: ${client}\nTCO Target: ${tcoDate}\nCPM: ${schedule.revision}\nData Date: ${fmtMonthDay(schedule.dataDate)}\nWindow: ${fmtDayRange(windowStart, windowEnd)}\n\n--- LOOK AHEAD ACTIVITIES (${windowActivities.length} total) ---\n${actSummary}\n\n--- CRITICAL PATH (CPM-wide, TF=0) ---\n${critSummary || 'None identified'}\n\nStarts: ${starts.length} | Finishes: ${finishes.length} | Continues: ${continues_.length} | Critical in window: ${criticalActs.length}`,
+        }],
+        maxTokens: 1500,
+      });
+
+      narrative = parsed.summary || '';
+      alertText = parsed.alert || '';
+      if (parsed.criticalChain && parsed.criticalChain.length > 0) {
+        criticalChainHtml = `
                 <div style="margin-top:12px; border:2px solid #C9A96E; border-radius:6px; padding:10px 14px;">
                   <div style="font-size:10px; font-weight:bold; color:#0F1B33; margin-bottom:8px; letter-spacing:1px;">CRITICAL CHAIN — ZERO FLOAT</div>
                   <div style="display:flex; gap:16px; flex-wrap:wrap;">
@@ -212,12 +193,6 @@ export async function POST(
                     `).join('')}
                   </div>
                 </div>`;
-              }
-            } catch (e) {
-              console.error('LLM JSON parse error:', e);
-            }
-          }
-        }
       }
     } catch (llmErr) {
       console.error('LLM narrative generation error:', llmErr);

@@ -16,6 +16,39 @@ interface AIMessage {
   content: string;
 }
 
+type ClaudeContentBlock =
+  | { type: 'text'; text: string }
+  | {
+      type: 'document';
+      source: { type: 'base64'; media_type: string; data: string };
+    };
+
+interface ClaudeMessage {
+  role: 'user' | 'assistant';
+  content: string | ClaudeContentBlock[];
+}
+
+function anthropicHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'x-api-key': process.env.ANTHROPIC_API_KEY ?? '',
+    'anthropic-version': '2023-06-01',
+  };
+}
+
+function extractTextContent(data: any): string {
+  return (data?.content ?? [])
+    .filter((b: any) => b?.type === 'text')
+    .map((b: any) => b?.text ?? '')
+    .join('');
+}
+
+function parseJsonFromModel<T>(raw: string): T {
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const objMatch = clean.match(/\{[\s\S]*\}/);
+  return JSON.parse(objMatch ? objMatch[0] : clean) as T;
+}
+
 /**
  * Llamada simple (no streaming) — devuelve el texto completo.
  * Usar para: extracción de PDF, narrativas de COR/RFI, reportes.
@@ -27,11 +60,7 @@ export async function askClaude(opts: {
 }): Promise<string> {
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY ?? '',
-      'anthropic-version': '2023-06-01',
-    },
+    headers: anthropicHeaders(),
     body: JSON.stringify({
       model: MODEL,
       max_tokens: opts.maxTokens ?? 3000,
@@ -47,11 +76,69 @@ export async function askClaude(opts: {
   }
 
   const data = await res.json();
-  // Claude devuelve content como array de bloques; concatenar los de texto
-  return (data?.content ?? [])
-    .filter((b: any) => b?.type === 'text')
-    .map((b: any) => b?.text ?? '')
-    .join('');
+  return extractTextContent(data);
+}
+
+/**
+ * Llamada con documento PDF (base64) — para extracción de cotizaciones y Pay Apps.
+ */
+export async function askClaudeWithPdf(opts: {
+  system?: string;
+  prompt: string;
+  pdfBase64: string;
+  mediaType?: string;
+  maxTokens?: number;
+}): Promise<string> {
+  const messages: ClaudeMessage[] = [
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: opts.mediaType ?? 'application/pdf',
+            data: opts.pdfBase64,
+          },
+        },
+        { type: 'text', text: opts.prompt },
+      ],
+    },
+  ];
+
+  const res = await fetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: anthropicHeaders(),
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: opts.maxTokens ?? 8000,
+      system: opts.system,
+      messages,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => 'Unknown');
+    console.error('Claude PDF API error:', err);
+    throw new Error('AI PDF request failed');
+  }
+
+  const data = await res.json();
+  return extractTextContent(data);
+}
+
+/**
+ * Igual que askClaudeWithPdf pero devuelve JSON parseado.
+ */
+export async function askClaudeWithPdfJSON<T = any>(opts: {
+  system?: string;
+  prompt: string;
+  pdfBase64: string;
+  mediaType?: string;
+  maxTokens?: number;
+}): Promise<T> {
+  const raw = await askClaudeWithPdf(opts);
+  return parseJsonFromModel<T>(raw);
 }
 
 /**
@@ -64,8 +151,7 @@ export async function askClaudeJSON<T = any>(opts: {
   maxTokens?: number;
 }): Promise<T> {
   const raw = await askClaude(opts);
-  const clean = raw.replace(/```json|```/g, '').trim();
-  return JSON.parse(clean) as T;
+  return parseJsonFromModel<T>(raw);
 }
 
 /**
@@ -79,11 +165,7 @@ export async function streamClaude(opts: {
 }): Promise<ReadableStream> {
   const res = await fetch(ANTHROPIC_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY ?? '',
-      'anthropic-version': '2023-06-01',
-    },
+    headers: anthropicHeaders(),
     body: JSON.stringify({
       model: MODEL,
       max_tokens: opts.maxTokens ?? 3000,
