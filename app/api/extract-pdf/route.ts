@@ -3,46 +3,9 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { askClaude } from '@/lib/ai';
 
-export async function POST(request: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    const base64Buffer = await file.arrayBuffer();
-    const base64String = Buffer.from(base64Buffer).toString('base64');
-
-    // Use LLM API to extract text from PDF
-    const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'file',
-                file: {
-                  filename: file?.name ?? 'document.pdf',
-                  file_data: `data:application/pdf;base64,${base64String}`,
-                },
-              },
-              {
-                type: 'text',
-                text: `You are a construction cost estimator. Extract ALL text and financial data from this subcontractor quote/invoice/proposal PDF.
+const EXTRACTION_PROMPT = `You are a construction cost estimator. Extract ALL text and financial data from this subcontractor quote/invoice/proposal PDF.
 
 CRITICAL: You MUST extract the actual dollar amounts from the document. Look carefully for:
 - Invoice totals, subtotals, line item prices, labor rates, material costs
@@ -75,35 +38,63 @@ IMPORTANT RULES:
 - If only a lump sum total is given, set quantity=1, unit="LS", unitPrice=total amount, total=total amount
 - isMaterial=true only for physical materials/supplies, false for labor/services
 - subcontractor must be a plain string (company name only), not an object
-- Respond with raw JSON only, no code blocks or markdown`,
+- Respond with raw JSON only, no code blocks or markdown`;
+
+export async function POST(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    if (!file) {
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    const base64Buffer = await file.arrayBuffer();
+    const base64String = Buffer.from(base64Buffer).toString('base64');
+
+    // Send the PDF to Claude (lib/ai.ts) for extraction — replaces the old Abacus call.
+    let raw: string;
+    try {
+      raw = await askClaude({
+        maxTokens: 8000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'document',
+                source: {
+                  type: 'base64',
+                  media_type: 'application/pdf',
+                  data: base64String,
+                },
               },
+              { type: 'text', text: EXTRACTION_PROMPT },
             ],
           },
         ],
-        max_tokens: 8000,
-        response_format: { type: 'json_object' },
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.text().catch(() => 'Unknown error');
-      console.error('[Extract PDF] LLM API error:', response.status, err);
+      });
+    } catch (err: any) {
+      console.error('[Extract PDF] Claude API error:', err?.message);
       return NextResponse.json({ error: 'Failed to extract PDF content' }, { status: 500 });
     }
 
-    const llmData = await response.json();
-    const content = llmData?.choices?.[0]?.message?.content ?? '{}';
-    console.log('[Extract PDF] LLM response length:', content?.length, 'preview:', content?.substring?.(0, 200));
+    console.log('[Extract PDF] Claude response length:', raw?.length, 'preview:', raw?.substring?.(0, 200));
 
     let parsed: any = {};
     try {
-      parsed = JSON.parse(content);
+      const clean = raw.replace(/```json|```/g, '').trim();
+      parsed = JSON.parse(clean);
     } catch (e: any) {
-      console.error('[Extract PDF] JSON parse error:', e?.message, 'content preview:', content?.substring?.(0, 300));
-      parsed = { fullText: content, parsed: null };
+      console.error('[Extract PDF] JSON parse error:', e?.message, 'content preview:', raw?.substring?.(0, 300));
+      parsed = { fullText: raw, parsed: null };
     }
 
-    // Normalize subcontractor in case LLM returns an object
+    // Normalize subcontractor in case the model returns an object
     if (parsed?.parsed?.subcontractor && typeof parsed.parsed.subcontractor !== 'string') {
       const sub = parsed.parsed.subcontractor;
       parsed.parsed.subcontractor = sub?.name ?? sub?.company ?? JSON.stringify(sub);
@@ -116,7 +107,7 @@ IMPORTANT RULES:
     }
 
     return NextResponse.json({
-      text: parsed?.fullText ?? content ?? '',
+      text: parsed?.fullText ?? raw ?? '',
       parsed: parsed?.parsed ?? null,
     });
   } catch (error: any) {

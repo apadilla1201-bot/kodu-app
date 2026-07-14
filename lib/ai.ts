@@ -11,9 +11,17 @@
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-4-6'; // rápido y fuerte para narrativas técnicas
 
+type AITextBlock = { type: 'text'; text: string };
+type AIDocumentBlock = {
+  type: 'document';
+  source: { type: 'base64'; media_type: string; data: string };
+};
+export type AIContentBlock = AITextBlock | AIDocumentBlock;
+
 interface AIMessage {
   role: 'user' | 'assistant';
-  content: string;
+  // A message is either plain text or a list of content blocks (text + PDF documents).
+  content: string | AIContentBlock[];
 }
 
 /**
