@@ -1,12 +1,14 @@
-const path = require('path');
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   output: process.env.NEXT_OUTPUT_MODE,
   productionBrowserSourceMaps: false,
   experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../'),
+    // The app lives at the repo root, so trace files from here. The previous
+    // value (`../`, a leftover from the Abacus monorepo layout) pointed above
+    // the project and broke the Vercel build with a duplicated path
+    // (ENOENT: .../path0/path0/.next...).
+    outputFileTracingRoot: __dirname,
   },
   eslint: {
     ignoreDuringBuilds: true,
