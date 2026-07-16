@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (session.user as any)?.id ?? '';
+    const companyId = (session.user as any)?.companyId ?? '';
     const body = await request.json();
     const {
       projectId, description, subcontractor, csiCode, date,
@@ -23,9 +23,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Project and description are required' }, { status: 400 });
     }
 
-    // Verify project ownership
+    // Verify the project belongs to the caller's company (multi-tenant access,
+    // consistent with the project list and the rest of the API which filter by
+    // companyId). Previously this checked userId, so a user could see a company
+    // project but got "Project not found" when creating a COR on it.
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
+      where: { id: projectId, companyId },
       include: { changeOrders: { orderBy: { sequence: 'desc' }, take: 1, select: { sequence: true } } },
     });
     if (!project) {
