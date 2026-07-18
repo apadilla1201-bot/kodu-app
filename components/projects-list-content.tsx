@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Plus, Search, FolderKanban, CheckCircle2, Clock,
-  XCircle, DollarSign, MapPin, Calendar, ArrowRight,
+  XCircle, DollarSign, MapPin, Calendar, ArrowRight, Pencil, Trash2,
 } from 'lucide-react';
 
 interface Project {
@@ -24,13 +25,42 @@ interface Project {
 }
 
 export function ProjectsListContent({ projects }: { projects: Project[] }) {
+  const router = useRouter();
   const [search, setSearch] = useState('');
-  const safe = projects ?? [];
+  const [items, setItems] = useState<Project[]>(projects ?? []);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const safe = items ?? [];
   const filtered = safe.filter((p: any) =>
     (p?.projectName ?? '').toLowerCase().includes(search.toLowerCase()) ||
     (p?.projectNumber ?? '').includes(search) ||
     (p?.client ?? '').toLowerCase().includes(search.toLowerCase())
   );
+
+  async function handleDelete(e: React.MouseEvent, p: Project) {
+    e.preventDefault();
+    e.stopPropagation();
+    const label = p?.projectName ?? 'this project';
+    if (!window.confirm(`Delete "${label}" and ALL its data (CORs, RFIs, pay apps)?\n\nThis cannot be undone.`)) return;
+    setDeleting(p.id);
+    try {
+      const res = await fetch(`/api/projects/${p.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.code ? `${data?.error} (${data.code})` : data?.error ?? 'Failed to delete project');
+      }
+      setItems((prev) => prev.filter((x) => x.id !== p.id));
+    } catch (err: any) {
+      window.alert(err?.message ?? 'Failed to delete project');
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  function handleEdit(e: React.MouseEvent, p: Project) {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/dashboard/projects/${p.id}/edit`);
+  }
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-6">
@@ -81,7 +111,24 @@ export function ProjectsListContent({ projects }: { projects: Project[] }) {
                         {p?.projectName ?? 'Untitled'}
                       </h3>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#C9A96E] transition-colors" />
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => handleEdit(e, p)}
+                        title="Edit project"
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-[#C9A96E] hover:bg-muted transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(e, p)}
+                        disabled={deleting === p.id}
+                        title="Delete project"
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#C9A96E] transition-colors" />
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground mb-1">{p?.client}</p>
                   {p?.location && (

@@ -518,7 +518,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                 ))}
               </div>
             ) : (
-              <Link href={`/dashboard/submittals/new?projectId=${project.id}`} className="text-sm text-[#C9A96E] hover:underline">+ Crear primer submittal</Link>
+              <Link href={`/dashboard/submittals/new?projectId=${project.id}`} className="text-sm text-[#C9A96E] hover:underline">{t('project.createFirstSubmittal')}</Link>
             )}
           </div>
 
@@ -938,7 +938,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                   disabled={reordering}
                   className="border border-amber-300 dark:border-amber-800 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  <Trash2 className="w-4 h-4" /> Borrar Última
+                  <Trash2 className="w-4 h-4" /> {t('project.deleteLast')}
                 </button>
               )}
               {payApps.length > 0 && (
@@ -947,7 +947,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                   disabled={reordering}
                   className="border border-red-300 dark:border-red-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  <Trash2 className="w-4 h-4" /> Borrar Todas
+                  <Trash2 className="w-4 h-4" /> {t('project.deleteAll')}
                 </button>
               )}
               <Link href={`/dashboard/pay-apps/new?projectId=${project.id}`}

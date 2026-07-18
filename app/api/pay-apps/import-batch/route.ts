@@ -476,14 +476,29 @@ export async function POST(request: Request) {
       delete cleanHeader.retainageContPercent;
 
       try {
+        // FIX: AIA G702 forms rarely include "Period From". Falling back to
+        // today produced inverted ranges (import day -> past periodTo).
+        // Derive missing dates from periodTo: monthly billing cycle.
+        const periodToDate = hdr.periodTo ? new Date(hdr.periodTo) : new Date();
+        const periodFromDate = hdr.periodFrom
+          ? new Date(hdr.periodFrom)
+          : new Date(periodToDate.getFullYear(), periodToDate.getMonth(), 1);
+        const applicationDate = hdr.applicationDate ? new Date(hdr.applicationDate) : periodToDate;
+        // Guard: never allow an inverted range
+        const safePeriodFrom = periodFromDate > periodToDate
+          ? new Date(periodToDate.getFullYear(), periodToDate.getMonth(), 1)
+          : periodFromDate;
+
         await prisma.payApplication.create({
           data: {
             ...cleanHeader,
             projectId,
             applicationNumber: paNum,
-            applicationDate: hdr.applicationDate ? new Date(hdr.applicationDate) : new Date(),
-            periodFrom: hdr.periodFrom ? new Date(hdr.periodFrom) : new Date(),
-            periodTo: hdr.periodTo ? new Date(hdr.periodTo) : new Date(),
+            applicationDate,
+            periodFrom: safePeriodFrom,
+            periodTo: periodToDate,
+            // Imported PAs are real billing documents, not drafts
+            status: 'Submitted',
             contractDate: hdr.contractDate ? new Date(hdr.contractDate) : null,
             lineItems: {
               create: pa.lineItems.map((li: any, i: number) => ({

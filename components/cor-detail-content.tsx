@@ -419,7 +419,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               </div>
             </div>
             {editing ? (
-              <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={inputClass + ' mt-1'} placeholder="Descripción" />
+              <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={inputClass + ' mt-1'} placeholder={t('cor.descPlaceholder')} />
             ) : (
               <p className="text-sm text-muted-foreground">{cor?.description}</p>
             )}
@@ -429,7 +429,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                   <div className="flex items-center gap-1"><span className="text-[10px] font-medium text-muted-foreground">Fecha:</span><input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={inputClass + ' w-40'} /></div>
                   <div className="flex items-center gap-1"><span className="text-[10px] font-medium text-muted-foreground">Aprobado:</span><input type="date" value={editApprovalDate} onChange={(e) => setEditApprovalDate(e.target.value)} className={inputClass + ' w-40'} /></div>
                   <input type="text" value={editSub} onChange={(e) => setEditSub(e.target.value)} placeholder="Subcontratista" className={inputClass + ' w-48'} />
-                  <input type="text" value={editCsi} onChange={(e) => setEditCsi(e.target.value)} placeholder="Código CSI" className={inputClass + ' w-32'} />
+                  <input type="text" value={editCsi} onChange={(e) => setEditCsi(e.target.value)} placeholder={t('cor.csiPlaceholder')} className={inputClass + ' w-32'} />
                 </>
               ) : (
                 <>
@@ -445,7 +445,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             {editing ? (
               <>
                 <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium flex items-center gap-2">
-                  <X className="w-4 h-4" /> Cancelar
+                  <X className="w-4 h-4" /> {t('common.cancel')}
                 </button>
                 <button
                   onClick={handleSave}
@@ -453,13 +453,13 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                   className="bg-[#2E7D32] hover:bg-[#256d29] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  {saving ? 'Guardando...' : 'Guardar Cambios'}
+                  {saving ? t('common.saving') : t('cor.saveChanges')}
                 </button>
               </>
             ) : (
               <>
                 <button onClick={startEdit} className="border border-[#C9A96E] text-[#C9A96E] hover:bg-[#C9A96E]/10 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
-                  <Pencil className="w-4 h-4" /> Editar
+                  <Pencil className="w-4 h-4" /> {t('common.edit')}
                 </button>
                 <select value={cor?.status ?? 'Pending'} onChange={(e: any) => handleStatusChange(e?.target?.value ?? 'Pending')} disabled={updatingStatus} className="text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50 bg-card">
                   <option value="Pending">Pending</option>
@@ -478,7 +478,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
 
       {/* Subcontractor PDF Section */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-card rounded-lg p-6 shadow-[var(--shadow-sm)]">
-        <h2 className="text-sm font-semibold flex items-center gap-2 mb-4"><File className="w-4 h-4 text-[#C9A96E]" /> PDF del Subcontratista</h2>
+        <h2 className="text-sm font-semibold flex items-center gap-2 mb-4"><File className="w-4 h-4 text-[#C9A96E]" /> {t('cor.subPdfTitle')}</h2>
         {editing ? (
           <div className="space-y-3">
             {/* Extracting indicator */}
@@ -497,8 +497,8 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               <div className="flex items-center gap-3 bg-[#2E7D32]/10 border border-[#2E7D32]/30 rounded-lg px-4 py-3">
                 <CheckCircle2 className="w-5 h-5 text-[#2E7D32] flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-[#2E7D32]">PDF procesado — datos extraídos y COR recalculado</p>
-                  <p className="text-xs text-muted-foreground">{editLineItems.length} line item(s) extraídos del nuevo PDF. Revisa los datos abajo antes de guardar.</p>
+                  <p className="text-sm font-medium text-[#2E7D32]">{t('cor.pdfProcessedBanner')}</p>
+                  <p className="text-xs text-muted-foreground">{t('cor.extractedReview', { count: editLineItems.length })}</p>
                 </div>
                 <RefreshCw className="w-4 h-4 text-[#2E7D32]" />
               </div>
@@ -510,7 +510,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                 <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-blue-700">PDF actual adjunto</p>
-                  <p className="text-xs text-muted-foreground">Se eliminará automáticamente al subir uno nuevo</p>
+                  <p className="text-xs text-muted-foreground">{t('cor.pdfAutoDeleteNote')}</p>
                 </div>
                 <button onClick={removePdf} className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1">
                   <Trash2 className="w-3.5 h-3.5" /> Quitar
@@ -522,7 +522,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             {pdfRemoved && !newPdfFile && (
               <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                 <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                <p className="text-sm text-red-600">PDF será eliminado al guardar</p>
+                <p className="text-sm text-red-600">{t('cor.pdfWillBeRemoved')}</p>
                 <button onClick={() => { setPdfRemoved(false); }} className="ml-auto px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors">
                   Deshacer
                 </button>
@@ -535,7 +535,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                 <Upload className="w-5 h-5 text-[#C9A96E] flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#C9A96E]">Nuevo PDF: {newPdfFile.name}</p>
-                  <p className="text-xs text-muted-foreground">{(newPdfFile.size / 1024 / 1024).toFixed(1)} MB {pdfExtracted ? '— Datos ya extraídos' : ''}</p>
+                  <p className="text-xs text-muted-foreground">{(newPdfFile.size / 1024 / 1024).toFixed(1)} MB {pdfExtracted ? t('cor.dataExtractedNote') : ''}</p>
                 </div>
                 <button onClick={() => { setNewPdfFile(null); setPdfExtracted(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
                   <X className="w-3.5 h-3.5" />
@@ -551,10 +551,10 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               className="px-4 py-3 rounded-lg border-2 border-dashed border-[#C9A96E]/40 hover:border-[#C9A96E] text-sm font-medium text-[#C9A96E] hover:bg-[#C9A96E]/5 transition-all flex items-center gap-2 w-full justify-center disabled:opacity-50"
             >
               <Upload className="w-4 h-4" />
-              {newPdfFile ? 'Cambiar PDF (se re-extraerán los datos)' : cor?.subPdfCloudPath && !pdfRemoved ? 'Reemplazar PDF (elimina el anterior y recalcula)' : 'Subir PDF del Subcontratista'}
+              {newPdfFile ? t('cor.changePdf') : cor?.subPdfCloudPath && !pdfRemoved ? t('cor.replacePdf') : t('cor.uploadPdf')}
             </button>
             <p className="text-xs text-muted-foreground text-center">
-              Al subir un nuevo PDF, el sistema extrae automáticamente los datos, reemplaza los line items y recalcula el monto total del COR.
+              {t('cor.autoExtractInfo')}
             </p>
           </div>
         ) : (
@@ -569,7 +569,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               </button>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground italic">No hay PDF del subcontratista adjunto. Haz clic en Editar para agregar uno.</p>
+            <p className="text-sm text-muted-foreground italic">{t('cor.noPdf')}</p>
           )
         )}
       </motion.div>
@@ -641,10 +641,10 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         ) : (
           editing ? (
             <div className="text-center py-4">
-              <p className="text-xs text-muted-foreground mb-3">Este COR no tiene line items. Sube un PDF del subcontratista para extraerlos automáticamente, o edita el monto total directamente.</p>
+              <p className="text-xs text-muted-foreground mb-3">{t('cor.noLineItemsHint')}</p>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground italic py-2">No hay line items detallados para este COR.</p>
+            <p className="text-sm text-muted-foreground italic py-2">{t('cor.noLineItems')}</p>
           )
         )}
       </motion.div>
@@ -654,7 +654,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         <h2 className="text-sm font-semibold mb-4 text-[#C9A96E] flex items-center gap-2">
           <DollarSign className="w-4 h-4" /> Cost Summary
           {editing && pdfExtracted && <span className="text-xs bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">Recalculado del nuevo PDF</span>}
-          {editing && !pdfExtracted && <span className="text-xs text-white/60">{editLineItems.length > 0 ? '(auto-calculado de line items)' : '(edición directa)'}</span>}
+          {editing && !pdfExtracted && <span className="text-xs text-white/60">{editLineItems.length > 0 ? t('cor.autoCalculated') : t('cor.directEdit')}</span>}
         </h2>
         <div className="space-y-2 max-w-md">
           {editing ? (
@@ -732,7 +732,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             </table>
           </div>
           {editing ? (
-            <textarea value={editMarketNotes} onChange={(e) => setEditMarketNotes(e.target.value)} rows={3} placeholder="Notas de análisis de mercado..." className={inputClass + ' mt-3'} />
+            <textarea value={editMarketNotes} onChange={(e) => setEditMarketNotes(e.target.value)} rows={3} placeholder={t('cor.marketNotesPlaceholder')} className={inputClass + ' mt-3'} />
           ) : (
             cor?.marketAnalysisNotes && (
               <div className="mt-4 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
@@ -745,28 +745,28 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
 
       {/* Justification */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-card rounded-lg p-6 shadow-[var(--shadow-sm)]">
-        <h2 className="text-sm font-semibold mb-4">Justificación</h2>
+        <h2 className="text-sm font-semibold mb-4">{t('cor.justification')}</h2>
         {editing ? (
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Reason for Change</label>
-              <textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} rows={4} placeholder="Razón del cambio..." className={inputClass + ' resize-y'} />
+              <textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} rows={4} placeholder={t('cor.reasonPlaceholder')} className={inputClass + ' resize-y'} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Razones Particulares</label>
               <textarea value={editRazones} onChange={(e) => setEditRazones(e.target.value)} rows={3} placeholder="Razones particulares..." className={inputClass + ' resize-y'} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Notas</label>
-              <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} placeholder="Notas adicionales..." className={inputClass + ' resize-y'} />
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">{t('cor.notes')}</label>
+              <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} placeholder={t('cor.notesPlaceholder')} className={inputClass + ' resize-y'} />
             </div>
           </div>
         ) : (
           <>
             {cor?.reasonForChange && <div className="mb-4"><h3 className="text-xs font-medium text-muted-foreground mb-1">Reason for Change</h3><p className="text-sm whitespace-pre-wrap">{cor.reasonForChange}</p></div>}
             {cor?.reasonsParticular && <div className="mb-4"><h3 className="text-xs font-medium text-muted-foreground mb-1">Razones Particulares</h3><p className="text-sm whitespace-pre-wrap">{cor.reasonsParticular}</p></div>}
-            {cor?.notes && <div><h3 className="text-xs font-medium text-muted-foreground mb-1">Notas</h3><p className="text-sm whitespace-pre-wrap">{cor.notes}</p></div>}
-            {!cor?.reasonForChange && !cor?.reasonsParticular && !cor?.notes && <p className="text-sm text-muted-foreground italic">Sin justificación. Haz clic en Editar para agregar una.</p>}
+            {cor?.notes && <div><h3 className="text-xs font-medium text-muted-foreground mb-1">{t('cor.notes')}</h3><p className="text-sm whitespace-pre-wrap">{cor.notes}</p></div>}
+            {!cor?.reasonForChange && !cor?.reasonsParticular && !cor?.notes && <p className="text-sm text-muted-foreground italic">{t('cor.noJustification')}</p>}
           </>
         )}
       </motion.div>
@@ -777,18 +777,18 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
           <p className="text-sm text-muted-foreground">
             Editando COR {cor?.corNumber} — <span className="font-semibold text-[#C9A96E]">{fmt(editTotal)}</span>
             {newPdfFile && <span className="ml-2 text-[#2E7D32]">📄 {newPdfFile.name}</span>}
-            {pdfExtracted && <span className="ml-1 text-[#2E7D32] text-xs">(datos extraídos)</span>}
+            {pdfExtracted && <span className="ml-1 text-[#2E7D32] text-xs">{t('cor.dataExtractedShort')}</span>}
             {pdfRemoved && !newPdfFile && <span className="ml-2 text-red-400">👷 PDF eliminado</span>}
           </p>
           <div className="flex gap-2">
-            <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium">Cancelar</button>
+            <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium">{t('common.cancel')}</button>
             <button
               onClick={handleSave}
               disabled={saving || uploadingPdf || extracting}
               className="bg-[#2E7D32] hover:bg-[#256d29] text-white px-6 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors disabled:opacity-50"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {saving ? 'Guardando...' : 'Guardar Cambios'}
+              {saving ? t('common.saving') : t('cor.saveChanges')}
             </button>
           </div>
         </div>
