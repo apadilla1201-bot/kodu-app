@@ -419,7 +419,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               </div>
             </div>
             {editing ? (
-              <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={inputClass + ' mt-1'} placeholder="Descripci\u00f3n" />
+              <input type="text" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={inputClass + ' mt-1'} placeholder="Descripción" />
             ) : (
               <p className="text-sm text-muted-foreground">{cor?.description}</p>
             )}
@@ -433,7 +433,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                 </>
               ) : (
                 <>
-                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {cor?.date ? new Date(cor.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '\u2014'}</span>
+                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {cor?.date ? new Date(cor.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</span>
                   {cor?.approvalDate && <span className="flex items-center gap-1 text-[#2E7D32]"><CheckCircle2 className="w-3 h-3" /> Aprobado: {new Date(cor.approvalDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>}
                   {cor?.subcontractor && <span className="flex items-center gap-1"><User className="w-3 h-3" /> {cor?.subcontractor}</span>}
                   {cor?.csiCode && <span className="flex items-center gap-1"><Hash className="w-3 h-3" /> {cor.csiCode}</span>}
@@ -497,8 +497,8 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               <div className="flex items-center gap-3 bg-[#2E7D32]/10 border border-[#2E7D32]/30 rounded-lg px-4 py-3">
                 <CheckCircle2 className="w-5 h-5 text-[#2E7D32] flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-[#2E7D32]">PDF procesado \u2014 datos extra\u00eddos y COR recalculado</p>
-                  <p className="text-xs text-muted-foreground">{editLineItems.length} line item(s) extra\u00eddos del nuevo PDF. Revisa los datos abajo antes de guardar.</p>
+                  <p className="text-sm font-medium text-[#2E7D32]">PDF procesado — datos extraídos y COR recalculado</p>
+                  <p className="text-xs text-muted-foreground">{editLineItems.length} line item(s) extraídos del nuevo PDF. Revisa los datos abajo antes de guardar.</p>
                 </div>
                 <RefreshCw className="w-4 h-4 text-[#2E7D32]" />
               </div>
@@ -510,7 +510,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                 <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-blue-700">PDF actual adjunto</p>
-                  <p className="text-xs text-muted-foreground">Se eliminar\u00e1 autom\u00e1ticamente al subir uno nuevo</p>
+                  <p className="text-xs text-muted-foreground">Se eliminará automáticamente al subir uno nuevo</p>
                 </div>
                 <button onClick={removePdf} className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1">
                   <Trash2 className="w-3.5 h-3.5" /> Quitar
@@ -522,7 +522,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             {pdfRemoved && !newPdfFile && (
               <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
                 <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
-                <p className="text-sm text-red-600">PDF ser\u00e1 eliminado al guardar</p>
+                <p className="text-sm text-red-600">PDF será eliminado al guardar</p>
                 <button onClick={() => { setPdfRemoved(false); }} className="ml-auto px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors">
                   Deshacer
                 </button>
@@ -535,7 +535,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                 <Upload className="w-5 h-5 text-[#C9A96E] flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#C9A96E]">Nuevo PDF: {newPdfFile.name}</p>
-                  <p className="text-xs text-muted-foreground">{(newPdfFile.size / 1024 / 1024).toFixed(1)} MB {pdfExtracted ? '\u2014 Datos ya extra\u00eddos' : ''}</p>
+                  <p className="text-xs text-muted-foreground">{(newPdfFile.size / 1024 / 1024).toFixed(1)} MB {pdfExtracted ? '— Datos ya extraídos' : ''}</p>
                 </div>
                 <button onClick={() => { setNewPdfFile(null); setPdfExtracted(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
                   <X className="w-3.5 h-3.5" />
@@ -551,10 +551,10 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               className="px-4 py-3 rounded-lg border-2 border-dashed border-[#C9A96E]/40 hover:border-[#C9A96E] text-sm font-medium text-[#C9A96E] hover:bg-[#C9A96E]/5 transition-all flex items-center gap-2 w-full justify-center disabled:opacity-50"
             >
               <Upload className="w-4 h-4" />
-              {newPdfFile ? 'Cambiar PDF (se re-extraer\u00e1n los datos)' : cor?.subPdfCloudPath && !pdfRemoved ? 'Reemplazar PDF (elimina el anterior y recalcula)' : 'Subir PDF del Subcontratista'}
+              {newPdfFile ? 'Cambiar PDF (se re-extraerán los datos)' : cor?.subPdfCloudPath && !pdfRemoved ? 'Reemplazar PDF (elimina el anterior y recalcula)' : 'Subir PDF del Subcontratista'}
             </button>
             <p className="text-xs text-muted-foreground text-center">
-              Al subir un nuevo PDF, el sistema extrae autom\u00e1ticamente los datos, reemplaza los line items y recalcula el monto total del COR.
+              Al subir un nuevo PDF, el sistema extrae automáticamente los datos, reemplaza los line items y recalcula el monto total del COR.
             </p>
           </div>
         ) : (
@@ -641,7 +641,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         ) : (
           editing ? (
             <div className="text-center py-4">
-              <p className="text-xs text-muted-foreground mb-3">Este COR no tiene line items. Sube un PDF del subcontratista para extraerlos autom\u00e1ticamente, o edita el monto total directamente.</p>
+              <p className="text-xs text-muted-foreground mb-3">Este COR no tiene line items. Sube un PDF del subcontratista para extraerlos automáticamente, o edita el monto total directamente.</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground italic py-2">No hay line items detallados para este COR.</p>
@@ -654,7 +654,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         <h2 className="text-sm font-semibold mb-4 text-[#C9A96E] flex items-center gap-2">
           <DollarSign className="w-4 h-4" /> Cost Summary
           {editing && pdfExtracted && <span className="text-xs bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">Recalculado del nuevo PDF</span>}
-          {editing && !pdfExtracted && <span className="text-xs text-white/60">{editLineItems.length > 0 ? '(auto-calculado de line items)' : '(edici\u00f3n directa)'}</span>}
+          {editing && !pdfExtracted && <span className="text-xs text-white/60">{editLineItems.length > 0 ? '(auto-calculado de line items)' : '(edición directa)'}</span>}
         </h2>
         <div className="space-y-2 max-w-md">
           {editing ? (
@@ -666,7 +666,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                 <div className="flex justify-between text-sm"><span className="text-gray-300">PDG Margin @ 6%</span><span className="font-mono">{fmt(editOP)}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-gray-300">Insurance @ 1.5%</span><span className="font-mono">{fmt(editGL)}</span></div>
                 <div className="flex justify-between text-lg border-t border-[#C9A96E] pt-3 mt-3">
-                  <span className="font-bold text-[#C9A96E]">TOTAL \u2014 COR {cor?.corNumber}</span>
+                  <span className="font-bold text-[#C9A96E]">TOTAL — COR {cor?.corNumber}</span>
                   <span className="font-mono font-bold text-[#C9A96E]">{fmt(editTotal)}</span>
                 </div>
               </>
@@ -680,7 +680,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                   </div>
                 </div>
                 <div className="flex justify-between text-lg border-t border-[#C9A96E] pt-3 mt-3">
-                  <span className="font-bold text-[#C9A96E]">TOTAL \u2014 COR {cor?.corNumber}</span>
+                  <span className="font-bold text-[#C9A96E]">TOTAL — COR {cor?.corNumber}</span>
                   <span className="font-mono font-bold text-[#C9A96E]">{fmt(editTotal)}</span>
                 </div>
               </>
@@ -693,7 +693,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               <div className="flex justify-between text-sm"><span className="text-gray-300">PDG Margin @ 6%</span><span className="font-mono">{fmt(cor?.overheadProfit ?? 0)}</span></div>
               <div className="flex justify-between text-sm"><span className="text-gray-300">Insurance @ 1.5%</span><span className="font-mono">{fmt(cor?.generalLiability ?? 0)}</span></div>
               <div className="flex justify-between text-lg border-t border-[#C9A96E] pt-3 mt-3">
-                <span className="font-bold text-[#C9A96E]">TOTAL \u2014 COR {cor?.corNumber}</span>
+                <span className="font-bold text-[#C9A96E]">TOTAL — COR {cor?.corNumber}</span>
                 <span className="font-mono font-bold text-[#C9A96E]">{fmt(cor?.totalAmount ?? 0)}</span>
               </div>
             </>
@@ -732,7 +732,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             </table>
           </div>
           {editing ? (
-            <textarea value={editMarketNotes} onChange={(e) => setEditMarketNotes(e.target.value)} rows={3} placeholder="Notas de an\u00e1lisis de mercado..." className={inputClass + ' mt-3'} />
+            <textarea value={editMarketNotes} onChange={(e) => setEditMarketNotes(e.target.value)} rows={3} placeholder="Notas de análisis de mercado..." className={inputClass + ' mt-3'} />
           ) : (
             cor?.marketAnalysisNotes && (
               <div className="mt-4 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
@@ -745,12 +745,12 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
 
       {/* Justification */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-card rounded-lg p-6 shadow-[var(--shadow-sm)]">
-        <h2 className="text-sm font-semibold mb-4">Justificaci\u00f3n</h2>
+        <h2 className="text-sm font-semibold mb-4">Justificación</h2>
         {editing ? (
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Reason for Change</label>
-              <textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} rows={4} placeholder="Raz\u00f3n del cambio..." className={inputClass + ' resize-y'} />
+              <textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} rows={4} placeholder="Razón del cambio..." className={inputClass + ' resize-y'} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Razones Particulares</label>
@@ -766,7 +766,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             {cor?.reasonForChange && <div className="mb-4"><h3 className="text-xs font-medium text-muted-foreground mb-1">Reason for Change</h3><p className="text-sm whitespace-pre-wrap">{cor.reasonForChange}</p></div>}
             {cor?.reasonsParticular && <div className="mb-4"><h3 className="text-xs font-medium text-muted-foreground mb-1">Razones Particulares</h3><p className="text-sm whitespace-pre-wrap">{cor.reasonsParticular}</p></div>}
             {cor?.notes && <div><h3 className="text-xs font-medium text-muted-foreground mb-1">Notas</h3><p className="text-sm whitespace-pre-wrap">{cor.notes}</p></div>}
-            {!cor?.reasonForChange && !cor?.reasonsParticular && !cor?.notes && <p className="text-sm text-muted-foreground italic">Sin justificaci\u00f3n. Haz clic en Editar para agregar una.</p>}
+            {!cor?.reasonForChange && !cor?.reasonsParticular && !cor?.notes && <p className="text-sm text-muted-foreground italic">Sin justificación. Haz clic en Editar para agregar una.</p>}
           </>
         )}
       </motion.div>
@@ -775,10 +775,10 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
       {editing && (
         <div className="sticky bottom-4 bg-card border border-border rounded-xl p-4 shadow-lg flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Editando COR {cor?.corNumber} \u2014 <span className="font-semibold text-[#C9A96E]">{fmt(editTotal)}</span>
-            {newPdfFile && <span className="ml-2 text-[#2E7D32]">\ud83d\udcc4 {newPdfFile.name}</span>}
-            {pdfExtracted && <span className="ml-1 text-[#2E7D32] text-xs">(datos extra\u00eddos)</span>}
-            {pdfRemoved && !newPdfFile && <span className="ml-2 text-red-400">\ud83d\uddd1\ufe0f PDF eliminado</span>}
+            Editando COR {cor?.corNumber} — <span className="font-semibold text-[#C9A96E]">{fmt(editTotal)}</span>
+            {newPdfFile && <span className="ml-2 text-[#2E7D32]">📄 {newPdfFile.name}</span>}
+            {pdfExtracted && <span className="ml-1 text-[#2E7D32] text-xs">(datos extraídos)</span>}
+            {pdfRemoved && !newPdfFile && <span className="ml-2 text-red-400">👷 PDF eliminado</span>}
           </p>
           <div className="flex gap-2">
             <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium">Cancelar</button>

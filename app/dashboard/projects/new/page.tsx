@@ -42,7 +42,8 @@ export default function NewProjectPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error ?? 'Failed to create project');
+        const base = data?.error ?? 'Failed to create project';
+        throw new Error(data?.code ? `${base} (${data.code})` : base);
       }
       const data = await res.json();
       toast.success('Project created successfully');

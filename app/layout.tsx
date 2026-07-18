@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
   title: `Kodu PM | ${GC_NAME}`,
-  description: 'Project controls — RFIs, daily logs, pay apps, and field reports',
+  description: 'Project controls for construction teams — Change Orders, RFIs, Submittals, Buyout, Daily Logs and Pay Applications. Import your CO LOG from Excel. Bilingual EN/ES.',
   applicationName: 'Kodu PM',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
@@ -30,7 +30,7 @@ export const metadata = {
   },
   openGraph: {
     title: `Kodu PM | ${GC_NAME}`,
-    description: 'Project controls — RFIs, daily logs, pay apps, and field reports',
+    description: 'Project controls for construction teams — Change Orders, RFIs, Submittals, Buyout, Daily Logs and Pay Applications. Import your CO LOG from Excel. Bilingual EN/ES.',
     images: ['/og-image.png'],
   },
 };
@@ -43,7 +43,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script src="https://apps.abacus.ai/chatllm/appllm-lib.js"></script>
+        {/* Third-party widget deferred: it was blocking first paint on the login page */}
+        <script src="https://apps.abacus.ai/chatllm/appllm-lib.js" defer></script>
       </head>
       <body className={`${dmSans.variable} ${jakartaSans.variable} ${jetbrainsMono.variable} font-sans`}>
         <ThemeProvider

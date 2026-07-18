@@ -1,7 +1,7 @@
 {
   "name": "Kodu PM",
   "short_name": "Kodu PM",
-  "description": "Project controls — RFIs, daily logs, pay apps, and field reports",
+  "description": "Project controls for construction teams — Change Orders, RFIs, Submittals, Buyout, Daily Logs and Pay Applications.",
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",

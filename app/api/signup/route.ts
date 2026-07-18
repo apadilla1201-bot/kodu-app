@@ -29,11 +29,25 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // FIX P0: provision a Company (tenant) for every new signup.
+    // Without it, the user has companyId = NULL and POST /api/projects
+    // fails with a FK violation (companyId='') — new users could never
+    // create their first project.
+    const displayName = name ?? email?.split?.('@')?.[0] ?? 'User';
+
+    const company = await prisma.company.create({
+      data: {
+        name: `${displayName}'s Company`,
+      },
+    });
+
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
-        name: name ?? email?.split?.('@')?.[0] ?? 'User',
+        name: displayName,
+        role: 'owner',
+        companyId: company.id,
       },
     });
 

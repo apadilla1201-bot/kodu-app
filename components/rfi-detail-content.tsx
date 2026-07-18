@@ -70,12 +70,12 @@ const priorityConfig: Record<string, { color: string; bg: string }> = {
 };
 
 function fmtDate(d: string | null | undefined): string {
-  if (!d) return '\u2014';
+  if (!d) return '—';
   return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 function fmtDateShort(d: string | null | undefined): string {
-  if (!d) return '\u2014';
+  if (!d) return '—';
   return new Date(d).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
 }
 
@@ -469,14 +469,14 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
                 <MapPin className="w-4 h-4 text-[#C9A96E] mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Location</p>
-                  <p className="font-medium">{rfi?.project?.location || '\u2014'}</p>
+                  <p className="font-medium">{rfi?.project?.location || '—'}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <User className="w-4 h-4 text-[#C9A96E] mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground">Owner</p>
-                  <p className="font-medium">{rfi?.project?.client || '\u2014'}</p>
+                  <p className="font-medium">{rfi?.project?.client || '—'}</p>
                 </div>
               </div>
             </div>
@@ -488,15 +488,15 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Discipline</span>
-                <span className="font-medium">{rfi?.discipline || '\u2014'}</span>
+                <span className="font-medium">{rfi?.discipline || '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Drawing Ref</span>
-                <span className="font-mono text-xs">{rfi?.drawingReference || '\u2014'}</span>
+                <span className="font-mono text-xs">{rfi?.drawingReference || '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Spec Ref</span>
-                <span className="font-mono text-xs">{rfi?.specReference || '\u2014'}</span>
+                <span className="font-mono text-xs">{rfi?.specReference || '—'}</span>
               </div>
             </div>
 
@@ -513,7 +513,7 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Assigned To</span>
-                <span className="font-semibold text-[#C9A96E]">{rfi?.assignedTo || '\u2014'}</span>
+                <span className="font-semibold text-[#C9A96E]">{rfi?.assignedTo || '—'}</span>
               </div>
               {rfi?.assignedToRole && (
                 <div className="flex justify-between">
