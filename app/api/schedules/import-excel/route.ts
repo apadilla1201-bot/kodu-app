@@ -267,6 +267,12 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
+    // FIX: resolve tenant (companyId) with DB fallback — userId lookup failed for company projects.
+    let companyId = (session.user as any)?.companyId ?? '';
+    if (!companyId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { companyId: true } });
+      companyId = dbUser?.companyId ?? '';
+    }
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -280,7 +286,7 @@ export async function POST(
 
     // Verify project ownership
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: session.user.id },
+      where: { id: projectId, companyId },
     });
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 

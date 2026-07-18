@@ -65,6 +65,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const userId = (session.user as any)?.id ?? '';
+    // FIX: resolve tenant (companyId) with DB fallback — project lookups by
+    // userId returned "Project not found" for migrated/company projects.
+    let companyId = (session.user as any)?.companyId ?? '';
+    if (!companyId && userId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { companyId: true } });
+      companyId = dbUser?.companyId ?? '';
+    }
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -392,7 +399,7 @@ export async function POST(request: Request) {
       // Create or find the project
       let project;
       if (projectId) {
-        project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+        project = await prisma.project.findFirst({ where: { id: projectId, companyId } });
         if (!project) {
           return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
@@ -407,6 +414,7 @@ export async function POST(request: Request) {
             contractAmount: contractAmount ? parseFloat(contractAmount) : 0,
             startDate: startDate ? new Date(startDate) : null,
             userId,
+            companyId,
           },
         });
       }

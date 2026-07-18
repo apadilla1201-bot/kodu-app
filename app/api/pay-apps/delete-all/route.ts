@@ -19,7 +19,15 @@ export async function POST(request: Request) {
     const { projectId } = await request.json();
     if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 });
 
-    const project = await prisma.project.findFirst({ where: { id: projectId, userId } });
+    // FIX: scope by tenant (companyId), not userId — migrated projects belong
+    // to the company; the userId lookup returned "Project not found".
+    let companyId = (session?.user as any)?.companyId ?? '';
+    if (!companyId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { companyId: true } });
+      companyId = dbUser?.companyId ?? '';
+    }
+
+    const project = await prisma.project.findFirst({ where: { id: projectId, companyId } });
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     // Count before deleting

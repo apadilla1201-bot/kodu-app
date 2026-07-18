@@ -97,6 +97,13 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = (session.user as any)?.id ?? '';
+    // FIX: resolve tenant (companyId) with DB fallback — userId lookup failed for company projects.
+    let companyId = (session.user as any)?.companyId ?? '';
+    if (!companyId && userId) {
+      const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { companyId: true } });
+      companyId = dbUser?.companyId ?? '';
+    }
 
     const body = await request.json();
     const { projectId, revision, dataDate, rawActivities } = body;
@@ -105,9 +112,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'projectId and rawActivities required' }, { status: 400 });
     }
 
-    // Verify project ownership
+    // Verify project ownership (tenant)
     const project = await prisma.project.findFirst({
-      where: { id: projectId, userId: (session.user as any).id },
+      where: { id: projectId, companyId },
     });
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
