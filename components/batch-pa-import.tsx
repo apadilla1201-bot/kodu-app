@@ -9,25 +9,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useI18n } from '@/hooks/use-i18n';
+import type { ParsedPA, PreviewPA } from '@/lib/pa-parser';
 
 interface Props {
   projectId: string;
   projectName: string;
   onComplete: () => void;
   onCancel: () => void;
-}
-
-interface PreviewPA {
-  fileName: string;
-  applicationNumber: number | null;
-  applicationDate: string | null;
-  periodFrom: string | null;
-  periodTo: string | null;
-  lineItemCount: number;
-  scheduledValue: number;
-  thisCompleted: number;
-  previousCompleted: number;
-  sheetsFound: { g703: boolean; g702: boolean; settings: boolean };
 }
 
 interface ImportResult {
@@ -52,6 +40,22 @@ function fmtDate(d: string | null): string {
   } catch { return d; }
 }
 
+/**
+ * Read a fetch response safely. Error responses from the hosting platform
+ * (413 payload too large, 504 timeout, HTML error pages) are NOT JSON —
+ * res.json() on those throws a cryptic browser error ("The string did not
+ * match the expected pattern" in Safari). Always go through text first.
+ */
+async function readApiJson(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (res.status === 413) throw new Error('PAYLOAD_TOO_LARGE');
+    throw new Error(`HTTP_${res.status}`);
+  }
+}
+
 export default function BatchPAImport({ projectId, projectName, onComplete, onCancel }: Props) {
   const { t } = useI18n();
   const [step, setStep] = useState<Step>('upload');
@@ -61,12 +65,14 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
   const [previews, setPreviews] = useState<PreviewPA[]>([]);
   const [results, setResults] = useState<ImportResult[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const parsedRef = useRef<ParsedPA[]>([]);
   const [dragOver, setDragOver] = useState(false);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
-    const valid = Array.from(newFiles).filter(f =>
-      f.name.endsWith('.xlsx') || f.name.endsWith('.xls')
-    );
+    const valid = Array.from(newFiles).filter(f => {
+      const n = f.name.toLowerCase();
+      return n.endsWith('.xlsx') || n.endsWith('.xls');
+    });
     if (valid.length === 0) {
       toast.error(t('import.excelOnly'));
       return;
@@ -88,45 +94,71 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
     if (e.dataTransfer.files) addFiles(e.dataTransfer.files);
   }, [addFiles]);
 
+  /**
+   * Parse locally in the browser — no upload. This avoids serverless
+   * payload/timeout limits entirely and makes the preview instant.
+   * One unreadable file is reported by name and skipped, it never
+   * kills the whole batch.
+   */
   const handlePreview = async () => {
     if (!files.length) return;
     setPreviewing(true);
     try {
-      const fd = new FormData();
-      fd.append('action', 'preview');
-      files.forEach(f => fd.append('files', f));
-
-      const res = await fetch('/api/pay-apps/import-batch', { method: 'POST', body: fd });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Preview failed');
+      const { parseExcelBuffer, sortParsedPAs, toPreviewPA } = await import('@/lib/pa-parser');
+      const parsed: ParsedPA[] = [];
+      const failed: string[] = [];
+      for (const f of files) {
+        try {
+          const u8 = new Uint8Array(await f.arrayBuffer());
+          parsed.push(parseExcelBuffer(u8, f.name));
+        } catch (e: any) {
+          console.error(`Parse failed for ${f.name}:`, e);
+          failed.push(f.name);
+        }
       }
-      const data = await res.json();
-      setPreviews(data.payApplications || []);
+
+      if (parsed.length === 0) {
+        toast.error(t('import.allFilesFailed'));
+        return;
+      }
+      if (failed.length > 0) {
+        toast.warning(t('import.someFilesFailed', { count: failed.length, names: failed.join(', ') }));
+      }
+
+      const sorted = sortParsedPAs(parsed);
+      parsedRef.current = sorted;
+      setPreviews(sorted.map(toPreviewPA));
       setStep('preview');
-      toast.success(t('import.detectedCount', { count: data.count }));
+      toast.success(t('import.detectedCount', { count: sorted.length }));
     } catch (e: any) {
+      console.error('Preview error:', e);
       toast.error(e.message || t('import.previewError'));
     } finally {
       setPreviewing(false);
     }
   };
 
+  /**
+   * Import sends only the parsed JSON (a few hundred KB at most) instead
+   * of the raw Excel files (which can exceed hosting upload limits).
+   */
   const handleImport = async () => {
+    if (!parsedRef.current.length) {
+      toast.error(t('import.previewError'));
+      return;
+    }
     setImporting(true);
     setStep('importing');
     try {
       const fd = new FormData();
       fd.append('action', 'import');
       fd.append('projectId', projectId);
-      files.forEach(f => fd.append('files', f));
+      fd.append('parsedJson', JSON.stringify(parsedRef.current));
 
       const res = await fetch('/api/pay-apps/import-batch', { method: 'POST', body: fd });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Import failed');
-      }
-      const data = await res.json();
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+
       setResults(data.results || []);
       setStep('results');
       if (data.created > 0) {
@@ -136,7 +168,12 @@ export default function BatchPAImport({ projectId, projectName, onComplete, onCa
         toast.warning(t('import.skipped', { count: data.skipped }));
       }
     } catch (e: any) {
-      toast.error(e.message || t('import.importError'));
+      const msg = e?.message === 'PAYLOAD_TOO_LARGE'
+        ? t('import.filesTooLarge')
+        : /^HTTP_\d+$/.test(e?.message || '')
+          ? t('import.serverError', { status: e.message.slice(5) })
+          : e.message || t('import.importError');
+      toast.error(msg);
       setStep('preview');
     } finally {
       setImporting(false);
