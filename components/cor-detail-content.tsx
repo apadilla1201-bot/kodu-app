@@ -660,40 +660,48 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
           {editing ? (
             editLineItems.length > 0 ? (
               <>
-                <div className="flex justify-between text-sm"><span className="text-gray-300">Subtotal</span><span className="font-mono">{fmt(editSubtotal)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-gray-300">Florida Sales Tax @ 7%</span><span className="font-mono">{fmt(editSalesTax)}</span></div>
-                <div className="flex justify-between text-sm border-t border-white/20 pt-2"><span>Supplier Total</span><span className="font-mono">{fmt(editSupplierTotal)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-gray-300">PDG Margin @ 6%</span><span className="font-mono">{fmt(editOP)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-gray-300">Insurance @ 1.5%</span><span className="font-mono">{fmt(editGL)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-300">{t('cor.subtotal')}</span><span className="font-mono">{fmt(editSubtotal)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-300">{t('cor.salesTax')}</span><span className="font-mono">{fmt(editSalesTax)}</span></div>
+                <div className="flex justify-between text-sm border-t border-white/20 pt-2"><span>{t('cor.supplierTotal')}</span><span className="font-mono">{fmt(editSupplierTotal)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-300">{t('cor.pdgMargin')}</span><span className="font-mono">{fmt(editOP)}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-gray-300">{t('cor.insurance')}</span><span className="font-mono">{fmt(editGL)}</span></div>
                 <div className="flex justify-between text-lg border-t border-[#C9A96E] pt-3 mt-3">
-                  <span className="font-bold text-[#C9A96E]">TOTAL — COR {cor?.corNumber}</span>
+                  <span className="font-bold text-[#C9A96E]">{t('cor.totalCor', { number: cor?.corNumber ?? '' })}</span>
                   <span className="font-mono font-bold text-[#C9A96E]">{fmt(editTotal)}</span>
                 </div>
               </>
             ) : (
               <>
                 <div className="mb-3">
-                  <label className="block text-xs text-gray-400 mb-1.5">Monto Total del COR</label>
+                  <label className="block text-xs text-gray-400 mb-1.5">{t('cor.totalAmountLabel')}</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C9A96E] font-bold">$</span>
                     <input type="number" value={editDirectTotal} onChange={(e) => setEditDirectTotal(parseFloat(e.target.value) || 0)} step="any" className="w-full pl-8 pr-4 py-3 rounded-lg border border-[#C9A96E]/30 bg-white/5 text-white text-lg font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50" />
                   </div>
                 </div>
                 <div className="flex justify-between text-lg border-t border-[#C9A96E] pt-3 mt-3">
-                  <span className="font-bold text-[#C9A96E]">TOTAL — COR {cor?.corNumber}</span>
+                  <span className="font-bold text-[#C9A96E]">{t('cor.totalCor', { number: cor?.corNumber ?? '' })}</span>
                   <span className="font-mono font-bold text-[#C9A96E]">{fmt(editTotal)}</span>
                 </div>
               </>
             )
           ) : (
             <>
-              <div className="flex justify-between text-sm"><span className="text-gray-300">Subtotal</span><span className="font-mono">{fmt(cor?.subtotal ?? 0)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-300">Florida Sales Tax @ 7%</span><span className="font-mono">{fmt(cor?.salesTax ?? 0)}</span></div>
-              <div className="flex justify-between text-sm border-t border-white/20 pt-2"><span>Supplier Total</span><span className="font-mono">{fmt(supplierTotal)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-300">PDG Margin @ 6%</span><span className="font-mono">{fmt(cor?.overheadProfit ?? 0)}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-gray-300">Insurance @ 1.5%</span><span className="font-mono">{fmt(cor?.generalLiability ?? 0)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-300">{t('cor.subtotal')}</span><span className="font-mono">{fmt(cor?.subtotal ?? 0)}</span></div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-300">
+                  {t('cor.salesTax')}
+                  {(cor?.salesTax ?? 0) === 0 && (
+                    <span className="block text-[11px] text-gray-400 italic">({t('cor.salesTaxExempt')})</span>
+                  )}
+                </span>
+                <span className="font-mono">{fmt(cor?.salesTax ?? 0)}</span>
+              </div>
+              <div className="flex justify-between text-sm border-t border-white/20 pt-2"><span>{t('cor.supplierTotal')}</span><span className="font-mono">{fmt(supplierTotal)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-300">{t('cor.pdgMargin')}</span><span className="font-mono">{fmt(cor?.overheadProfit ?? 0)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-300">{t('cor.insurance')}</span><span className="font-mono">{fmt(cor?.generalLiability ?? 0)}</span></div>
               <div className="flex justify-between text-lg border-t border-[#C9A96E] pt-3 mt-3">
-                <span className="font-bold text-[#C9A96E]">TOTAL — COR {cor?.corNumber}</span>
+                <span className="font-bold text-[#C9A96E]">{t('cor.totalCor', { number: cor?.corNumber ?? '' })}</span>
                 <span className="font-mono font-bold text-[#C9A96E]">{fmt(cor?.totalAmount ?? 0)}</span>
               </div>
             </>

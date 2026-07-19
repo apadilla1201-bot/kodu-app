@@ -5,8 +5,11 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useI18n } from '@/hooks/use-i18n';
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -155,6 +158,13 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {isLogin && (
+                <div className="mt-1.5 text-right">
+                  <Link href="/forgot-password" className="text-xs text-[#1B2A4A]/60 hover:text-[#C9A96E] transition-colors">
+                    {t('auth.forgotPassword')}
+                  </Link>
+                </div>
+              )}
             </div>
 
             {error && (
@@ -186,6 +196,14 @@ export default function LoginPage() {
             >
               {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
             </button>
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-[#C9A96E]/15 flex items-center justify-center gap-4 text-xs text-[#1B2A4A]/40">
+            <Link href="/privacy" className="hover:text-[#C9A96E] transition-colors">Privacy</Link>
+            <span>·</span>
+            <Link href="/terms" className="hover:text-[#C9A96E] transition-colors">Terms</Link>
+            <span>·</span>
+            <a href="mailto:support@kodupm.com" className="hover:text-[#C9A96E] transition-colors">support@kodupm.com</a>
           </div>
         </div>
       </div>

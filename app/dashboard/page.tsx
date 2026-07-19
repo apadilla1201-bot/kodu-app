@@ -16,7 +16,7 @@ export default async function DashboardPage() {
         select: { id: true, status: true, totalAmount: true },
       },
       rfis: {
-        select: { id: true, status: true },
+        select: { id: true, status: true, dateDue: true },
       },
       payApplications: {
         select: { id: true, status: true },
@@ -40,6 +40,10 @@ export default async function DashboardPage() {
     totalPendingAmount: (p?.changeOrders ?? []).filter((c: any) => c?.status === 'Pending').reduce((sum: number, c: any) => sum + (c?.totalAmount ?? 0), 0),
     totalRFIs: p?.rfis?.length ?? 0,
     openRFIs: (p?.rfis ?? []).filter((r: any) => r?.status === 'Open' || r?.status === 'Under Review')?.length ?? 0,
+    overdueRFIs: (p?.rfis ?? []).filter((r: any) =>
+      (r?.status === 'Open' || r?.status === 'Under Review') &&
+      r?.dateDue && new Date(r.dateDue).getTime() < Date.now()
+    )?.length ?? 0,
     totalPayApps: p?.payApplications?.length ?? 0,
   }));
 

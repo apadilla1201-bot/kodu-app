@@ -14,7 +14,9 @@ import {
   Plus,
   TrendingUp,
   ArrowRight,
+  AlertTriangle,
 } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
 
 interface ProjectSummary {
   id: string;
@@ -31,6 +33,7 @@ interface ProjectSummary {
   totalPendingAmount: number;
   totalRFIs: number;
   openRFIs: number;
+  overdueRFIs: number;
   totalPayApps: number;
 }
 
@@ -60,6 +63,7 @@ function AnimatedNumber({ value, prefix = '' }: { value: number; prefix?: string
 }
 
 export function DashboardContent({ projects }: { projects: ProjectSummary[] }) {
+  const { t } = useI18n();
   const safeProjects = projects ?? [];
   const totalCORs = safeProjects.reduce((s: number, p: any) => s + (p?.totalCORs ?? 0), 0);
   const totalApproved = safeProjects.reduce((s: number, p: any) => s + (p?.totalApprovedAmount ?? 0), 0);
@@ -68,28 +72,29 @@ export function DashboardContent({ projects }: { projects: ProjectSummary[] }) {
 
   const totalRFIs = safeProjects.reduce((s: number, p: any) => s + (p?.totalRFIs ?? 0), 0);
   const openRFIs = safeProjects.reduce((s: number, p: any) => s + (p?.openRFIs ?? 0), 0);
+  const overdueRFIs = safeProjects.reduce((s: number, p: any) => s + (p?.overdueRFIs ?? 0), 0);
   const totalPayApps = safeProjects.reduce((s: number, p: any) => s + (p?.totalPayApps ?? 0), 0);
 
   const stats = [
-    { label: 'Total Projects', value: safeProjects?.length ?? 0, icon: FolderKanban, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
-    { label: 'Total CORs', value: totalCORs, icon: FileText, color: 'text-[#1B2A4A]', bg: 'bg-[#1B2A4A]/10' },
-    { label: 'Approved Value', value: totalApproved, icon: CheckCircle2, color: 'text-[#2E7D32]', bg: 'bg-[#2E7D32]/10', prefix: '$' },
-    { label: 'Open RFIs', value: openRFIs, icon: FileQuestion, color: 'text-blue-600', bg: 'bg-blue-100' },
+    { label: t('dashboard.totalProjects'), value: safeProjects?.length ?? 0, icon: FolderKanban, color: 'text-[#C9A96E]', bg: 'bg-[#C9A96E]/10' },
+    { label: t('dashboard.totalCORs'), value: totalCORs, icon: FileText, color: 'text-[#1B2A4A]', bg: 'bg-[#1B2A4A]/10' },
+    { label: t('dashboard.approvedValue'), value: totalApproved, icon: CheckCircle2, color: 'text-[#2E7D32]', bg: 'bg-[#2E7D32]/10', prefix: '$' },
+    { label: t('dashboard.openRFIs'), value: openRFIs, icon: FileQuestion, color: 'text-blue-600', bg: 'bg-blue-100', overdue: overdueRFIs },
   ];
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold text-foreground tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Overview of all projects and change orders</p>
+          <h1 className="text-2xl font-display font-bold text-foreground tracking-tight">{t('dashboard.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('dashboard.subtitle')}</p>
         </div>
         <Link
           href="/dashboard/projects/new"
           className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          New Project
+          {t('dashboard.newProject')}
         </Link>
       </div>
 
@@ -114,6 +119,12 @@ export function DashboardContent({ projects }: { projects: ProjectSummary[] }) {
               <div className="text-2xl font-bold text-foreground">
                 <AnimatedNumber value={stat?.value ?? 0} prefix={stat?.prefix ?? ''} />
               </div>
+              {(stat?.overdue ?? 0) > 0 && (
+                <div className="mt-1.5 flex items-center gap-1 text-xs font-medium text-red-600">
+                  <AlertTriangle className="w-3 h-3" />
+                  {t('dashboard.overdueNote', { count: stat.overdue })}
+                </div>
+              )}
             </motion.div>
           );
         })}
@@ -122,21 +133,21 @@ export function DashboardContent({ projects }: { projects: ProjectSummary[] }) {
       {/* Projects List */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-display font-semibold text-foreground">Projects</h2>
+          <h2 className="text-lg font-display font-semibold text-foreground">{t('dashboard.projects')}</h2>
           <Link href="/dashboard/projects" className="text-sm text-[#C9A96E] hover:underline flex items-center gap-1">
-            View All <ArrowRight className="w-3 h-3" />
+            {t('dashboard.viewAll')} <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
         {safeProjects?.length === 0 ? (
           <div className="bg-card rounded-lg p-12 text-center shadow-[var(--shadow-sm)]">
             <FolderKanban className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground mb-4">No projects yet. Create your first project to get started.</p>
+            <p className="text-muted-foreground mb-4">{t('dashboard.emptyTitle')}</p>
             <Link
               href="/dashboard/projects/new"
               className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Create Project
+              {t('dashboard.newProject')}
             </Link>
           </div>
         ) : (
@@ -166,6 +177,12 @@ export function DashboardContent({ projects }: { projects: ProjectSummary[] }) {
                           {project.totalRFIs} RFIs
                         </span>
                       )}
+                      {(project?.overdueRFIs ?? 0) > 0 && (
+                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-semibold flex items-center gap-1" title={t('dashboard.overdueRfiTitle')}>
+                          <AlertTriangle className="w-3 h-3" />
+                          {project.overdueRFIs} {t('dashboard.overdue')}
+                        </span>
+                      )}
                       {(project?.totalPayApps ?? 0) > 0 && (
                         <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded font-medium">
                           {project.totalPayApps} PAs
@@ -175,13 +192,13 @@ export function DashboardContent({ projects }: { projects: ProjectSummary[] }) {
                     </div>
                     <p className="text-sm text-muted-foreground mb-3">{project?.client ?? ''}</p>
                     <div className="flex items-center gap-4 text-xs">
-                      <span className="flex items-center gap-1 text-[#2E7D32]">
-                        <CheckCircle2 className="w-3 h-3" /> {project?.approved ?? 0}
+                      <span className="flex items-center gap-1 text-[#2E7D32]" title={t('dashboard.approvedCorTitle')}>
+                        <CheckCircle2 className="w-3 h-3" /> {project?.approved ?? 0} {t('dashboard.approvedLabel')}
                       </span>
-                      <span className="flex items-center gap-1 text-[#92400E]">
-                        <Clock className="w-3 h-3" /> {project?.pending ?? 0}
+                      <span className="flex items-center gap-1 text-[#92400E]" title={t('dashboard.pendingCorTitle')}>
+                        <Clock className="w-3 h-3" /> {project?.pending ?? 0} {t('dashboard.pendingLabel')}
                       </span>
-                      <span className="flex items-center gap-1 text-muted-foreground ml-auto">
+                      <span className="flex items-center gap-1 text-muted-foreground ml-auto" title={t('dashboard.approvedValueTitle')}>
                         <DollarSign className="w-3 h-3" />
                         {(project?.totalApprovedAmount ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
                       </span>
