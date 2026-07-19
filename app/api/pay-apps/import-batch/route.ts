@@ -79,25 +79,40 @@ export async function POST(request: Request) {
     const project = await prisma.project.findFirst({ where: { id: projectId, companyId } });
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
-    // Get existing PA numbers to avoid duplicates
+    // Get existing PA numbers AND periods to avoid duplicates
     const existingPAs = await prisma.payApplication.findMany({
       where: { projectId },
-      select: { applicationNumber: true },
+      select: { applicationNumber: true, periodTo: true },
     });
     const existingNums = new Set(existingPAs.map(pa => pa.applicationNumber));
+    // Same project + same billing period (Period To) = same PA. This makes
+    // re-running an import idempotent instead of creating duplicates.
+    const existingPeriods = new Map<string, number>();
+    for (const ep of existingPAs) {
+      if (ep.periodTo) existingPeriods.set(ep.periodTo.toISOString().slice(0, 10), ep.applicationNumber);
+    }
 
-    // Get the highest existing PA number
-    let nextNum = (existingPAs.length > 0 ? Math.max(...existingPAs.map(pa => pa.applicationNumber)) : 0) + 1;
+    // Next available number; only consumed when a PA is actually created
+    let nextAvailable = (existingPAs.length > 0 ? Math.max(...existingPAs.map(pa => pa.applicationNumber)) : 0) + 1;
 
     const results: { fileName: string; applicationNumber: number; status: 'created' | 'skipped'; lineItems: number; reason?: string }[] = [];
 
     for (let idx = 0; idx < sorted.length; idx++) {
       const pa = sorted[idx];
       const hdr = pa.headerData;
-      // Assign sequential number based on date-sorted order, not from Excel
-      const paNum = nextNum + idx;
 
-      // Skip if this PA# already exists
+      // Skip if this billing period was already imported (idempotent re-runs)
+      const periodKey = hdr.periodTo ? new Date(hdr.periodTo).toISOString().slice(0, 10) : null;
+      if (periodKey && existingPeriods.has(periodKey)) {
+        const existingNum = existingPeriods.get(periodKey)!;
+        results.push({ fileName: pa.fileName, applicationNumber: existingNum, status: 'skipped', lineItems: 0, reason: `Period ${periodKey} already imported as PA #${existingNum}` });
+        continue;
+      }
+
+      // Assign sequential number based on date-sorted order, not from Excel
+      const paNum = nextAvailable++;
+
+      // Skip if this PA# already exists (defensive; racing imports)
       if (existingNums.has(paNum)) {
         results.push({ fileName: pa.fileName, applicationNumber: paNum, status: 'skipped', lineItems: 0, reason: `PA #${paNum} already exists` });
         continue;
@@ -164,6 +179,7 @@ export async function POST(request: Request) {
         });
 
         existingNums.add(paNum);
+        if (periodKey) existingPeriods.set(periodKey, paNum);
         results.push({ fileName: pa.fileName, applicationNumber: paNum, status: 'created', lineItems: pa.lineItems.length });
       } catch (err: any) {
         console.error(`Failed to create PA #${paNum} from ${pa.fileName}:`, err);
