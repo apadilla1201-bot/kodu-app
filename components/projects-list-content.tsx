@@ -8,6 +8,7 @@ import {
   Plus, Search, FolderKanban, CheckCircle2, Clock,
   XCircle, DollarSign, MapPin, Calendar, ArrowRight, Pencil, Trash2,
 } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
 
 interface Project {
   id: string;
@@ -25,6 +26,7 @@ interface Project {
 }
 
 export function ProjectsListContent({ projects }: { projects: Project[] }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<Project[]>(projects ?? []);
@@ -40,17 +42,17 @@ export function ProjectsListContent({ projects }: { projects: Project[] }) {
     e.preventDefault();
     e.stopPropagation();
     const label = p?.projectName ?? 'this project';
-    if (!window.confirm(`Delete "${label}" and ALL its data (CORs, RFIs, pay apps)?\n\nThis cannot be undone.`)) return;
+    if (!window.confirm(t('projects.deleteConfirm', { name: label }))) return;
     setDeleting(p.id);
     try {
       const res = await fetch(`/api/projects/${p.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.code ? `${data?.error} (${data.code})` : data?.error ?? 'Failed to delete project');
+        throw new Error(data?.code ? `${data?.error} (${data.code})` : data?.error ?? t('projects.deleteFailed'));
       }
       setItems((prev) => prev.filter((x) => x.id !== p.id));
     } catch (err: any) {
-      window.alert(err?.message ?? 'Failed to delete project');
+      window.alert(err?.message ?? t('projects.deleteFailed'));
     } finally {
       setDeleting(null);
     }
@@ -66,14 +68,14 @@ export function ProjectsListContent({ projects }: { projects: Project[] }) {
     <div className="max-w-[1200px] mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-display font-bold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your construction projects</p>
+          <h1 className="text-2xl font-display font-bold tracking-tight">{t('dashboard.projects')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('projects.subtitle')}</p>
         </div>
         <Link
           href="/dashboard/projects/new"
           className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
         >
-          <Plus className="w-4 h-4" /> New Project
+          <Plus className="w-4 h-4" /> {t('dashboard.newProject')}
         </Link>
       </div>
 
@@ -83,7 +85,7 @@ export function ProjectsListContent({ projects }: { projects: Project[] }) {
           type="text"
           value={search}
           onChange={(e: any) => setSearch(e?.target?.value ?? '')}
-          placeholder="Search projects by name, number, or client..."
+          placeholder={t('projects.searchPlaceholder')}
           className="w-full pl-10 pr-4 py-2.5 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50"
         />
       </div>
@@ -91,7 +93,7 @@ export function ProjectsListContent({ projects }: { projects: Project[] }) {
       {filtered?.length === 0 ? (
         <div className="bg-card rounded-lg p-12 text-center shadow-[var(--shadow-sm)]">
           <FolderKanban className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground">{search ? 'No projects match your search' : 'No projects yet'}</p>
+          <p className="text-muted-foreground">{search ? t('projects.noMatch') : t('projects.empty')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -108,13 +110,13 @@ export function ProjectsListContent({ projects }: { projects: Project[] }) {
                     <div>
                       <span className="text-xs font-mono text-[#C9A96E] font-medium">#{p?.projectNumber}</span>
                       <h3 className="font-semibold text-foreground group-hover:text-[#C9A96E] transition-colors mt-0.5">
-                        {p?.projectName ?? 'Untitled'}
+                        {p?.projectName ?? t('projects.untitled')}
                       </h3>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={(e) => handleEdit(e, p)}
-                        title="Edit project"
+                        title={t('projects.edit')}
                         className="p-1.5 rounded-md text-muted-foreground hover:text-[#C9A96E] hover:bg-muted transition-colors"
                       >
                         <Pencil className="w-4 h-4" />
@@ -122,7 +124,7 @@ export function ProjectsListContent({ projects }: { projects: Project[] }) {
                       <button
                         onClick={(e) => handleDelete(e, p)}
                         disabled={deleting === p.id}
-                        title="Delete project"
+                        title={t('projects.delete')}
                         className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                       >
                         <Trash2 className="w-4 h-4" />

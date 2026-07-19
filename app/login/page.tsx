@@ -32,7 +32,7 @@ export default function LoginPage() {
           redirect: false,
         });
         if (res?.error) {
-          setError('Invalid email or password');
+          setError(t('auth.invalidCredentials'));
         } else {
           router.replace('/dashboard');
         }
@@ -52,7 +52,7 @@ export default function LoginPage() {
             redirect: false,
           });
           if (signInRes?.error) {
-            setError('Account created. Please login.');
+            setError(t('auth.accountCreatedLogin'));
             setIsLogin(true);
           } else {
             router.replace('/dashboard');
@@ -61,7 +61,7 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      setError('An unexpected error occurred');
+      setError(t('auth.unexpectedError'));
     } finally {
       setLoading(false);
     }
@@ -77,10 +77,10 @@ export default function LoginPage() {
             <Image src="/pdg_logo.png" alt="The Project Delivery Group LLC" fill className="object-contain" />
           </div>
           <h1 className="text-3xl font-display font-bold text-[#C9A96E] tracking-tight mb-4">
-            Change Order Management
+            {t('auth.heroTitle')}
           </h1>
           <p className="text-gray-300 text-lg max-w-md mx-auto">
-            Professional COR tracking, generation, and market analysis for construction projects.
+            {t('auth.heroSubtitle')}
           </p>
           <div className="mt-12 grid grid-cols-3 gap-6 max-w-sm mx-auto">
             {[{ label: 'Projects', icon: '📋' }, { label: 'CORs', icon: '📄' }, { label: 'PDFs', icon: '📑' }].map((item: any) => (
@@ -102,16 +102,16 @@ export default function LoginPage() {
             </div>
           </div>
           <h2 className="text-2xl font-display font-bold text-[#0F1B33] tracking-tight mb-2">
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            {isLogin ? t('auth.welcomeBack') : t('auth.createAccount')}
           </h2>
           <p className="text-[#1B2A4A]/60 mb-8">
-            {isLogin ? 'Sign in to manage your change orders' : 'Register to start managing change orders'}
+            {isLogin ? t('auth.signInSubtitle') : t('auth.registerSubtitle')}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">Full Name</label>
+                <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">{t('auth.fullName')}</label>
                 <div className="relative">
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C9A96E]" />
                   <input
@@ -119,13 +119,13 @@ export default function LoginPage() {
                     value={name}
                     onChange={(e: any) => setName(e?.target?.value ?? '')}
                     className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#C9A96E]/30 rounded-lg text-[#0F1B33] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50 focus:border-[#C9A96E]"
-                    placeholder="Your name"
+                    placeholder={t('auth.yourName')}
                   />
                 </div>
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">{t('auth.email')}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C9A96E]" />
                 <input
@@ -139,7 +139,7 @@ export default function LoginPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">Password</label>
+              <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">{t('auth.password')}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C9A96E]" />
                 <input
@@ -182,7 +182,7 @@ export default function LoginPage() {
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  {isLogin ? 'Sign In' : 'Create Account'}
+                  {isLogin ? t('auth.signIn') : t('auth.createAccount')}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -194,7 +194,7 @@ export default function LoginPage() {
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
               className="text-sm text-[#1B2A4A]/60 hover:text-[#C9A96E] transition-colors"
             >
-              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {isLogin ? t('auth.noAccount') : t('auth.haveAccount')}
             </button>
           </div>
 
