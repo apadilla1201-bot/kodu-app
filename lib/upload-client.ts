@@ -40,8 +40,43 @@ export function downloadBlobFile(blob: Blob, fileName: string, openInNewTab = fa
   URL.revokeObjectURL(url);
 }
 
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Sube un archivo al storage.
+ * 1) Intenta subida directa a Vercel Blob (sin el límite de ~4.5 MB de las
+ *    funciones serverless, que tumbaba PDFs reales de propuestas de subs).
+ * 2) Si Blob no está configurado (dev local / S3), cae a la subida por servidor.
+ */
 export async function uploadFileToStorage(file: File, isPublic = false): Promise<UploadedFile> {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error('File too large (max 50 MB)');
+  }
+
   const contentType = resolveContentType(file);
+
+  // 1) Subida directa a Vercel Blob
+  let blobError: Error | null = null;
+  try {
+    const { upload } = await import('@vercel/blob/client');
+    const safeName = (file.name || 'file').replace(/[/\\]/g, '_');
+    const blob = await upload(`uploads/${Date.now()}-${safeName}`, file, {
+      access: 'public',
+      handleUploadUrl: '/api/upload/blob-token',
+      contentType,
+      multipart: file.size > 10 * 1024 * 1024,
+    });
+    return { cloud_storage_path: `vercel-blob:${blob.url}`, isPublic };
+  } catch (error: any) {
+    const msg = String(error?.message ?? '');
+    if (msg.includes('blob-not-configured')) {
+      blobError = null; // backend sin Blob: ir directo al fallback
+    } else {
+      blobError = error instanceof Error ? error : new Error(msg);
+    }
+  }
+
+  // 2) Fallback: subida por servidor (local/S3; sujeta al límite de plataforma)
   const fd = new FormData();
   fd.append('file', file, file.name);
   fd.append('fileName', file.name);
@@ -55,7 +90,8 @@ export async function uploadFileToStorage(file: File, isPublic = false): Promise
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data?.error ?? 'Failed to upload file');
+    // Si la subida directa también falló, su error suele ser más informativo.
+    throw blobError ?? new Error(data?.error ?? 'Failed to upload file');
   }
 
   return {
