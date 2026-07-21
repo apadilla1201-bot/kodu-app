@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/hooks/use-i18n';
-import { ArrowLeft, Send, FileStack } from 'lucide-react';
+import { ArrowLeft, Send, FileStack, Paperclip, X, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { uploadFileToStorage } from '@/lib/upload-client';
 
 interface ProjectData {
   id: string;
@@ -14,19 +15,31 @@ interface ProjectData {
   nextSequence: number;
 }
 
+interface Contact {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 const types = ['Shop Drawing', 'Product Data', 'Sample', 'Mock-up', 'Other'];
 
 export function NewSubmittalForm({
   projects,
   initialProjectId,
+  currentUser,
 }: {
   projects: ProjectData[];
   initialProjectId?: string;
+  currentUser?: { name: string; email: string };
 }) {
   const router = useRouter();
   const { toast } = useToast();
   const { t } = useI18n();
   const [submitting, setSubmitting] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     projectId: initialProjectId || projects?.[0]?.id || '',
@@ -37,7 +50,7 @@ export function NewSubmittalForm({
     subcontractor: '',
     priority: 'Normal',
     requiredDate: '',
-    submittedBy: 'Augusto Padilla',
+    submittedBy: currentUser?.name || '',
     assignedTo: '',
     assignedToEmail: '',
     assignedToRole: 'Architect',
@@ -53,7 +66,86 @@ export function NewSubmittalForm({
     ? `${selected.projectNumber}-SUB-${String(selected.nextSequence).padStart(3, '0')}`
     : '';
 
+  // Directorio del proyecto (mismo patrón que el módulo de RFI):
+  // jala contactos y auto-rellena Superintendent y PM.
+  useEffect(() => {
+    if (!form.projectId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/projects/${form.projectId}/contacts`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: Contact[] = data.contacts || [];
+        setContacts(list);
+
+        const superC = list.find((c) => c.role === 'Superintendent');
+        const pmC = list.find((c) => c.role === 'Project Manager');
+        setForm((prev) => ({
+          ...prev,
+          submittedBy: prev.submittedBy || pmC?.name || currentUser?.name || '',
+          superintendentName: prev.superintendentName || superC?.name || '',
+          superintendentEmail: prev.superintendentEmail || superC?.email || '',
+        }));
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [form.projectId, currentUser?.name]);
+
   const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  const pickContact = (
+    contactId: string,
+    nameField?: string,
+    emailField?: string,
+    roleField?: string,
+  ) => {
+    const c = contacts.find((x) => x.id === contactId);
+    if (!c) return;
+    setForm((prev) => ({
+      ...prev,
+      ...(nameField ? { [nameField]: c.name } : {}),
+      ...(emailField ? { [emailField]: c.email } : {}),
+      ...(roleField ? { [roleField]: c.role } : {}),
+    }));
+  };
+
+  const DirectorySelect = ({
+    onPick,
+    className = '',
+  }: {
+    onPick: (contactId: string) => void;
+    className?: string;
+  }) => {
+    if (contacts.length === 0) return null;
+    return (
+      <select
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onPick(e.target.value);
+          e.target.value = '';
+        }}
+        className={`mt-1 px-2 py-1.5 border rounded-lg bg-background text-xs text-muted-foreground ${className}`}
+      >
+        <option value="">{t('submittals.selectFromDirectory')}</option>
+        {contacts.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name} — {c.role}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setSelectedFiles((prev) => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (asDraft: boolean) => {
     if (!form.projectId || !form.title.trim()) {
@@ -62,6 +154,19 @@ export function NewSubmittalForm({
     }
     setSubmitting(true);
     try {
+      // 1) Subir anexos (planos y/o cualquier archivo) al storage
+      const attachments = [];
+      for (const file of selectedFiles) {
+        const uploaded = await uploadFileToStorage(file);
+        attachments.push({
+          fileName: file.name,
+          fileType: file.type || null,
+          cloudStoragePath: uploaded.cloud_storage_path,
+          isPublic: uploaded.isPublic,
+        });
+      }
+
+      // 2) Crear el submittal con los anexos ya subidos
       const res = await fetch('/api/submittals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,6 +175,7 @@ export function NewSubmittalForm({
           ...form,
           status: asDraft ? 'Draft' : 'Submitted',
           requiredDate: form.requiredDate || null,
+          attachments,
         }),
       });
       if (!res.ok) {
@@ -113,6 +219,14 @@ export function NewSubmittalForm({
               <option key={p.id} value={p.id}>#{p.projectNumber} — {p.projectName}</option>
             ))}
           </select>
+          {contacts.length === 0 && (
+            <p className="text-xs text-muted-foreground mt-1.5">
+              {t('submittals.noDirectoryContacts')}{' '}
+              <Link href={`/dashboard/directory?projectId=${form.projectId}`} className="underline text-[#C9A96E]">
+                {t('submittals.addToDirectory')}
+              </Link>
+            </p>
+          )}
         </div>
 
         <div>
@@ -135,6 +249,48 @@ export function NewSubmittalForm({
           />
         </div>
 
+        {/* Anexos: planos y/o cualquier archivo */}
+        <div className="border border-dashed rounded-lg p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <label className="text-sm font-medium inline-flex items-center gap-2">
+              <Paperclip className="w-4 h-4 text-[#C9A96E]" />
+              {t('submittals.attachments')}
+            </label>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 border rounded-lg text-sm hover:bg-muted transition-colors"
+            >
+              {t('submittals.attachFiles')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+          </div>
+          {selectedFiles.length > 0 && (
+            <div className="space-y-1.5 mt-3">
+              {selectedFiles.map((f, i) => (
+                <div key={`${f.name}-${i}`} className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2">
+                  <Paperclip className="w-3.5 h-3.5 text-[#C9A96E]" />
+                  <span className="text-sm flex-1 truncate">{f.name}</span>
+                  <span className="text-xs text-muted-foreground">{(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    className="p-1 hover:bg-red-100 rounded text-red-500"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium">{t('submittals.type')}</label>
@@ -154,6 +310,16 @@ export function NewSubmittalForm({
           </div>
           <div>
             <label className="text-sm font-medium">{t('submittals.subcontractor')}</label>
+            <DirectorySelect
+              onPick={(id) => {
+                const c = contacts.find((x) => x.id === id);
+                setForm((prev) => ({
+                  ...prev,
+                  subcontractorEmail: c?.email ?? prev.subcontractorEmail,
+                  subcontractor: prev.subcontractor || c?.name || prev.subcontractor,
+                }));
+              }}
+            />
             <input value={form.subcontractor} onChange={(e) => update('subcontractor', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" />
           </div>
           <div>
@@ -166,6 +332,7 @@ export function NewSubmittalForm({
           </div>
           <div>
             <label className="text-sm font-medium">{t('submittals.assignedToReviewer')}</label>
+            <DirectorySelect onPick={(id) => pickContact(id, 'assignedTo', 'assignedToEmail', 'assignedToRole')} />
             <input value={form.assignedTo} onChange={(e) => update('assignedTo', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" placeholder={t('submittals.assignedToPlaceholder')} />
           </div>
           <div>
@@ -174,6 +341,7 @@ export function NewSubmittalForm({
           </div>
           <div>
             <label className="text-sm font-medium">{t('submittals.reviewerEmail')}</label>
+            <DirectorySelect onPick={(id) => pickContact(id, undefined, 'reviewerEmail')} />
             <input type="email" value={form.reviewerEmail} onChange={(e) => update('reviewerEmail', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" />
           </div>
           <div>
@@ -182,6 +350,7 @@ export function NewSubmittalForm({
           </div>
           <div>
             <label className="text-sm font-medium">{t('submittals.superintendentCc')}</label>
+            <DirectorySelect onPick={(id) => pickContact(id, 'superintendentName', 'superintendentEmail')} />
             <input value={form.superintendentName} onChange={(e) => update('superintendentName', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background" placeholder={t('submittals.namePlaceholder')} />
           </div>
           <div>
@@ -205,8 +374,8 @@ export function NewSubmittalForm({
             onClick={() => handleSubmit(false)}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#C9A96E] hover:bg-[#B8944F] text-white rounded-lg font-semibold disabled:opacity-50"
           >
-            <Send className="w-4 h-4" />
-            {t('submittals.submitSubmittal')}
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {submitting ? t('submittals.uploadingAttachments') : t('submittals.submitSubmittal')}
           </button>
         </div>
       </div>

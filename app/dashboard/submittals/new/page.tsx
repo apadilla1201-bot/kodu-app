@@ -32,6 +32,7 @@ export default async function NewSubmittalPage({
     <NewSubmittalForm
       projects={projectData}
       initialProjectId={searchParams?.projectId}
+      currentUser={{ name: session.user?.name ?? '', email: session.user?.email ?? '' }}
     />
   );
 }

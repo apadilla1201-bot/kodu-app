@@ -1,11 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/hooks/use-i18n';
-import { ArrowLeft, FileStack, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, FileStack, CheckCircle2, RotateCcw, Paperclip, Download, Loader2 } from 'lucide-react';
+import { downloadStorageFile, uploadFileToStorage } from '@/lib/upload-client';
+
+interface SubmittalAttachment {
+  id: string;
+  fileName: string;
+  fileType: string | null;
+  cloudStoragePath: string;
+  isPublic: boolean;
+}
 
 interface SubmittalData {
   id: string;
@@ -26,6 +35,7 @@ interface SubmittalData {
   ballInCourt?: string | null;
   ballInCourtRole?: string | null;
   assignedTo?: string | null;
+  attachments?: SubmittalAttachment[];
   project: {
     id: string;
     projectNumber: string;
@@ -54,6 +64,11 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
   const { toast } = useToast();
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const attachments = submittal.attachments ?? [];
 
   const setStatus = async (status: string) => {
     setLoading(true);
@@ -71,6 +86,50 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
       toast({ title: e?.message ?? t('common.error'), variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownload = async (att: SubmittalAttachment) => {
+    setDownloadingFile(att.id);
+    try {
+      await downloadStorageFile(att.cloudStoragePath, att.fileName);
+    } catch (e: any) {
+      toast({ title: e?.message ?? t('common.error'), variant: 'destructive' });
+    } finally {
+      setDownloadingFile(null);
+    }
+  };
+
+  // Anexar archivos a un submittal ya existente (PATCH con attachments)
+  const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      const newAttachments = [];
+      for (const file of files) {
+        const uploaded = await uploadFileToStorage(file);
+        newAttachments.push({
+          fileName: file.name,
+          fileType: file.type || null,
+          cloudStoragePath: uploaded.cloud_storage_path,
+          isPublic: uploaded.isPublic,
+        });
+      }
+      const res = await fetch(`/api/submittals/${submittal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ attachments: newAttachments }),
+      });
+      if (!res.ok) throw new Error(t('submittals.updateError'));
+      toast({ title: t('submittals.attachmentAdded') });
+      router.refresh();
+    } catch (err: any) {
+      toast({ title: err?.message ?? t('common.error'), variant: 'destructive' });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -131,6 +190,47 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
           <p className="text-sm whitespace-pre-wrap">{submittal.description}</p>
         </div>
       )}
+
+      {/* Anexos: planos y/o cualquier archivo */}
+      <div className="bg-card border rounded-xl p-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <h2 className="font-semibold inline-flex items-center gap-2">
+            <Paperclip className="w-4 h-4 text-[#C9A96E]" />
+            {t('submittals.attachments')}
+            <span className="text-sm font-normal text-muted-foreground">({attachments.length})</span>
+          </h2>
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
+            {uploading ? t('submittals.uploadingAttachments') : t('submittals.attachFiles')}
+          </button>
+          <input ref={fileInputRef} type="file" multiple onChange={handleAttach} className="hidden" />
+        </div>
+        {attachments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('submittals.noAttachments')}</p>
+        ) : (
+          <div className="space-y-1.5">
+            {attachments.map((att) => (
+              <div key={att.id} className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2">
+                <Paperclip className="w-3.5 h-3.5 text-[#C9A96E]" />
+                <span className="text-sm flex-1 truncate">{att.fileName}</span>
+                <button
+                  onClick={() => handleDownload(att)}
+                  disabled={downloadingFile === att.id}
+                  className="p-1 hover:bg-[#C9A96E]/10 rounded text-[#C9A96E] disabled:opacity-50"
+                  title={t('submittals.download')}
+                >
+                  {downloadingFile === att.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-3">
         {submittal.status === 'Draft' && (

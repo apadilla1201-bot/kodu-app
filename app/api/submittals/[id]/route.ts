@@ -43,6 +43,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       'priority', 'status', 'submittedBy', 'reviewedBy', 'notes',
       'assignedTo', 'assignedToRole', 'ballInCourt', 'ballInCourtRole',
     ];
+    // Nuevos anexos (planos / archivos) sobre un submittal existente
+    const newAttachments = Array.isArray(body?.attachments) ? body.attachments : [];
     for (const f of fields) {
       if (body[f] !== undefined) data[f] = body[f];
     }
@@ -74,7 +76,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const updated = await prisma.submittal.update({
       where: { id: params.id },
-      data,
+      data: {
+        ...data,
+        ...(newAttachments.length
+          ? {
+              attachments: {
+                create: newAttachments.map((a: any) => ({
+                  fileName: a.fileName,
+                  fileType: a.fileType ?? null,
+                  cloudStoragePath: a.cloudStoragePath,
+                  isPublic: a.isPublic ?? false,
+                })),
+              },
+            }
+          : {}),
+      },
       include: { project: true, attachments: true },
     });
 
