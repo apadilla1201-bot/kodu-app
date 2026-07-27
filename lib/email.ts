@@ -82,15 +82,34 @@ export async function sendEmail(opts: {
   }
 }
 
+const NAVY = '#0F1B33';
+const GOLD = '#C9A96E';
+
+/**
+ * Logo visible en TODOS los correos.
+ * El logo de PDG es blanco/dorado: va sobre la barra navy (nunca sobre fondo blanco,
+ * que era el problema reportado — blanco sobre blanco, ilegible).
+ * La URL pública del logo puede sobreescribirse con EMAIL_LOGO_URL en Vercel.
+ */
+function emailLogoUrl(): string {
+  const explicit = process.env.EMAIL_LOGO_URL?.trim();
+  if (explicit) return explicit;
+  return `${appBaseUrl()}/pdg_logo.png`;
+}
+
 function wrapEmail(headerBg: string, headerTitle: string, headerColor: string, body: string): string {
+  const logo = emailLogoUrl();
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;">
-      <div style="background:${headerBg};padding:16px 20px;border-radius:8px 8px 0 0;">
+      <div style="background:${NAVY};padding:18px 20px;border-radius:8px 8px 0 0;text-align:center;">
+        <img src="${logo}" alt="The Project Delivery Group LLC" width="190" style="display:block;margin:0 auto;max-width:190px;height:auto;border:0;" />
+      </div>
+      <div style="background:${headerBg};padding:12px 20px;border-top:3px solid ${GOLD};">
         <h2 style="color:${headerColor};margin:0;font-size:18px;">${headerTitle}</h2>
       </div>
       <div style="background:#f9fafb;padding:20px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
         ${body}
-        <p style="margin-top:16px;font-size:11px;color:#9ca3af;">The Project Delivery Group LLC · Kodu PM</p>
+        <p style="margin-top:16px;font-size:11px;color:#9ca3af;">The Project Delivery Group LLC · Kodu PM · <a href="${appBaseUrl()}" style="color:#9ca3af;">app.kodupm.com</a></p>
       </div>
     </div>
   `;
@@ -203,6 +222,7 @@ export async function sendSubmittalEmail(opts: {
   assignedTo?: string | null;
   ballInCourt?: string | null;
   submittalId: string;
+  externalRespondUrl?: string;
 }) {
   const titles: Record<typeof opts.event, { bg: string; label: string; color: string }> = {
     submitted: { bg: '#0F1B33', label: 'Submittal Submitted', color: '#C9A96E' },
@@ -213,6 +233,9 @@ export async function sendSubmittalEmail(opts: {
   };
   const t = titles[opts.event];
   const link = `${appBaseUrl()}/dashboard/submittals/${opts.submittalId}`;
+  const externalLink = opts.externalRespondUrl
+    ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond Without Login</a></p>`
+    : '';
   const html = wrapEmail(
     t.bg,
     t.label,
@@ -227,6 +250,7 @@ export async function sendSubmittalEmail(opts: {
       ${opts.submittedBy ? `<p><strong>Submitted By:</strong> ${opts.submittedBy}</p>` : ''}
       ${opts.reviewedBy ? `<p><strong>Reviewed By:</strong> ${opts.reviewedBy}</p>` : ''}
       <p><a href="${link}" style="display:inline-block;background:${t.bg};color:${t.color};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid ${t.color};">View Submittal in Kodu</a></p>
+      ${externalLink}
     `,
   );
   return sendEmail({
@@ -234,6 +258,133 @@ export async function sendSubmittalEmail(opts: {
     cc: opts.cc,
     replyTo: opts.replyTo,
     subject: `${opts.submittalNumber} — ${t.label}`,
+    html,
+  });
+}
+
+// ============================================================
+// Change Order emails — NUEVO (antes los COR no enviaban correo)
+// ============================================================
+
+const usd = (n: number) =>
+  n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+
+/** COR creado / enviado para aprobación — incluye enlace seguro para aprobar sin login. */
+export async function sendCorApprovalRequestEmail(opts: {
+  to: string | string[];
+  cc?: string | string[];
+  replyTo?: string;
+  corNumber: string;
+  description: string;
+  projectName: string;
+  projectNumber: string;
+  subcontractor?: string | null;
+  totalAmount: number;
+  ownerName?: string | null;
+  submittedBy: string;
+  corId: string;
+  externalApproveUrl?: string;
+}) {
+  const link = `${appBaseUrl()}/dashboard/cors/${opts.corId}`;
+  const externalLink = opts.externalApproveUrl
+    ? `<p style="margin-top:12px;"><a href="${opts.externalApproveUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Review & Approve Without Login</a></p>
+       <p style="font-size:11px;color:#9ca3af;margin-top:6px;">This secure link is unique to this Change Order and lets you review the amount and approve or reject it — no account needed.</p>`
+    : '';
+  const html = wrapEmail(
+    NAVY,
+    'Change Order — Approval Requested',
+    GOLD,
+    `
+      <p><strong>Change Order #:</strong> ${opts.corNumber}</p>
+      <p><strong>Project:</strong> ${opts.projectName} (#${opts.projectNumber})</p>
+      <p><strong>Description:</strong> ${opts.description.substring(0, 300)}</p>
+      ${opts.subcontractor ? `<p><strong>Subcontractor:</strong> ${opts.subcontractor}</p>` : ''}
+      <div style="background:white;padding:15px;border-radius:4px;border-left:4px solid ${GOLD};margin:12px 0;">
+        <p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Total Amount</p>
+        <p style="margin:4px 0 0 0;font-size:22px;font-weight:700;color:${NAVY};">${usd(opts.totalAmount)}</p>
+      </div>
+      <p><strong>Submitted By:</strong> ${opts.submittedBy}</p>
+      <p><a href="${link}" style="display:inline-block;background:${NAVY};color:${GOLD};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Change Order in Kodu</a></p>
+      ${externalLink}
+    `,
+  );
+  return sendEmail({
+    to: opts.to,
+    cc: opts.cc,
+    replyTo: opts.replyTo,
+    subject: `COR ${opts.corNumber} — Approval Requested — ${usd(opts.totalAmount)}`,
+    html,
+  });
+}
+
+/** COR aprobado o rechazado (por un usuario o vía enlace seguro). */
+export async function sendCorDecisionEmail(opts: {
+  to: string | string[];
+  cc?: string | string[];
+  corNumber: string;
+  description: string;
+  projectName: string;
+  totalAmount: number;
+  decision: 'Approved' | 'Rejected';
+  decidedBy: string;
+  corId: string;
+}) {
+  const approved = opts.decision === 'Approved';
+  const bg = approved ? '#2E7D32' : '#B91C1C';
+  const link = `${appBaseUrl()}/dashboard/cors/${opts.corId}`;
+  const html = wrapEmail(
+    bg,
+    `Change Order ${opts.decision}`,
+    '#fff',
+    `
+      <p><strong>Change Order #:</strong> ${opts.corNumber}</p>
+      <p><strong>Project:</strong> ${opts.projectName}</p>
+      <p><strong>Description:</strong> ${opts.description.substring(0, 300)}</p>
+      <p><strong>Total Amount:</strong> ${usd(opts.totalAmount)}</p>
+      <p><strong>${opts.decision} By:</strong> ${opts.decidedBy}</p>
+      <p><a href="${link}" style="display:inline-block;background:${bg};color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Change Order in Kodu</a></p>
+    `,
+  );
+  return sendEmail({
+    to: opts.to,
+    cc: opts.cc,
+    subject: `COR ${opts.corNumber} ${opts.decision} — ${usd(opts.totalAmount)}`,
+    html,
+  });
+}
+
+/** Submittal respondido vía enlace seguro (externo). */
+export async function sendSubmittalRespondedEmail(opts: {
+  to: string | string[];
+  cc?: string | string[];
+  submittalNumber: string;
+  title: string;
+  projectName: string;
+  responseText: string;
+  responseBy: string;
+  submittalId: string;
+}) {
+  const link = `${appBaseUrl()}/dashboard/submittals/${opts.submittalId}`;
+  const html = wrapEmail(
+    '#2E7D32',
+    'Submittal — External Response',
+    '#fff',
+    `
+      <p><strong>Submittal #:</strong> ${opts.submittalNumber}</p>
+      <p><strong>Project:</strong> ${opts.projectName}</p>
+      <p><strong>Title:</strong> ${opts.title}</p>
+      <p><strong>Responded By:</strong> ${opts.responseBy} (via secure link)</p>
+      <div style="background:white;padding:15px;border-radius:4px;border-left:4px solid #2E7D32;margin:12px 0;">
+        <p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Response</p>
+        <p style="margin:4px 0 0 0;">${opts.responseText.substring(0, 800)}</p>
+      </div>
+      <p><a href="${link}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Submittal in Kodu</a></p>
+    `,
+  );
+  return sendEmail({
+    to: opts.to,
+    cc: opts.cc,
+    subject: `${opts.submittalNumber} — External Response Received`,
     html,
   });
 }
