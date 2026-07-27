@@ -70,6 +70,8 @@ export function CORWizard({ projects, initialProjectId }: { projects: ProjectOpt
   const [subcontractor, setSubcontractor] = useState('');
   const [csiCode, setCsiCode] = useState('');
   const [corDate, setCorDate] = useState(new Date().toISOString().split('T')[0]);
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: generateId(), description: '', productCode: '', quantity: 1, unit: 'EA', unitPrice: 0, total: 0, isMaterial: true },
   ]);
@@ -262,6 +264,9 @@ export function CORWizard({ projects, initialProjectId }: { projects: ProjectOpt
           subcontractor,
           csiCode,
           date: corDate,
+          ownerName: ownerName || undefined,
+          ownerEmail: ownerEmail || undefined,
+          sendForApproval: Boolean(ownerEmail),
           lineItems: (lineItems ?? []).map((li: any) => ({
             description: li?.description ?? '',
             productCode: li?.productCode ?? '',
@@ -424,6 +429,24 @@ export function CORWizard({ projects, initialProjectId }: { projects: ProjectOpt
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium mb-1">Subcontractor / Supplier</label>
                   <input type="text" value={subcontractor} onChange={(e: any) => setSubcontractor(e?.target?.value ?? '')} placeholder="Subcontractor or supplier name" className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50" />
+                </div>
+              </div>
+
+              {/* Approver (Owner) — email notification + secure approval link */}
+              <div className="bg-[#0F1B33]/5 border border-[#C9A96E]/30 rounded-lg p-4">
+                <h3 className="text-sm font-semibold mb-1">Send for approval (optional)</h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  The approver receives an email with a secure link to review and approve or reject this COR — no account needed.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Approver name (Owner)</label>
+                    <input type="text" value={ownerName} onChange={(e: any) => setOwnerName(e?.target?.value ?? '')} placeholder="e.g. Patricia Gómez" className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Approver email</label>
+                    <input type="email" value={ownerEmail} onChange={(e: any) => setOwnerEmail(e?.target?.value ?? '')} placeholder="owner@company.com" className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50" />
+                  </div>
                 </div>
               </div>
 
