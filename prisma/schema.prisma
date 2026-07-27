@@ -147,6 +147,10 @@ model ChangeOrder {
   pdfIsPublic         Boolean            @default(false)
   subPdfCloudPath     String?
   subPdfIsPublic      Boolean            @default(false)
+  ownerName           String?            // approver contact (external)
+  ownerEmail          String?
+  externalToken       String?            @unique // magic link para aprobar/rechazar sin login
+  decidedBy           String?            // quién aprobó/rechazó (incluye externos)
   notes               String?
   lineItems           LineItem[]
   marketComparisons   MarketComparison[]
@@ -335,6 +339,10 @@ model Submittal {
   ballInCourtRole String?
   reviewedBy      String?
   reviewedDate    DateTime?
+  externalToken   String?              @unique // magic link para respuesta externa (sin login)
+  responseText    String?              @db.Text
+  responseBy      String?
+  responseDate    DateTime?
   notes           String?              @db.Text
   attachments     SubmittalAttachment[]
   createdAt       DateTime             @default(now())
