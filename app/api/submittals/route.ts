@@ -1,154 +1,120 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { collectEmails, resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
-import { appBaseUrl } from '@/lib/app-url';
-import { randomBytes } from 'crypto';
+import { collectEmails, sendRfiAnsweredEmail } from '@/lib/email';
 
-export async function GET(request: Request) {
+export async function GET(_request: Request, { params }: { params: { token: string } }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const companyId = (session.user as any)?.companyId ?? '';
-
-    const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get('projectId');
-
-    const where: any = { project: { companyId } };
-    if (projectId) where.projectId = projectId;
-
-    const submittals = await prisma.submittal.findMany({
-      where,
+    const token = params?.token ?? '';
+    const rfi = await prisma.rFI.findFirst({
+      where: { externalToken: token },
       include: {
-        project: { select: { id: true, projectNumber: true, projectName: true } },
-        attachments: true,
+        project: { select: { projectNumber: true, projectName: true } },
       },
-      orderBy: { createdAt: 'desc' },
-    });
+    });a
 
-    return NextResponse.json(submittals);
+    if (!rfi) {
+      return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
+    }
+
+    if (rfi.status === 'Answered' || rfi.status === 'Closed') {
+      return NextResponse.json({
+        rfiNumber: rfi.rfiNumber,
+        subject: rfi.subject,
+        question: rfi.question,
+        status: rfi.status,
+        projectName: rfi.project.projectName,
+        projectNumber: rfi.project.projectNumber,
+        alreadyAnswered: true,
+        responseText: rfi.responseText,
+      });
+    }
+
+    return NextResponse.json({
+      rfiNumber: rfi.rfiNumber,
+      subject: rfi.subject,
+      question: rfi.question,
+      status: rfi.status,
+      projectName: rfi.project.projectName,
+      projectNumber: rfi.project.projectNumber,
+      assignedTo: rfi.assignedTo,
+      dueDate: rfi.dateDue,
+      alreadyAnswered: false,
+    });
   } catch (error: any) {
-    console.error('GET /api/submittals error:', error);
-    return NextResponse.json({ error: 'Failed to fetch submittals' }, { status: 500 });
+    console.error('GET /api/rfis/public/[token] error:', error);
+    return NextResponse.json({ error: 'Failed to load RFI' }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request, { params }: { params: { token: string } }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const companyId = (session.user as any)?.companyId ?? '';
+    const token = params?.token ?? '';
+    const rfi = await prisma.rFI.findFirst({
+      where: { externalToken: token },
+      include: { project: true },
+    });
+
+    if (!rfi) {
+      return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
+    }
+
+    if (rfi.status === 'Answered' || rfi.status === 'Closed') {
+      return NextResponse.json({ error: 'This RFI has already been answered' }, { status: 400 });
+    }
 
     const body = await request.json();
-    const {
-      projectId, title, description, submittalType, specSection, subcontractor,
-      priority, status, requiredDate, submittedBy, submittedByEmail, notes, attachments,
-      assignedTo, assignedToRole, assignedToEmail, reviewerEmail,
-      subcontractorEmail, superintendentName, superintendentEmail,
-    } = body ?? {};
+    const { responseText, responseBy, costImpact, scheduleImpact } = body ?? {};
 
-    if (!projectId || !title) {
-      return NextResponse.json({ error: 'Project and title are required' }, { status: 400 });
+    if (!responseText?.trim()) {
+      return NextResponse.json({ error: 'Response text is required' }, { status: 400 });
     }
 
-    const project = await prisma.project.findFirst({ where: { id: projectId, companyId } });
-    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    const responder = responseBy ? String(responseBy) : rfi.assignedTo || 'External Respondent';
 
-    const last = await prisma.submittal.findFirst({
-      where: { projectId },
-      orderBy: { sequence: 'desc' },
-    });
-    const nextSeq = (last?.sequence ?? 0) + 1;
-    const submittalNumber = `${project.projectNumber}-SUB-${String(nextSeq).padStart(3, '0')}`;
-
-    const pmEmail = resolveEmailAddress(submittedByEmail, session.user?.email);
-    const assigneeName = assignedTo ? String(assignedTo) : null;
-    const assigneeEmail = resolveEmailAddress(assignedToEmail, assignedTo);
-    const isSubmitted = status === 'Submitted';
-    const externalToken = randomBytes(24).toString('hex');
-
-    const submittal = await prisma.submittal.create({
+    const updated = await prisma.rFI.update({
+      where: { id: rfi.id },
       data: {
-        projectId,
-        submittalNumber,
-        sequence: nextSeq,
-        title,
-        description: description ?? null,
-        submittalType: submittalType ?? 'Shop Drawing',
-        specSection: specSection ?? null,
-        subcontractor: subcontractor ?? null,
-        priority: priority ?? 'Normal',
-        status: status ?? 'Draft',
-        requiredDate: requiredDate ? new Date(requiredDate) : null,
-        submittedBy: submittedBy ?? session.user?.name ?? null,
-        submittedByEmail: pmEmail,
-        submittedDate: isSubmitted ? new Date() : null,
-        assignedTo: assigneeName,
-        assignedToRole: assignedToRole ? String(assignedToRole) : null,
-        assignedToEmail: assigneeEmail,
-        reviewerEmail: resolveEmailAddress(reviewerEmail),
-        subcontractorEmail: resolveEmailAddress(subcontractorEmail, subcontractor),
-        superintendentName: superintendentName ? String(superintendentName) : null,
-        superintendentEmail: resolveEmailAddress(superintendentEmail),
-        ballInCourt: assigneeName || (isSubmitted ? 'Architect' : null),
-        ballInCourtRole: assignedToRole ? String(assignedToRole) : (isSubmitted ? 'Architect' : null),
-        externalToken,
-        notes: notes ?? null,
-        attachments: attachments?.length
-          ? {
-              create: attachments.map((a: any) => ({
-                fileName: a.fileName,
-                fileType: a.fileType ?? null,
-                cloudStoragePath: a.cloudStoragePath,
-                isPublic: a.isPublic ?? false,
-              })),
-            }
-          : undefined,
+        responseText: String(responseText),
+        responseBy: responder,
+        responseDate: new Date(),
+        status: 'Answered',
+        costImpact: costImpact || rfi.costImpact,
+        scheduleImpact: scheduleImpact || rfi.scheduleImpact,
+        ballInCourt: rfi.submittedBy,
+        ballInCourtRole: rfi.submittedByRole || 'Project Manager',
       },
-      include: { project: true, attachments: true },
     });
 
-    if (submittal.status === 'Submitted') {
-      try {
-        const toList = collectEmails(assigneeEmail);
-        const ccList = collectEmails(
-          pmEmail,
-          reviewerEmail,
-          subcontractorEmail,
-          superintendentEmail,
-          session.user?.email,
-        ).filter((e) => !toList.includes(e));
-        const primaryTo = toList.length ? toList : collectEmails(pmEmail, session.user?.email);
+    try {
+      const toList = collectEmails((rfi as any).submittedByEmail, rfi.submittedBy);
+      const ccList = collectEmails(
+        (rfi as any).assignedToEmail,
+        (rfi as any).superintendentEmail,
+        (rfi as any).requestingSubEmail,
+      ).filter((e) => !toList.includes(e));
 
-        if (primaryTo.length) {
-          await sendSubmittalEmail({
-            to: primaryTo,
-            cc: ccList,
-            replyTo: pmEmail || undefined,
-            event: 'submitted',
-            submittalId: submittal.id,
-            submittalNumber: submittal.submittalNumber,
-            title: submittal.title,
-            projectName: project.projectName,
-            projectNumber: project.projectNumber,
-            subcontractor: submittal.subcontractor,
-            submittedBy: submittal.submittedBy,
-            assignedTo: assigneeName,
-            ballInCourt: submittal.ballInCourt,
-            externalRespondUrl: `${appBaseUrl()}/respond/submittal/${externalToken}`,
-          });
-        }
-      } catch (emailErr) {
-        console.error('Submittal submitted email error:', emailErr);
+      if (toList.length) {
+        await sendRfiAnsweredEmail({
+          to: toList,
+          cc: ccList,
+          rfiId: rfi.id,
+          rfiNumber: rfi.rfiNumber,
+          subject: rfi.subject,
+          responseText: String(responseText),
+          responseBy: responder,
+          costImpact: String(costImpact || rfi.costImpact || 'TBD'),
+          scheduleImpact: String(scheduleImpact || rfi.scheduleImpact || 'TBD'),
+        });
       }
+    } catch (emailErr) {
+      console.error('External RFI response email error:', emailErr);
     }
 
-    return NextResponse.json(submittal, { status: 201 });
+    return NextResponse.json({ ok: true, rfiNumber: updated.rfiNumber, status: updated.status });
   } catch (error: any) {
-    console.error('POST /api/submittals error:', error);
-    return NextResponse.json({ error: 'Failed to create submittal' }, { status: 500 });
+    console.error('POST /api/rfis/public/[token] error:', error);
+    return NextResponse.json({ error: 'Failed to submit response' }, { status: 500 });
   }
 }
