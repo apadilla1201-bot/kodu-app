@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { collectEmails, resolveEmailAddress, sendSubmittalEmail } from '@/lib/email';
+import { appBaseUrl } from '@/lib/app-url';
+import { randomBytes } from 'crypto';
 
 export async function GET(request: Request) {
   try {
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
     const assigneeName = assignedTo ? String(assignedTo) : null;
     const assigneeEmail = resolveEmailAddress(assignedToEmail, assignedTo);
     const isSubmitted = status === 'Submitted';
+    const externalToken = randomBytes(24).toString('hex');
 
     const submittal = await prisma.submittal.create({
       data: {
@@ -92,6 +95,7 @@ export async function POST(request: Request) {
         superintendentEmail: resolveEmailAddress(superintendentEmail),
         ballInCourt: assigneeName || (isSubmitted ? 'Architect' : null),
         ballInCourtRole: assignedToRole ? String(assignedToRole) : (isSubmitted ? 'Architect' : null),
+        externalToken,
         notes: notes ?? null,
         attachments: attachments?.length
           ? {
@@ -134,6 +138,7 @@ export async function POST(request: Request) {
             submittedBy: submittal.submittedBy,
             assignedTo: assigneeName,
             ballInCourt: submittal.ballInCourt,
+            externalRespondUrl: `${appBaseUrl()}/respond/submittal/${externalToken}`,
           });
         }
       } catch (emailErr) {
