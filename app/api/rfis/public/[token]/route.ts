@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
       include: {
         project: { select: { projectNumber: true, projectName: true } },
       },
-    });
+    });a
 
     if (!rfi) {
       return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
