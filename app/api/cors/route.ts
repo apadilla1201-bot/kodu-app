@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { collectEmails, resolveEmailAddress, sendCorApprovalRequestEmail } from '@/lib/email';
+import { appBaseUrl } from '@/lib/app-url';
+import { randomBytes } from 'crypto';
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +20,7 @@ export async function POST(request: Request) {
       projectId, description, subcontractor, csiCode, date,
       lineItems, marketComparisons, marketAnalysisNotes,
       reasonForChange, reasonsParticular, subPdfCloudPath, subPdfIsPublic,
+      ownerName, ownerEmail, sendForApproval,
     } = body ?? {};
 
     if (!projectId || !description) {
@@ -48,6 +52,9 @@ export async function POST(request: Request) {
     const glCalc = supplierTotal * 0.015;
     const totalCalc = supplierTotal + opCalc + glCalc;
 
+    const externalToken = randomBytes(24).toString('hex');
+    const approverEmail = resolveEmailAddress(ownerEmail);
+
     const changeOrder = await prisma.changeOrder.create({
       data: {
         projectId,
@@ -57,6 +64,9 @@ export async function POST(request: Request) {
         description: String(description ?? ''),
         subcontractor: subcontractor ? String(subcontractor) : null,
         csiCode: csiCode ? String(csiCode) : null,
+        ownerName: ownerName ? String(ownerName) : null,
+        ownerEmail: approverEmail,
+        externalToken,
         subtotal: subtotalCalc,
         overheadProfit: opCalc,
         generalLiability: glCalc,
@@ -92,6 +102,35 @@ export async function POST(request: Request) {
       },
       include: { lineItems: true, marketComparisons: true },
     });
+
+    // Email al aprobador (Owner) con enlace seguro para aprobar sin login.
+    // Se envía si hay ownerEmail, o si el wizard marcó "send for approval" (cae al correo del creador).
+    try {
+      const creatorEmail = resolveEmailAddress(session.user?.email);
+      const toList = collectEmails(approverEmail);
+      const primaryTo = toList.length ? toList : sendForApproval ? collectEmails(creatorEmail) : [];
+      const ccList = collectEmails(creatorEmail).filter((e) => !primaryTo.includes(e));
+
+      if (primaryTo.length) {
+        await sendCorApprovalRequestEmail({
+          to: primaryTo,
+          cc: ccList,
+          replyTo: creatorEmail || undefined,
+          corId: changeOrder.id,
+          corNumber: changeOrder.corNumber,
+          description: changeOrder.description,
+          projectName: project.projectName,
+          projectNumber: project.projectNumber,
+          subcontractor: changeOrder.subcontractor,
+          totalAmount: changeOrder.totalAmount,
+          ownerName: ownerName ? String(ownerName) : null,
+          submittedBy: session.user?.name || 'Project Manager',
+          externalApproveUrl: `${appBaseUrl()}/respond/cor/${externalToken}`,
+        });
+      }
+    } catch (emailErr) {
+      console.error('COR approval request email error:', emailErr);
+    }
 
     return NextResponse.json(changeOrder, { status: 201 });
   } catch (error: any) {
