@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { collectEmails, sendSubmittalRespondedEmail } from '@/lib/email';
+import { appBaseUrl } from '@/lib/app-url';
+import { randomBytes } from 'crypto';
 
 const CLOSED_STATUSES = ['Approved', 'Rejected', 'Revise & Resubmit', 'Closed'];
 
@@ -68,6 +70,8 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
     const responder = responseBy ? String(responseBy) : submittal.assignedTo || 'External Respondent';
 
+    const decisionToken = submittal.decisionToken ?? randomBytes(24).toString('hex');
+
     await prisma.submittal.update({
       where: { id: submittal.id },
       data: {
@@ -75,6 +79,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
         responseBy: responder,
         responseDate: new Date(),
         status: 'Under Review',
+        decisionToken,
         ballInCourt: submittal.submittedBy,
         ballInCourtRole: 'Project Manager',
       },
@@ -99,6 +104,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
           projectName: submittal.project.projectName,
           responseText: String(responseText),
           responseBy: responder,
+          closeUrl: `${appBaseUrl()}/respond/close/${decisionToken}`,
         });
       }
     } catch (emailErr) {

@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { collectEmails, sendRfiAnsweredEmail } from '@/lib/email';
+import { appBaseUrl } from '@/lib/app-url';
+import { randomBytes } from 'crypto';
 
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
   try {
@@ -12,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
       include: {
         project: { select: { projectNumber: true, projectName: true } },
       },
-    });a
+    });
 
     if (!rfi) {
       return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
@@ -73,6 +75,8 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
     const responder = responseBy ? String(responseBy) : rfi.assignedTo || 'External Respondent';
 
+    const decisionToken = rfi.decisionToken ?? randomBytes(24).toString('hex');
+
     const updated = await prisma.rFI.update({
       where: { id: rfi.id },
       data: {
@@ -80,6 +84,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
         responseBy: responder,
         responseDate: new Date(),
         status: 'Answered',
+        decisionToken,
         costImpact: costImpact || rfi.costImpact,
         scheduleImpact: scheduleImpact || rfi.scheduleImpact,
         ballInCourt: rfi.submittedBy,
@@ -106,6 +111,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
           responseBy: responder,
           costImpact: String(costImpact || rfi.costImpact || 'TBD'),
           scheduleImpact: String(scheduleImpact || rfi.scheduleImpact || 'TBD'),
+          closeUrl: `${appBaseUrl()}/respond/close/${decisionToken}`,
         });
       }
     } catch (emailErr) {

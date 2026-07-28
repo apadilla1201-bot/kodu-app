@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { collectEmails, resolveEmailAddress, sendRfiAssignedEmail } from '@/lib/email';
+import { collectEmails, resolveEmailAddress, sendRfiAssignedEmail, sendItemSentConfirmationEmail } from '@/lib/email';
 import { appBaseUrl } from '@/lib/app-url';
 import { randomBytes } from 'crypto';
 
@@ -88,6 +88,7 @@ export async function POST(request: Request) {
     const assigneeEmail = resolveEmailAddress(assignedToEmail, assignedTo);
 
     const externalToken = randomBytes(24).toString('hex');
+    const decisionToken = randomBytes(24).toString('hex');
 
     const rfi = await prisma.rFI.create({
       data: {
@@ -114,6 +115,7 @@ export async function POST(request: Request) {
         ballInCourt: assigneeName || null,
         ballInCourtRole: assignedToRole ? String(assignedToRole) : null,
         externalToken,
+        decisionToken,
         daysToRespond: days,
         dateDue,
         costImpact: costImpact || 'TBD',
@@ -172,6 +174,24 @@ export async function POST(request: Request) {
       }
     } catch (emailErr) {
       console.error('RFI notification email error:', emailErr);
+    }
+
+    // Confirmación al CREADOR: "tu RFI fue enviado — te avisaremos cuando respondan"
+    try {
+      const creatorTo = collectEmails(pmEmail, session.user?.email);
+      if (creatorTo.length && assigneeName) {
+        await sendItemSentConfirmationEmail({
+          to: creatorTo,
+          kind: 'RFI',
+          number: rfi.rfiNumber,
+          title: String(subject),
+          projectName: project.projectName,
+          assignedTo: assigneeName,
+          itemUrl: `${appBaseUrl()}/dashboard/rfis/${rfi.id}`,
+        });
+      }
+    } catch (emailErr) {
+      console.error('RFI creator confirmation email error:', emailErr);
     }
 
     return NextResponse.json(rfi, { status: 201 });

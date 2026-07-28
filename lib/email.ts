@@ -180,8 +180,19 @@ export async function sendRfiAnsweredEmail(opts: {
   costImpact: string;
   scheduleImpact: string;
   rfiId: string;
+  closeUrl?: string;
 }) {
   const link = `${appBaseUrl()}/dashboard/rfis/${opts.rfiId}`;
+  const actionBlock = opts.closeUrl
+    ? `
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin:14px 0;">
+        <p style="margin:0 0 10px 0;font-size:13px;color:#374151;"><strong>¿Qué hacemos con esta respuesta?</strong></p>
+        <a href="${opts.closeUrl}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;">✓ Close RFI (response OK)</a>
+        <a href="${link}" style="display:inline-block;background:#fff;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid #0F1B33;">↪ Reassign / Review in Kodu</a>
+        <p style="margin:10px 0 0 0;font-size:11px;color:#9ca3af;">“Close RFI” works without login (secure one-item link). To reassign to someone else, open it in Kodu.</p>
+      </div>
+    `
+    : '';
   const html = wrapEmail(
     '#2E7D32',
     'RFI Answered',
@@ -196,6 +207,7 @@ export async function sendRfiAnsweredEmail(opts: {
       </div>
       <p><strong>Cost Impact:</strong> ${opts.costImpact}</p>
       <p><strong>Schedule Impact:</strong> ${opts.scheduleImpact}</p>
+      ${actionBlock}
       <p><a href="${link}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View RFI in Kodu</a></p>
     `,
   );
@@ -363,8 +375,19 @@ export async function sendSubmittalRespondedEmail(opts: {
   responseText: string;
   responseBy: string;
   submittalId: string;
+  closeUrl?: string;
 }) {
   const link = `${appBaseUrl()}/dashboard/submittals/${opts.submittalId}`;
+  const actionBlock = opts.closeUrl
+    ? `
+      <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin:14px 0;">
+        <p style="margin:0 0 10px 0;font-size:13px;color:#374151;"><strong>¿Qué hacemos con esta respuesta?</strong></p>
+        <a href="${opts.closeUrl}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;">✓ Close Submittal (response OK)</a>
+        <a href="${link}" style="display:inline-block;background:#fff;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid #0F1B33;">↪ Reassign / Review in Kodu</a>
+        <p style="margin:10px 0 0 0;font-size:11px;color:#9ca3af;">“Close Submittal” works without login (secure one-item link).</p>
+      </div>
+    `
+    : '';
   const html = wrapEmail(
     '#2E7D32',
     'Submittal — External Response',
@@ -378,6 +401,7 @@ export async function sendSubmittalRespondedEmail(opts: {
         <p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Response</p>
         <p style="margin:4px 0 0 0;">${opts.responseText.substring(0, 800)}</p>
       </div>
+      ${actionBlock}
       <p><a href="${link}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Submittal in Kodu</a></p>
     `,
   );
@@ -385,6 +409,77 @@ export async function sendSubmittalRespondedEmail(opts: {
     to: opts.to,
     cc: opts.cc,
     subject: `${opts.submittalNumber} — External Response Received`,
+    html,
+  });
+}
+
+// ============================================================
+// Confirmación al CREADOR (ciclo completo de notificaciones)
+// ============================================================
+
+/** Al creador: "tu ítem fue enviado al assignee — te avisaremos cuando responda". */
+export async function sendItemSentConfirmationEmail(opts: {
+  to: string | string[];
+  kind: 'RFI' | 'Submittal' | 'Change Order';
+  number: string;
+  title: string;
+  projectName: string;
+  assignedTo: string;
+  itemUrl: string;
+}) {
+  const html = wrapEmail(
+    NAVY,
+    `${opts.kind} Sent`,
+    GOLD,
+    `
+      <p>Tu ${opts.kind} fue enviado correctamente.</p>
+      <p><strong>${opts.kind} #:</strong> ${opts.number}</p>
+      <p><strong>Project:</strong> ${opts.projectName}</p>
+      <p><strong>${opts.kind === 'Change Order' ? 'Description' : opts.kind === 'RFI' ? 'Subject' : 'Title'}:</strong> ${opts.title.substring(0, 200)}</p>
+      <p><strong>Sent To (respond):</strong> ${opts.assignedTo}</p>
+      <p style="color:#374151;">Te avisaremos por correo cuando <strong>${opts.assignedTo}</strong> responda, con opciones para cerrar o reasignar.</p>
+      <p><a href="${opts.itemUrl}" style="display:inline-block;background:${NAVY};color:${GOLD};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View in Kodu</a></p>
+    `,
+  );
+  return sendEmail({
+    to: opts.to,
+    subject: `✓ ${opts.kind} ${opts.number} sent to ${opts.assignedTo}`,
+    html,
+  });
+}
+
+/** Al creador cuando el OWNER decidió un COR vía enlace seguro. */
+export async function sendCorDecidedNoticeEmail(opts: {
+  to: string | string[];
+  cc?: string | string[];
+  corNumber: string;
+  description: string;
+  projectName: string;
+  totalAmount: number;
+  decision: 'Approved' | 'Rejected';
+  decidedBy: string;
+  corId: string;
+}) {
+  const approved = opts.decision === 'Approved';
+  const bg = approved ? '#2E7D32' : '#B91C1C';
+  const link = `${appBaseUrl()}/dashboard/cors/${opts.corId}`;
+  const html = wrapEmail(
+    bg,
+    `Your Change Order was ${opts.decision}`,
+    '#fff',
+    `
+      <p><strong>Change Order #:</strong> ${opts.corNumber}</p>
+      <p><strong>Project:</strong> ${opts.projectName}</p>
+      <p><strong>Description:</strong> ${opts.description.substring(0, 300)}</p>
+      <p><strong>Total Amount:</strong> ${usd(opts.totalAmount)}</p>
+      <p><strong>${opts.decision} By:</strong> ${opts.decidedBy} (via secure link)</p>
+      <p><a href="${link}" style="display:inline-block;background:${bg};color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Change Order in Kodu</a></p>
+    `,
+  );
+  return sendEmail({
+    to: opts.to,
+    cc: opts.cc,
+    subject: `COR ${opts.corNumber} ${opts.decision} by ${opts.decidedBy} — ${usd(opts.totalAmount)}`,
     html,
   });
 }

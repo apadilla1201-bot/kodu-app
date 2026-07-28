@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { collectEmails, resolveEmailAddress, sendRfiAnsweredEmail } from '@/lib/email';
+import { appBaseUrl } from '@/lib/app-url';
+import { randomBytes } from 'crypto';
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
@@ -46,6 +48,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const responder = responseBy ? String(responseBy) : (session.user?.name || 'Respondent');
 
+    // Asegura decisionToken para que el creador pueda cerrar desde el correo (sin login)
+    const decisionToken = rfi.decisionToken ?? randomBytes(24).toString('hex');
+
     const updated = await prisma.rFI.update({
       where: { id: params.id },
       data: {
@@ -53,6 +58,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         responseBy: responder,
         responseDate: new Date(),
         status: 'Answered',
+        decisionToken,
         costImpact: costImpact || rfi.costImpact,
         scheduleImpact: scheduleImpact || rfi.scheduleImpact,
         // Ball in court returns to PM after response
@@ -90,6 +96,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
           responseBy: responder,
           costImpact: String(costImpact || rfi.costImpact || 'TBD'),
           scheduleImpact: String(scheduleImpact || rfi.scheduleImpact || 'TBD'),
+          closeUrl: `${appBaseUrl()}/respond/close/${decisionToken}`,
         });
       }
     } catch (emailErr) {

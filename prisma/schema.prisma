@@ -277,6 +277,7 @@ model RFI {
   ballInCourt        String?         // name of who must act now
   ballInCourtRole    String?
   externalToken      String?         @unique // magic link for external response (no login)
+  decisionToken      String?         @unique // magic link for creator to close from email (no login)
   dateSubmitted      DateTime        @default(now())
   dateDue            DateTime?
   daysToRespond      Int             @default(7)
@@ -340,6 +341,7 @@ model Submittal {
   reviewedBy      String?
   reviewedDate    DateTime?
   externalToken   String?              @unique // magic link para respuesta externa (sin login)
+  decisionToken   String?              @unique // magic link para que el creador cierre desde el correo (sin login)
   responseText    String?              @db.Text
   responseBy      String?
   responseDate    DateTime?

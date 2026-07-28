@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { collectEmails, sendCorDecisionEmail } from '@/lib/email';
+import { collectEmails, sendCorDecisionEmail, sendCorDecidedNoticeEmail } from '@/lib/email';
 
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
   try {
@@ -77,7 +77,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       },
     });
 
-    // Notify the GC team: project creator + owner contact if registered
+    // Notify the CREATOR that the owner decided ("your COR was Approved/Rejected")
     try {
       const teamEmails = collectEmails((cor as any).ownerEmail).filter((e) => e !== decider);
       const creator = cor.project?.userId
@@ -87,7 +87,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       const notifyCc = teamEmails.filter((e) => !notifyTo.includes(e));
 
       if (notifyTo.length) {
-        await sendCorDecisionEmail({
+        await sendCorDecidedNoticeEmail({
           to: notifyTo,
           cc: notifyCc,
           corId: cor.id,

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { collectEmails, resolveEmailAddress, sendCorApprovalRequestEmail } from '@/lib/email';
+import { collectEmails, resolveEmailAddress, sendCorApprovalRequestEmail, sendItemSentConfirmationEmail } from '@/lib/email';
 import { appBaseUrl } from '@/lib/app-url';
 import { randomBytes } from 'crypto';
 
@@ -130,6 +130,27 @@ export async function POST(request: Request) {
       }
     } catch (emailErr) {
       console.error('COR approval request email error:', emailErr);
+    }
+
+    // Confirmación al CREADOR cuando el COR se envió a aprobación
+    try {
+      if (approverEmail || sendForApproval) {
+        const creatorTo = collectEmails(resolveEmailAddress(session.user?.email));
+        const approverName = ownerName ? String(ownerName) : approverEmail ? String(approverEmail) : 'Approver';
+        if (creatorTo.length) {
+          await sendItemSentConfirmationEmail({
+            to: creatorTo,
+            kind: 'Change Order',
+            number: changeOrder.corNumber,
+            title: changeOrder.description,
+            projectName: project.projectName,
+            assignedTo: approverName,
+            itemUrl: `${appBaseUrl()}/dashboard/cors/${changeOrder.id}`,
+          });
+        }
+      }
+    } catch (emailErr) {
+      console.error('COR creator confirmation email error:', emailErr);
     }
 
     return NextResponse.json(changeOrder, { status: 201 });
