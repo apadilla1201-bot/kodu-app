@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useI18n } from '@/hooks/use-i18n';
+import { navForRole, ROLE_LABELS } from '@/lib/permissions';
 import type { AppLocale } from '@/lib/i18n';
 import {
   LayoutDashboard,
@@ -25,6 +26,8 @@ import {
   User,
   FileSpreadsheet,
   Languages,
+  Wallet,
+  UserPlus,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -33,19 +36,28 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession() || {};
   const { t, locale, setLocale } = useI18n();
 
-  const navItems = [
+  // PASO 3: menú filtrado por rol (Super no ve Pay Apps ni Budgets; owner/sub ven solo lo suyo)
+  const userRole = (session?.user as any)?.role ?? 'viewer';
+  const allowed = navForRole(userRole);
+
+  const allNavItems = [
     { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
     { href: '/dashboard/projects', label: t('nav.projects'), icon: FolderKanban },
     { href: '/dashboard/rfis', label: t('nav.rfiLog'), icon: FileQuestion },
     { href: '/dashboard/submittals', label: t('nav.submittals'), icon: FileStack },
     { href: '/dashboard/buyout', label: t('nav.buyout'), icon: ClipboardList },
+    { href: '/dashboard/pay-apps', label: 'Pay Applications', icon: Wallet },
+    { href: '/dashboard/budgets', label: 'Budgets', icon: Receipt },
     { href: '/dashboard/photos', label: t('nav.sitePhotos'), icon: Camera },
     { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
     { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
     { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
     { href: '/dashboard/import', label: t('nav.importExcel'), icon: FileSpreadsheet },
+    { href: '/dashboard/team', label: 'Team', icon: UserPlus },
     { href: '/dashboard/settings', label: t('nav.settings'), icon: Settings },
   ];
+
+  const navItems = allNavItems.filter((item) => allowed.includes(item.href));
 
   const onLocaleChange = async (value: string) => {
     await setLocale(value as AppLocale);
@@ -103,6 +115,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-white truncate">{session?.user?.name ?? t('common.user')}</p>
                 <p className="text-xs text-gray-400 truncate">{session?.user?.email ?? ''}</p>
+                <p className="text-[10px] text-[#C9A96E] truncate">{ROLE_LABELS[userRole] ?? userRole}</p>
               </div>
             </div>
             <button

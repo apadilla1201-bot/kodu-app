@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
+import { isFullAccess, canWrite } from '@/lib/permissions';
 
 export async function GET() {
   try {
@@ -25,8 +26,22 @@ export async function GET() {
         companyId = dbUser?.companyId ?? '';
       }
     }
+    // PASO 3: roles restringidos (owner del proyecto / subcontractor / viewer)
+    // solo ven los proyectos donde tienen membresía. Admin/PM/Super ven todos.
+    const role = (session.user as any)?.role ?? 'viewer';
+    const uid = (session.user as any)?.id ?? '';
+    let where: any = { companyId };
+    if (!isFullAccess(role) && role !== 'superintendent' && role !== 'estimator') {
+      const memberships = await prisma.projectMember.findMany({
+        where: { userId: uid },
+        select: { projectId: true },
+      });
+      const projectIds = memberships.map((m) => m.projectId).filter(Boolean) as string[];
+      where = { companyId, id: { in: projectIds } };
+    }
+
     const projects = await prisma.project.findMany({
-      where: { companyId },
+      where,
       include: {
         changeOrders: { select: { id: true, status: true, totalAmount: true } },
       },
@@ -47,8 +62,14 @@ export async function POST(request: Request) {
     }
     const userId = (session.user as any)?.id ?? '';
     let companyId = (session.user as any)?.companyId ?? '';
+    const role = (session.user as any)?.role ?? 'viewer';
     const body = await request.json();
     const { projectNumber, projectName, client, location, contractAmount, startDate } = body ?? {};
+
+    // PASO 3: solo roles con permiso de escritura pueden crear proyectos
+    if (!canWrite(role)) {
+      return NextResponse.json({ error: 'Tu rol no permite crear proyectos' }, { status: 403 });
+    }
 
     if (!projectNumber || !projectName || !client) {
       return NextResponse.json({ error: 'Project number, name, and client are required' }, { status: 400 });

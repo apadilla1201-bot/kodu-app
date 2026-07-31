@@ -35,6 +35,7 @@ model Company {
   plan          String    @default("starter")       // starter | pro | enterprise
   users         User[]
   projects      Project[]
+  invites       UserInvite[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -53,10 +54,56 @@ model User {
   accounts      Account[]
   sessions      Session[]
   projects      Project[]
+  memberships   ProjectMember[]
+  invitesSent   UserInvite[]      @relation("InviteCreator")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([companyId])
+}
+
+// ============================================================
+// PASO 3 — Invitaciones con roles y acceso por proyecto
+// Roles: admin | pm | superintendent | owner | subcontractor
+// (el "architect" nunca recibe cuenta: responde por enlace seguro)
+// ============================================================
+
+// Membresía de un usuario a la empresa (companyId del User) + alcance por proyecto.
+// projectId NULL = miembro de empresa con acceso según su rol a todos los proyectos.
+// projectId SET  = acceso limitado a ese proyecto (owner / subcontractor).
+model ProjectMember {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role      String   @default("viewer") // admin | pm | superintendent | owner | subcontractor | viewer
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
+}
+
+// Invitación pendiente: el invitado crea su clave y se une a la empresa del invitador.
+model UserInvite {
+  id        String    @id @default(cuid())
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email     String
+  name      String?
+  role      String    @default("viewer")
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  status    String    @default("pending") // pending | accepted | revoked
+  invitedBy String?
+  inviter   User?     @relation("InviteCreator", fields: [invitedBy], references: [id], onDelete: SetNull)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([email])
 }
 
 model Account {
@@ -113,6 +160,8 @@ model Project {
   submittals      Submittal[]
   buyoutItems     BuyoutItem[]
   contacts        ProjectContact[]
+  members         ProjectMember[]
+  invites         UserInvite[]
   sitePhotos      SitePhoto[]
   dailyLogs       DailyLog[]
   createdAt       DateTime         @default(now())
