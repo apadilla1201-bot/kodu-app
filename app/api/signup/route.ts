@@ -4,10 +4,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
+// Signup público con selección de plan (Step 4b).
+// El plan elegido se guarda DIRECTO en Company.plan (starter | pro | enterprise).
+// Enterprise NO se auto-aprovisiona: se crea como 'starter' y se marca para
+// seguimiento manual (venta asistida).
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name } = body ?? {};
+    const { email, password, name, companyName, plan: rawPlan } = body ?? {};
 
     if (!email || !password) {
       return NextResponse.json(
@@ -23,6 +27,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // Whitelist de planes válidos — nunca confiar en el cliente.
+    const requestedPlan = ['starter', 'pro', 'enterprise'].includes(rawPlan)
+      ? rawPlan
+      : 'starter';
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -36,15 +45,26 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // FIX P0: provision a Company (tenant) for every new signup.
-    // Without it, the user has companyId = NULL and POST /api/projects
-    // fails with a FK violation (companyId='') — new users could never
-    // create their first project.
     const displayName = name ?? email?.split?.('@')?.[0] ?? 'User';
+
+    // FIX P0 (existente): provisionar Company (tenant) por cada signup.
+    // Step 4b: el nombre de la compañía lo puede dar el usuario; si no,
+    // se deriva de su nombre como antes.
+    const finalCompanyName =
+      companyName && String(companyName).trim().length > 0
+        ? String(companyName).trim()
+        : `${displayName}'s Company`;
+
+    // Enterprise = venta asistida: se crea en starter y queda marcada en el
+    // nombre para que Augusto la contacte y la suba a mano tras el acuerdo.
+    const isEnterpriseLead = requestedPlan === 'enterprise';
 
     const company = await prisma.company.create({
       data: {
-        name: `${displayName}'s Company`,
+        name: isEnterpriseLead
+          ? `${finalCompanyName} [ENTERPRISE LEAD]`
+          : finalCompanyName,
+        plan: isEnterpriseLead ? 'starter' : requestedPlan,
       },
     });
 
@@ -59,7 +79,12 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { message: 'User created successfully', userId: user?.id },
+      {
+        message: 'User created successfully',
+        userId: user?.id,
+        plan: company.plan,
+        enterpriseLead: isEnterpriseLead,
+      },
       { status: 201 }
     );
   } catch (error: any) {

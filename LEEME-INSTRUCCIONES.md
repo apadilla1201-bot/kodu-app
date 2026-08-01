@@ -1,72 +1,69 @@
-# SPRINT 2 — Approval Inbox + Plan & Billing (koduPM)
+# STEP 4b — Signup con selección de plan (koduPM)
 
 ## ⚠️ Requisito previo
-Este paquete asume que **Sprint 0 y Sprint 1 ya están publicados** (tú confirmaste
-que ya lo están ✅). Si algo fallara, avísame antes de subir este.
+Sprints 0, 1 y 2 ya publicados (✅ confirmado). Este paquete va al repo **kodu-app**.
 
 ## Qué agrega este paquete
 
-### 1. Approval Inbox (bandeja de aprobaciones cross-project)
-- Nuevo módulo en el menú lateral: **Approvals / Aprobaciones** (icono de bandeja).
-- Muestra en UNA sola pantalla, cruzando TODOS tus proyectos:
-  - **CORs pendientes de aprobación** — con el **monto total en riesgo** en dólares.
-  - **RFIs vencidos** — pasaron su fecha límite, con días de espera.
-  - **Submittals por revisar** — enviados y esperando revisión.
-- Tarjetas resumen arriba con conteos reales + tabs para filtrar por tipo.
-- Clic en cualquier item → te lleva directo al registro para decidir.
-- **Solo lo ven los roles de gestión** (admin / dueño de empresa / PM).
-  Superintendents, owners de proyecto y subs NO lo ven (ni en el menú ni por URL —
-  hay doble bloqueo: menú + redirección en el servidor).
-- **No toca la base de datos**: todo se deriva en vivo, sin migraciones.
+### Registro de clientes nuevos CON plan, sin que tú muevas un dedo
+Hoy un GC nuevo puede crear cuenta, pero su compañía nace siempre en "starter"
+y con un nombre genérico ("Pedro's Company"). Con este cambio:
 
-### 2. Plan & Billing (badge de plan + ruta de upgrade)
-- **Badge del plan** en la parte baja del menú lateral (Starter gris / Pro dorado /
-  Enterprise dorado sólido). Clic → lleva a Settings.
-- Nueva tarjeta **Plan & Billing** en Settings: muestra tu plan actual, qué incluye,
-  y el botón **"Contact us to upgrade"** (abre correo a info@kodupm.com).
-  (Stripe/pagos automáticos vienen en una fase posterior — esto ya te da el camino
-  de monetización visible para los clientes.)
+1. **El formulario de registro pide el nombre de su compañía** — así su cuenta
+   nace bien nombrada desde el día uno (ese nombre sale en PDFs, correos, etc.).
+2. **Elige su plan al registrarse**: Starter $99/mes · Pro $249/mes · Enterprise
+   (a medida) — con los mismos precios de tu landing.
+3. **El plan elegido se guarda directo en la base de datos** (Company.plan).
+   El badge del sidebar y la tarjeta Plan & Billing (Sprint 2) lo mostrarán
+   automáticamente.
+4. **Enterprise = venta asistida:** si alguien elige Enterprise, su cuenta se
+   crea en Starter y la compañía queda marcada como `[ENTERPRISE LEAD]` en la
+   base de datos — tú la ves, la contactas y la subes a mano tras el acuerdo.
+   Nadie se auto-sirve el plan más caro sin hablar contigo.
+5. **Seguridad:** el servidor valida el plan contra una lista blanca
+   (starter/pro/enterprise). Si alguien manipula el formulario y manda otra
+   cosa, cae en "starter". Nunca se confía en lo que manda el navegador.
 
-## Archivos (9) — sube cada uno a la MISMA ruta en el repo kodu-app
+### Lo que NO hace (a propósito)
+- **No cobra todavía.** El cliente se registra, elige plan y empieza a usar
+  la app. El cobro automático con tarjeta es el Step 4c (Stripe), que sigue
+  después. Mientras tanto, cuando tengas tus primeros clientes de pago,
+  les facturas por tu lado (o activamos Stripe).
+
+## Archivos (4) — sube cada uno a la MISMA ruta en el repo kodu-app
 
 | Archivo del paquete | Va en el repo kodu-app como |
 |---|---|
-| `app/api/approvals/route.ts` | `app/api/approvals/route.ts` (NUEVO) |
-| `app/api/company/plan/route.ts` | `app/api/company/plan/route.ts` (NUEVO) |
-| `app/dashboard/approvals/page.tsx` | `app/dashboard/approvals/page.tsx` (NUEVO) |
-| `components/approvals-content.tsx` | `components/approvals-content.tsx` (NUEVO) |
-| `components/plan-badge.tsx` | `components/plan-badge.tsx` (NUEVO) |
-| `components/dashboard-shell.tsx` | `components/dashboard-shell.tsx` (reemplazar) |
-| `components/settings-content.tsx` | `components/settings-content.tsx` (reemplazar) |
-| `lib/permissions.ts` | `lib/permissions.ts` (reemplazar) |
+| `app/api/signup/route.ts` | `app/api/signup/route.ts` (reemplazar) |
+| `app/login/page.tsx` | `app/login/page.tsx` (reemplazar) |
 | `lib/i18n/messages/en.ts` | `lib/i18n/messages/en.ts` (reemplazar) |
 | `lib/i18n/messages/es.ts` | `lib/i18n/messages/es.ts` (reemplazar) |
 
-Son 9 archivos de código + este LEEME. Las versiones "reemplazar" **incluyen todo
-lo del Sprint 0 y Sprint 1** — no pierdes nada de lo que ya publicaste.
+Las versiones "reemplazar" **incluyen todo lo de los Sprints 0, 1 y 2** —
+no pierdes nada de lo publicado.
 
-## Cómo subirlo (mismo método de siempre)
-1. Descomprime el ZIP. Verás las carpetas `app`, `components`, `lib`.
+## Cómo subirlo (método de siempre)
+1. Descomprime el ZIP. Verás las carpetas `app` y `lib`.
 2. GitHub → repo **kodu-app** → **Add file → Upload files**.
-3. Arrastra las 3 carpetas de golpe.
-4. En "Commit changes" escribe: `Sprint 2: approval inbox + plan badge`
-   y dale **Commit changes**.
-5. Vercel redespliega solo en ~1-2 minutos.
+3. Arrastra las 2 carpetas.
+4. Commit: `Step 4b: signup con seleccion de plan` → **Commit changes**.
+5. Vercel redespliega en ~1-2 minutos.
 
-## Cómo verificar que funcionó
-1. Entra a https://app.kodupm.com → en el menú lateral aparece **Approvals**
-   (o **Aprobaciones** si estás en español).
-2. Abre Approvals → verás las 3 tarjetas resumen y las listas. Si no hay nada
-   pendiente, aparece "Inbox zero / Bandeja vacía".
-3. En la parte baja del sidebar (arriba de tu nombre) aparece el **badge del plan**
-   (ahora mismo debería decir STARTER, que es el plan actual de tu compañía).
-4. Ve a **Settings** → aparece la tarjeta **Plan & Billing** con el plan actual
-   y el enlace para upgrade.
-5. Cambia de idioma EN/ES → todo lo nuevo cambia también.
-6. (Opcional) Entra con un usuario Superintendent si tienes uno → NO debe ver
-   "Approvals" en el menú.
+## Cómo verificar
+1. Abre https://app.kodupm.com/login en una **ventana de incógnito**.
+2. Dale a "Don't have an account? Sign up".
+3. Debes ver: campo **Company name** + 3 tarjetas de plan
+   (STARTER $99/mo · PRO $249/mo · ENTERPRISE Custom).
+4. Crea una cuenta de prueba con un correo que NO uses en ningún otro lado
+   y una clave única (regla de siempre), eligiendo **Pro**.
+5. Al entrar al dashboard: el badge del sidebar debe decir **PRO** y en
+   Settings → Plan & Billing también.
+6. Cambia el idioma a español → el formulario de registro también se traduce.
+7. (Importante) Tu cuenta actual NO se toca: sigues entrando igual, tu
+   compañía sigue en starter.
 
 ## Nota de negocio
-El plan actual de tu compañía en la BD es `starter` (valor por defecto). Cuando
-quieras cambiarlo a `pro` (por ejemplo, para tu propia operación), me avisas y
-lo ajusto directo en la base de datos — 30 segundos.
+- Los precios mostrados ($99/$249/Custom) son los mismos de tu landing.
+  Si algún día los cambias, hay que cambiarlos en ambos lados (yo lo hago).
+- Cuando tengas el primer cliente Enterprise lead marcado en la BD,
+  te aviso cómo verlo y lo contactas.

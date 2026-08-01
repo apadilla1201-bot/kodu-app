@@ -14,6 +14,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [plan, setPlan] = useState<'starter' | 'pro' | 'enterprise'>('starter');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,7 +42,7 @@ export default function LoginPage() {
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ email, password, name, companyName, plan }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -122,6 +124,50 @@ export default function LoginPage() {
                     placeholder={t('auth.yourName')}
                   />
                 </div>
+              </div>
+            )}
+            {!isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">{t('auth.companyName')}</label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#C9A96E]" />
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e: any) => setCompanyName(e?.target?.value ?? '')}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#C9A96E]/30 rounded-lg text-[#0F1B33] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C9A96E]/50 focus:border-[#C9A96E]"
+                    placeholder={t('auth.companyPlaceholder')}
+                  />
+                </div>
+              </div>
+            )}
+            {!isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-[#0F1B33] mb-1.5">{t('auth.choosePlan')}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['starter', 'pro', 'enterprise'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPlan(p)}
+                      className={`border rounded-lg px-2 py-2.5 text-center transition-all ${
+                        plan === p
+                          ? 'border-[#C9A96E] bg-[#C9A96E]/10 ring-1 ring-[#C9A96E]/50'
+                          : 'border-[#C9A96E]/30 bg-white hover:border-[#C9A96E]/60'
+                      }`}
+                    >
+                      <span className="block text-xs font-bold text-[#0F1B33] uppercase tracking-wide">
+                        {t(`plan.${p}` as any)}
+                      </span>
+                      <span className="block text-[11px] text-[#1B2A4A]/60 mt-0.5">
+                        {p === 'enterprise' ? t('auth.planCustom') : t(`auth.planPrice_${p}` as any)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {plan === 'enterprise' && (
+                  <p className="text-xs text-[#1B2A4A]/60 mt-1.5">{t('auth.enterpriseNote')}</p>
+                )}
               </div>
             )}
             <div>
