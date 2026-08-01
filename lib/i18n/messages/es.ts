@@ -139,6 +139,18 @@ export const esMessages: Messages = {
     emptyTitle: 'Bandeja vacía',
     emptyHint: 'Nada está esperando una decisión ahora mismo. Buen trabajo.',
   },
+  budgets: {
+    title: 'Presupuestos',
+    subtitle: 'Todos los presupuestos de proyectos, de toda tu compañía.',
+    newBudget: 'Nuevo presupuesto',
+    emptyTitle: 'Aún no hay presupuestos',
+    emptyHint: 'Sube tu primer presupuesto desde Excel o crea uno para un proyecto.',
+    colProject: 'Proyecto',
+    colVersion: 'Versión',
+    colDate: 'Fecha',
+    colGrandTotal: 'Total general',
+    colItems: 'Ítems',
+  },
   plan: {
     title: 'Plan y facturación',
     starter: 'Starter',

@@ -137,6 +137,18 @@ export const enMessages = {
     emptyTitle: 'Inbox zero',
     emptyHint: 'Nothing is waiting for a decision right now. Nice work.',
   },
+  budgets: {
+    title: 'Budgets',
+    subtitle: 'All project budgets, across your company.',
+    newBudget: 'New Budget',
+    emptyTitle: 'No budgets yet',
+    emptyHint: 'Upload your first budget from Excel or create one for a project.',
+    colProject: 'Project',
+    colVersion: 'Version',
+    colDate: 'Date',
+    colGrandTotal: 'Grand Total',
+    colItems: 'Items',
+  },
   plan: {
     title: 'Plan & Billing',
     starter: 'Starter',
