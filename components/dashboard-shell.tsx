@@ -7,6 +7,9 @@ import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useI18n } from '@/hooks/use-i18n';
 import { navForRole, ROLE_LABELS } from '@/lib/permissions';
+import { GlobalSearch } from '@/components/global-search';
+import { NotificationBell } from '@/components/notification-bell';
+import { Breadcrumbs } from '@/components/breadcrumbs';
 import type { AppLocale } from '@/lib/i18n';
 import {
   LayoutDashboard,
@@ -28,6 +31,7 @@ import {
   Languages,
   Wallet,
   UserPlus,
+  Search,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -145,6 +149,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:border-[#C9A96E]/60 hover:text-foreground transition-colors"
+              aria-label="Search"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{t('search.trigger')}</span>
+              <kbd className="px-1 py-0.5 rounded border border-border text-[10px]">Ctrl K</kbd>
+            </button>
+            <NotificationBell />
             <Languages className="w-4 h-4 text-muted-foreground hidden sm:block" />
             <select
               value={locale}
@@ -159,8 +173,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          {children}
+          <style>{`@keyframes koduFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+          <Breadcrumbs />
+          <div key={pathname ?? 'page'} style={{ animation: 'koduFadeIn 180ms ease-out' }}>
+            {children}
+          </div>
         </main>
+        <GlobalSearch />
       </div>
     </div>
   );
