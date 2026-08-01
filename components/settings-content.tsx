@@ -7,7 +7,7 @@ import { useI18n } from '@/hooks/use-i18n';
 import type { AppLocale } from '@/lib/i18n';
 import { ROLE_LABELS, canInvite } from '@/lib/permissions';
 import Link from 'next/link';
-import { Loader2, Save, User, Languages, Users, ArrowRight } from 'lucide-react';
+import { Loader2, Save, User, Languages, Users, ArrowRight, Crown } from 'lucide-react';
 
 export function SettingsContent() {
   const { data: session, update } = useSession();
@@ -24,6 +24,8 @@ export function SettingsContent() {
     password: '',
     locale: 'en' as AppLocale,
   });
+  const [plan, setPlan] = useState<string>('starter');
+  const [companyName, setCompanyName] = useState<string>('');
 
   useEffect(() => {
     (async () => {
@@ -42,6 +44,19 @@ export function SettingsContent() {
         toast({ title: t('settings.loadFailed'), variant: 'destructive' });
       } finally {
         setLoading(false);
+      }
+    })();
+    // Plan actual de la compañía (para la tarjeta Plan & Billing)
+    (async () => {
+      try {
+        const res = await fetch('/api/company/plan', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setPlan((data?.plan ?? 'starter').toLowerCase());
+          setCompanyName(data?.companyName ?? '');
+        }
+      } catch {
+        // silencioso: la tarjeta muestra "starter" por defecto
       }
     })();
   }, [toast, t]);
@@ -166,6 +181,37 @@ export function SettingsContent() {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {t('settings.saveProfile')}
         </button>
+      </div>
+
+      {/* Plan & Billing: plan actual + ruta de upgrade (Stripe llega en una fase posterior) */}
+      <div className="bg-card border border-border rounded-xl p-6 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Crown className="w-5 h-5 text-[#C9A96E]" />
+            <h2 className="text-sm font-semibold">{t('plan.title')}</h2>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
+            plan === 'enterprise'
+              ? 'bg-[#C9A96E] text-[#0F1B33] border-[#C9A96E]'
+              : plan === 'pro'
+                ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/40'
+                : 'bg-muted text-muted-foreground border-border'
+          }`}>
+            {t(`plan.${plan}` as any)}
+          </span>
+        </div>
+        {companyName && (
+          <p className="text-xs text-muted-foreground">{companyName}</p>
+        )}
+        <p className="text-sm text-muted-foreground">{t(`plan.${plan}Desc` as any)}</p>
+        {plan !== 'enterprise' && (
+          <a
+            href="mailto:info@kodupm.com?subject=koduPM%20plan%20upgrade"
+            className="inline-flex items-center gap-2 text-sm font-medium text-[#C9A96E] hover:underline"
+          >
+            {t('plan.upgradeCta')} <ArrowRight className="w-4 h-4" />
+          </a>
+        )}
       </div>
 
       {/* Gestión de equipo: solo visible para quien puede invitar (admin/PM) */}

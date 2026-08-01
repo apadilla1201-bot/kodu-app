@@ -10,6 +10,7 @@ import { navForRole, ROLE_LABELS } from '@/lib/permissions';
 import { GlobalSearch } from '@/components/global-search';
 import { NotificationBell } from '@/components/notification-bell';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { PlanBadge } from '@/components/plan-badge';
 import type { AppLocale } from '@/lib/i18n';
 import {
   LayoutDashboard,
@@ -32,6 +33,7 @@ import {
   Wallet,
   UserPlus,
   Search,
+  Inbox,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -56,6 +58,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
     { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
     { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
+    { href: '/dashboard/approvals', label: t('nav.approvals'), icon: Inbox },
     { href: '/dashboard/import', label: t('nav.importExcel'), icon: FileSpreadsheet },
     { href: '/dashboard/team', label: 'Team', icon: UserPlus },
     { href: '/dashboard/settings', label: t('nav.settings'), icon: Settings },
@@ -112,6 +115,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="p-4 border-t border-white/10">
+            <PlanBadge />
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-[#C9A96E]/20 flex items-center justify-center">
                 <User className="w-4 h-4 text-[#C9A96E]" />
