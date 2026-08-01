@@ -42,16 +42,16 @@ export async function PATCH(request: Request) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const data: Record<string, unknown> = {};
+    const data: Record<string, any> = {};
 
     if (body.name !== undefined) data.name = String(body.name).trim() || null;
-    if (body.role !== undefined) {
-      const role = String(body.role);
-      if (!['owner', 'pm', 'estimator', 'viewer', 'user'].includes(role)) {
-        return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
-      }
-      data.role = role;
-    }
+
+    // SEGURIDAD (Sprint 0): el campo "role" se IGNORA por completo aquí.
+    // Un usuario NUNCA puede cambiar su propio rol desde su perfil.
+    // Los roles se asignan únicamente desde Team (invitaciones con rol,
+    // paquete 3) o directamente en la base de datos por un admin.
+    // Antes: body.role se aplicaba sin verificación = escalada de privilegios.
+
     if (body.email !== undefined) {
       const email = String(body.email).trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

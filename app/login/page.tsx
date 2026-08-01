@@ -98,7 +98,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8 flex justify-center">
             <div className="relative w-[200px] h-[90px]">
-              <Image src="/pdg_logo.png" alt="PDG Logo" fill className="object-contain" />
+              <Image src="/pdg_logo_dark.png" alt="PDG Logo" fill className="object-contain" />
             </div>
           </div>
           <h2 className="text-2xl font-display font-bold text-[#0F1B33] tracking-tight mb-2">

@@ -121,8 +121,8 @@ export function PayAppListContent({ projects }: { projects: any[] }) {
                         <span>Period: {new Date(pa.periodFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {new Date(pa.periodTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                       </div>
                     </div>
-                    <div className="text-right mr-4">
-                      <p className="font-mono font-bold text-[#C9A96E]">{fmt(totalCompleted)}</p>
+                    <div className="text-right mr-4 shrink-0 max-w-[45%]">
+                      <p className="font-mono font-bold text-[#C9A96E] truncate">{fmt(totalCompleted)}</p>
                       <p className="text-xs text-muted-foreground">de {fmt(totalContract)} ({pctComplete.toFixed(1)}%)</p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E] transition-colors" />

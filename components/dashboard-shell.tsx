@@ -138,8 +138,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-sm font-medium text-muted-foreground">
-              {t('nav.corSystem')}
+            <h1 className="flex items-baseline select-none" aria-label="koduPM">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#0F1B33] text-[#C9A96E] font-bold text-sm mr-1.5 translate-y-[3px]">k</span>
+              <span className="text-lg font-bold text-[#0F1B33] tracking-tight">kodu</span>
+              <span className="text-lg font-bold text-[#C9A96E] tracking-tight">PM</span>
             </h1>
           </div>
           <div className="flex items-center gap-2">

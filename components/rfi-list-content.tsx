@@ -141,7 +141,8 @@ export function RFIListContent({ rfis, projects }: { rfis: RFIItem[]; projects: 
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 min-w-0">
+
         {[
           { label: 'Total', value: stats.total, color: 'border-[#C9A96E]', textColor: 'text-[#C9A96E]' },
           { label: 'Open', value: stats.open, color: 'border-blue-500', textColor: 'text-blue-600' },
@@ -150,7 +151,7 @@ export function RFIListContent({ rfis, projects }: { rfis: RFIItem[]; projects: 
           { label: 'Closed', value: stats.closed, color: 'border-gray-400', textColor: 'text-gray-500' },
           { label: 'Overdue', value: stats.overdue, color: 'border-red-500', textColor: 'text-red-600' },
         ].map((s) => (
-          <div key={s.label} className={`bg-card rounded-xl p-4 border-l-4 ${s.color} shadow-sm`}>
+          <div key={s.label} className={`bg-card rounded-xl p-4 border-l-4 ${s.color} shadow-sm min-w-0 overflow-hidden`}>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.textColor}`}>{s.value}</p>
           </div>

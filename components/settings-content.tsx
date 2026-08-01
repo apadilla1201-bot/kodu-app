@@ -5,12 +5,16 @@ import { useSession } from 'next-auth/react';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/hooks/use-i18n';
 import type { AppLocale } from '@/lib/i18n';
-import { Loader2, Save, User, Languages } from 'lucide-react';
+import { ROLE_LABELS, canInvite } from '@/lib/permissions';
+import Link from 'next/link';
+import { Loader2, Save, User, Languages, Users, ArrowRight } from 'lucide-react';
 
 export function SettingsContent() {
   const { data: session, update } = useSession();
   const { toast } = useToast();
   const { t, locale, setLocale } = useI18n();
+  const userRole = (session?.user as any)?.role ?? 'viewer';
+  const canManageTeam = canInvite(userRole);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -45,10 +49,11 @@ export function SettingsContent() {
   const save = async () => {
     setSaving(true);
     try {
+      // SEGURIDAD (Sprint 0): el rol YA NO se envía en el guardado.
+      // El rol lo asigna un admin desde Team, no el propio usuario.
       const body: Record<string, string> = {
         name: form.name,
         email: form.email,
-        role: form.role,
         locale: form.locale,
       };
       if (form.password) body.password = form.password;
@@ -133,19 +138,13 @@ export function SettingsContent() {
             className="w-full px-3 py-2 border border-border rounded-lg bg-background"
           />
         </div>
+        {/* Rol: SOLO LECTURA. Se asigna desde Team, no editable aquí (seguridad). */}
         <div>
           <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1.5">{t('settings.role')}</label>
-          <select
-            value={form.role}
-            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-            className="w-full px-3 py-2 border border-border rounded-lg bg-background"
-          >
-            <option value="pm">{t('settings.roles.pm')}</option>
-            <option value="owner">{t('settings.roles.owner')}</option>
-            <option value="estimator">{t('settings.roles.estimator')}</option>
-            <option value="viewer">{t('settings.roles.viewer')}</option>
-            <option value="user">{t('settings.roles.user')}</option>
-          </select>
+          <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/40 text-sm">
+            {(ROLE_LABELS as any)[form.role] ?? form.role}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">{t('settings.roleManagedByAdmin')}</p>
         </div>
         <div>
           <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1.5">
@@ -168,6 +167,23 @@ export function SettingsContent() {
           {t('settings.saveProfile')}
         </button>
       </div>
+
+      {/* Gestión de equipo: solo visible para quien puede invitar (admin/PM) */}
+      {canManageTeam && (
+        <Link
+          href="/dashboard/team"
+          className="flex items-center gap-3 bg-card border border-border rounded-xl p-5 hover:border-[#C9A96E]/60 hover:shadow-sm transition-all group"
+        >
+          <div className="w-10 h-10 rounded-lg bg-[#0F1B33] text-[#C9A96E] flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{t('team.manageFromSettings')}</p>
+            <p className="text-xs text-muted-foreground">{t('team.manageFromSettingsHint')}</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-[#C9A96E] group-hover:translate-x-0.5 transition-all shrink-0" />
+        </Link>
+      )}
     </div>
   );
 }
