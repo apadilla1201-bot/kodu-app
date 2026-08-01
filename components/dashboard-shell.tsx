@@ -7,10 +7,6 @@ import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useI18n } from '@/hooks/use-i18n';
 import { navForRole, ROLE_LABELS } from '@/lib/permissions';
-import { GlobalSearch } from '@/components/global-search';
-import { NotificationBell } from '@/components/notification-bell';
-import { Breadcrumbs } from '@/components/breadcrumbs';
-import { PlanBadge } from '@/components/plan-badge';
 import type { AppLocale } from '@/lib/i18n';
 import {
   LayoutDashboard,
@@ -32,8 +28,6 @@ import {
   Languages,
   Wallet,
   UserPlus,
-  Search,
-  Inbox,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -58,7 +52,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
     { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
     { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
-    { href: '/dashboard/approvals', label: t('nav.approvals'), icon: Inbox },
     { href: '/dashboard/import', label: t('nav.importExcel'), icon: FileSpreadsheet },
     { href: '/dashboard/team', label: 'Team', icon: UserPlus },
     { href: '/dashboard/settings', label: t('nav.settings'), icon: Settings },
@@ -115,7 +108,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="p-4 border-t border-white/10">
-            <PlanBadge />
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-[#C9A96E]/20 flex items-center justify-center">
                 <User className="w-4 h-4 text-[#C9A96E]" />
@@ -146,23 +138,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="flex items-baseline select-none" aria-label="koduPM">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#0F1B33] text-[#C9A96E] font-bold text-sm mr-1.5 translate-y-[3px]">k</span>
-              <span className="text-lg font-bold text-[#0F1B33] tracking-tight">kodu</span>
-              <span className="text-lg font-bold text-[#C9A96E] tracking-tight">PM</span>
+            <h1 className="text-sm font-medium text-muted-foreground">
+              {t('nav.corSystem')}
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-              className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:border-[#C9A96E]/60 hover:text-foreground transition-colors"
-              aria-label="Search"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">{t('search.trigger')}</span>
-              <kbd className="px-1 py-0.5 rounded border border-border text-[10px]">Ctrl K</kbd>
-            </button>
-            <NotificationBell />
             <Languages className="w-4 h-4 text-muted-foreground hidden sm:block" />
             <select
               value={locale}
@@ -177,13 +157,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          <style>{`@keyframes koduFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-          <Breadcrumbs />
-          <div key={pathname ?? 'page'} style={{ animation: 'koduFadeIn 180ms ease-out' }}>
-            {children}
-          </div>
+          {children}
         </main>
-        <GlobalSearch />
       </div>
     </div>
   );
