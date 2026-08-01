@@ -6,7 +6,6 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { htmlToPdf } from '@/lib/pdf';
-import { GC_ADDRESS_FULL, GC_LICENSE } from '@/lib/gc-branding';
 import { appBaseUrl } from '@/lib/app-url';
 import { getPdfBrand, type PdfBrand } from '@/lib/company-brand';
 import { createTranslator, type AppLocale } from '@/lib/i18n';
@@ -152,13 +151,13 @@ function buildG702Html(pa: any, project: any, lines: LineItem[], brand: PdfBrand
     </div>
   </div>
   <div class="gold-bar">
-    <span>${esc(brand.name)} — ${esc(GC_ADDRESS_FULL)}</span>
-    <span>License: ${GC_LICENSE}</span>
+    <span>${esc(brand.addressFull ? `${brand.name} — ${brand.addressFull}` : brand.name)}</span>
+    ${brand.license ? `<span>License: ${esc(brand.license)}</span>` : ''}
   </div>
 
   <div class="info-grid">
     <div class="info-cell"><div class="info-label">${esc(L('toOwner'))}</div>${esc(pa.ownerName || '')}<br/>${esc(pa.ownerAddress || '')}<br/>${esc(pa.ownerCity || '')}</div>
-    <div class="info-cell right"><div class="info-label">${esc(L('fromContractor'))}</div>${esc(brand.name)}<br/>Attn: ${esc(pa.contractorPrinted || 'Pedro Dominguez')}<br/>${esc(GC_ADDRESS_FULL)}</div>
+    <div class="info-cell right"><div class="info-label">${esc(L('fromContractor'))}</div>${esc(brand.name)}<br/>Attn: ${esc(pa.contractorPrinted || brand.name)}<br/>${esc(brand.addressFull ?? '')}</div>
     <div class="info-cell"><div class="info-label">${esc(t('pdf.rfi.project'))}</div>${esc(pa.contractFor || project?.projectName || '')}</div>
     <div class="info-cell right"><div class="info-label">Architect</div>${esc(pa.architectName || '')}<br/>${esc(pa.architectAddress || '')}<br/>${esc(pa.architectCity || '')}</div>
     <div class="info-cell"><div class="info-label">Contract Date</div>${fmtDate(pa.contractDate)}</div>

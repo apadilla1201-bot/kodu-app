@@ -32,6 +32,9 @@ export function SettingsContent() {
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [logoBusy, setLogoBusy] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  // Datos de la empresa que salen en los reportes PDF
+  const [info, setInfo] = useState({ address: '', addressCity: '', phone: '', website: '', license: '' });
+  const [infoBusy, setInfoBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -72,6 +75,13 @@ export function SettingsContent() {
         if (res.ok) {
           const data = await res.json();
           setCompanyLogo(data?.logoUrl ?? null);
+          setInfo({
+            address: data?.address ?? '',
+            addressCity: data?.addressCity ?? '',
+            phone: data?.phone ?? '',
+            website: data?.website ?? '',
+            license: data?.license ?? '',
+          });
         }
       } catch {
         // silencioso
@@ -110,6 +120,24 @@ export function SettingsContent() {
       toast({ title: t('settings.logoFailed'), variant: 'destructive' });
     } finally {
       setLogoBusy(false);
+    }
+  };
+
+  const saveInfo = async () => {
+    setInfoBusy(true);
+    try {
+      const res = await fetch('/api/company/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(info),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? 'Save failed');
+      toast({ title: t('settings.infoSaved') });
+    } catch (e: any) {
+      toast({ title: e?.message ?? t('settings.infoFailed'), variant: 'destructive' });
+    } finally {
+      setInfoBusy(false);
     }
   };
 
@@ -317,6 +345,76 @@ export function SettingsContent() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Datos de la empresa que salen en los reportes PDF: solo admin/PM */}
+      {canManageCompany && (
+        <div className="bg-card border border-border rounded-xl p-6 space-y-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-[#C9A96E]" />
+            <h2 className="text-sm font-semibold">{t('settings.companyInfo')}</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">{t('settings.companyInfoHint')}</p>
+          <div className="space-y-2.5">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">{t('settings.addressStreet')}</label>
+              <input
+                value={info.address}
+                onChange={(e) => setInfo((f) => ({ ...f, address: e.target.value }))}
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm"
+                placeholder="7255 NE 4th Ave, Suite 110-2"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">{t('settings.addressCity')}</label>
+                <input
+                  value={info.addressCity}
+                  onChange={(e) => setInfo((f) => ({ ...f, addressCity: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm"
+                  placeholder="Miami, FL 33138"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">{t('settings.phone')}</label>
+                <input
+                  value={info.phone}
+                  onChange={(e) => setInfo((f) => ({ ...f, phone: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm"
+                  placeholder="(772) 766-9399"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">{t('settings.website')}</label>
+                <input
+                  value={info.website}
+                  onChange={(e) => setInfo((f) => ({ ...f, website: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm"
+                  placeholder="www.tuempresa.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-muted-foreground mb-1">{t('settings.license')}</label>
+                <input
+                  value={info.license}
+                  onChange={(e) => setInfo((f) => ({ ...f, license: e.target.value }))}
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm"
+                  placeholder="CGC1530498"
+                />
+              </div>
+            </div>
+            <button
+              onClick={saveInfo}
+              disabled={infoBusy}
+              className="flex items-center gap-2 bg-[#0F1B33] hover:bg-[#1a2a4a] text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+            >
+              {infoBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {t('settings.infoSave')}
+            </button>
           </div>
         </div>
       )}

@@ -195,6 +195,7 @@ export async function POST(
       to,
       preparedBy: session.user?.name || 'Project Team',
       companyName: brand.name,
+      companyAddressFull: brand.addressFull,
       logoHtml: brand.logoHtml,
       tcoTarget: String(body?.tcoTarget || '').trim() || tcoFromSchedule,
       overview: String(body?.overview || '').trim() || autoOverview(project, mappedLogs),

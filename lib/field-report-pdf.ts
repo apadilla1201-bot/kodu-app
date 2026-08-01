@@ -2,7 +2,6 @@
  * Weekly Field Report PDF — Ritz / PDG owner format (6 sections).
  */
 import { downloadFileBuffer } from '@/lib/s3';
-import { GC_ADDRESS_FULL, GC_NAME_UPPER } from '@/lib/gc-branding';
 import { formatLogDate } from '@/lib/daily-log';
 import { guessMimeType } from '@/lib/storage';
 import { photoLocationLine, photoTagLabel } from '@/lib/site-photos';
@@ -82,6 +81,7 @@ export type FieldReportData = {
   to: string;
   preparedBy: string;
   companyName?: string | null;
+  companyAddressFull?: string | null;
   logoHtml?: string;
   tcoTarget: string | null;
   overview: string;
@@ -547,7 +547,7 @@ export async function buildFieldReportHtml(data: FieldReportData, locale: AppLoc
   <div class="meta-grid">
     <div class="meta-cell"><label>${esc(pdf('location'))}</label><span>${esc(data.location || '—')}</span></div>
     <div class="meta-cell"><label>${esc(pdf('reportDate'))}</label><span>${esc(reportDate)}</span></div>
-    <div class="meta-cell"><label>${esc(pdf('preparedBy'))}</label><span>${esc(data.preparedBy)} — ${esc(data.companyName ? data.companyName.toUpperCase() : GC_NAME_UPPER)}</span></div>
+    <div class="meta-cell"><label>${esc(pdf('preparedBy'))}</label><span>${esc(data.preparedBy)} — ${esc((data.companyName ?? 'koduPM').toUpperCase())}</span></div>
     <div class="meta-cell"><label>${esc(pdf('tcoTarget'))}</label><span>${esc(data.tcoTarget || pdf('tcoDefault'))}</span></div>
   </div>
 
@@ -587,7 +587,7 @@ export async function buildFieldReportHtml(data: FieldReportData, locale: AppLoc
   </div>
 
   <div class="ftr">
-    <span>${GC_NAME_UPPER} · ${GC_ADDRESS_FULL}</span>
+    <span>${esc((data.companyName ?? 'koduPM').toUpperCase())}${data.companyAddressFull ? ` · ${esc(data.companyAddressFull)}` : ''}</span>
     <span>${esc(pdf('confidential', { number: data.projectNumber }))}</span>
   </div>
 </div>

@@ -1,6 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
-import { GC_ADDRESS_HTML } from '@/lib/gc-branding';
 import type { PdfBrand } from '@/lib/company-brand';
 import { createTranslator, type AppLocale } from '@/lib/i18n';
 
@@ -181,7 +180,7 @@ export function buildRfiPdfHtml(
       ${brand.logoHtml}
       <div class="company">
         ${esc(brand.nameUpper)}<br/>
-        ${GC_ADDRESS_HTML}
+        ${brand.addressHtml ?? ''}
       </div>
     </div>
     <div class="header-right">

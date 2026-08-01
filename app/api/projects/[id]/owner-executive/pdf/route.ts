@@ -5,11 +5,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
-import { GC_ADDRESS_FULL } from '@/lib/gc-branding';
 import { appBaseUrl } from '@/lib/app-url';
 import { getPdfBrand } from '@/lib/company-brand';
 
 /* ── Formatters ────────────────────────────────────────── */
+const esc = (s: string) =>
+  (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 const fmtK = (v: number) => {
   if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
   if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(1)}K`;
@@ -450,7 +452,7 @@ export async function POST(
   <div style="position:absolute;bottom:28px;left:50px;right:50px;height:1px;background:#ddd"></div>
 
   <div class="ftr">
-    <div>${brand.nameUpper} | ${GC_ADDRESS_FULL}</div>
+    <div>${esc(brand.nameUpper)}${brand.addressFull ? ` | ${esc(brand.addressFull)}` : ''}</div>
     <div>Page 1 of 2</div>
     <div>CONFIDENTIAL</div>
   </div>

@@ -24,9 +24,11 @@ datasource db {
 model Company {
   id            String    @id @default(cuid())
   name          String                              // "The Project Delivery Group LLC"
-  address       String?
+  address       String?                             // calle y número (reportes PDF)
+  addressCity   String?                             // ciudad, estado, CP
   phone         String?
   website       String?
+  license       String?                             // n.º de licencia (ej. CGC...)
   logoUrl       String?
   // Branding tokens (tu sistema visual PDG: navy / gold / cream)
   brandPrimary  String    @default("#1B365D")       // dark navy

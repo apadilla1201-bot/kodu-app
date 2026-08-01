@@ -8,7 +8,6 @@ import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
 import { htmlToPdf } from '@/lib/pdf';
-import { GC_CONTACT_LINE } from '@/lib/gc-branding';
 import { getPdfBrand } from '@/lib/company-brand';
 
 function esc(str: string): string {
@@ -292,7 +291,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       </td>
     </tr>
   </table>
-  <div style="font-size:9px;color:#666;margin-bottom:4px;">${esc(GC_CONTACT_LINE)}</div>
+  <div style="font-size:9px;color:#666;margin-bottom:4px;">${esc(brand.contactLine ?? '')}</div>
   <div style="height:3px;background:linear-gradient(90deg,#C9A96E,#C9A96E 60%,transparent);margin-bottom:12px;"></div>
 
   <!-- Title -->
