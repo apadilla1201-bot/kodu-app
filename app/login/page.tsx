@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useI18n } from '@/hooks/use-i18n';
 
-export default function LoginPage() {
+function LoginForm() {
   const { t } = useI18n();
-  const [isLogin, setIsLogin] = useState(true);
+  const searchParams = useSearchParams();
+  // Los CTAs de la landing llegan a /login?mode=signup → abrir en modo registro.
+  const [isLogin, setIsLogin] = useState(searchParams?.get('mode') !== 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -254,5 +256,14 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams exige un boundary de Suspense en Next.js 14.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

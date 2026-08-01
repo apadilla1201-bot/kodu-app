@@ -3,6 +3,15 @@
 ## ⚠️ Requisito previo
 Sprints 0, 1 y 2 ya publicados (✅ confirmado). Este paquete va al repo **kodu-app**.
 
+## 🚨 Incluye el FIX del 404 que encontraste
+El botón **"Start Free / Empieza Gratis"** de la landing apuntaba a
+`app.kodupm.com/signup` — una página que **no existe** (por eso el 404 de tu
+captura). Este paquete lo corrige por los dos lados:
+- La página de login ahora entiende `?mode=signup` y abre directo en modo
+  registro.
+- La landing (paquete aparte, `SUBIR-LANDING-ES.zip` actualizado) apunta sus
+  5 botones "Start Free" a `app.kodupm.com/login?mode=signup`.
+
 ## Qué agrega este paquete
 
 ### Registro de clientes nuevos CON plan, sin que tú muevas un dedo
