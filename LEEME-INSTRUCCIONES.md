@@ -1,48 +1,54 @@
-# FIX — Rol PDG + logo PDG restablecido
+# MEJORAS 2 — Logo de la empresa en TODOS los reportes PDF
 
-## Qué pasó (los 2 problemas tienen la misma raíz)
-Tu usuario de PDG tiene rol legacy **'user'** (se ve abajo a la izquierda en
-tu captura). Ese rol no existe en la matriz nueva de permisos, así que:
-- El menú te caía en modo "viewer" → solo veías **Dashboard**.
-- No podías gestionar la compañía → no te salía la opción de subir el logo PDG.
+## Qué hace este paquete
 
-Con una empresa nueva no pasaba porque los signups nuevos nacen con rol
-'owner' (correcto). Tu cuenta es anterior a la matriz.
+Todos los reportes PDF que genera koduPM ahora salen con el **logo de tu empresa**
+en el encabezado, y el **nombre de la empresa** en lugar de textos fijos:
 
-## Qué hace este paquete (2 archivos)
-1. **`lib/permissions.ts`** — blindaje permanente: si algún rol raro/legacy
-   vuelve a aparecer, el menú mostrará TODO en vez de encogerse. (Los módulos
-   sensibles — Budgets, Pay Apps, Approvals, Team — ya tienen su propio
-   candado en el servidor, así que no se abre seguridad: solo se evita que
-   alguien se quede "atrapado" en el Dashboard como te pasó.)
-2. **`app/api/internal/set-owner/route.ts`** — ruta TEMPORAL de administración
-   (mismo mecanismo que usamos con las migraciones). Al abrirla con tu correo:
-   - Cambia tu rol de 'user' → **'owner'** (admin de tu compañía).
-   - Detecta que tu compañía es **The Project Delivery Group LLC** y le
-     restablece el **logo PDG** (`/pdg_logo.png`) — aparece en el login y en
-     el sidebar de todos tus proyectos PDG.
+| Reporte | Dónde se genera |
+|---|---|
+| RFI (y vista previa de RFI) | RFIs → abrir un RFI → Descargar PDF |
+| Change Order (COR) | Change Orders → Descargar PDF |
+| Pay Application G702 y G703 | Pay Apps → Descargar PDF |
+| Field Report (reporte semanal de campo) | Proyecto → Field Report → PDF |
+| Owner Executive Report | Proyecto → Owner Report → PDF |
+| Cronograma CPM (schedule) | Schedules → PDF |
+| Look Ahead (ejecutivo y técnico) | Schedules → Look Ahead → PDF |
 
-## Pasos (10 minutos, método de siempre)
-1. **Sube** este paquete al repo **kodu-app** (carpetas `app` y `lib`) →
-   Commit: `Fix rol PDG + logo PDG` → espera ~2 min a Vercel.
-2. **Abre esta URL en tu navegador** (reemplaza TU_CORREO por tu correo real
-   de login, el que usas para entrar):
-   ```
-   https://app.kodupm.com/api/internal/set-owner?key=kodupm-migrar-2026&email=TU_CORREO
-   ```
-   Debe responder un JSON con `"ok": true`, `"role": "owner"` y el logo PDG.
-3. **Cierra sesión** (Sign Out) y **vuelve a entrar** — verás el menú
-   completo y el logo PDG arriba en el sidebar y en el login.
-4. **BORRA la ruta temporal** (importante, por seguridad):
-   GitHub → repo kodu-app → `app/api/internal/set-owner/route.ts` →
-   icono ⋮ → **Delete file** → Commit. Vercel redespliega solo.
+## Cómo funciona (regla de logos)
 
-## Verificación
-- Menú lateral completo otra vez (Projects, RFI Log, Budgets, Team…).
-- Logo PDG en el sidebar (arriba) y en el login al entrar con tu cuenta PDG.
-- Las empresas NUEVAS siguen viendo el wordmark koduPM (el PDG no se les
-  aparece — sigue siendo exclusivo de tu compañía).
+1. Si tu empresa **tiene logo** (Configuración → Logo de la empresa) → sale ese logo.
+   - En Project Delivery Group sale el logo PDG automáticamente.
+2. Si una empresa **NO tiene logo** → sale el logo de **koduPM** (incluido en este
+   paquete como `public/kodu-logo.png`).
+3. Cada empresa ve **solo su propio logo**. Ninguna otra empresa verá el logo de PDG.
+
+El logo va dentro de una placa azul marino para que se vea bien en cualquier
+fondo, igual que en la pantalla de login.
+
+## Cómo subirlo a GitHub (2 minutos)
+
+1. Descomprime este ZIP.
+2. Entra a tu repo **kodu-app** en GitHub.
+3. Click en **Add file → Upload files**.
+4. Arrastra las **3 carpetas** que vienen dentro: `app`, `lib` y `public`.
+   - GitHub las fusiona con las que ya existen (no borra nada).
+5. Click en **Commit changes**.
+6. Espera 1-2 minutos a que Vercel termine el despliegue.
+
+## Cómo verificar que funcionó
+
+1. Entra a https://app.kodupm.com con tu cuenta de PDG.
+2. Abre cualquier **RFI** y descarga el PDF → debe salir el **logo de PDG**
+   arriba a la izquierda.
+3. Descarga un **COR** o un **Pay App** → mismo logo.
+4. (Opcional) Entra con la otra empresa de prueba (sin logo) y genera un PDF
+   → debe salir el **logo de koduPM**.
 
 ## Nota
-Si algún día otro usuario tuyo de PDG ve el menú cortado, corre la misma URL
-con SU correo (antes de borrar la ruta) — o me avisas.
+
+En algunos reportes todavía aparecen datos fijos de PDG (dirección de Miami,
+licencia CGC1530498, línea de contacto). Son los datos reales de tus proyectos
+actuales, así que para PDG están correctos. Si más adelante quieres que cada
+empresa ponga su propia dirección/licencia, se agrega en Configuración (me avisas
+y lo hacemos).

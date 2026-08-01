@@ -81,6 +81,8 @@ export type FieldReportData = {
   from: string;
   to: string;
   preparedBy: string;
+  companyName?: string | null;
+  logoHtml?: string;
   tcoTarget: string | null;
   overview: string;
   photoIntro: string | null;
@@ -538,13 +540,14 @@ export async function buildFieldReportHtml(data: FieldReportData, locale: AppLoc
 </head>
 <body>
 <div class="doc">
+  <div style="margin-bottom:10px;">${data.logoHtml ?? ''}</div>
   <div class="doc-title">${esc(pdf('docTitle'))} &nbsp; ${esc(titleDate)}</div>
   <div class="doc-subtitle">${esc(subtitle)}</div>
 
   <div class="meta-grid">
     <div class="meta-cell"><label>${esc(pdf('location'))}</label><span>${esc(data.location || '—')}</span></div>
     <div class="meta-cell"><label>${esc(pdf('reportDate'))}</label><span>${esc(reportDate)}</span></div>
-    <div class="meta-cell"><label>${esc(pdf('preparedBy'))}</label><span>${esc(data.preparedBy)} — ${esc(GC_NAME_UPPER)}</span></div>
+    <div class="meta-cell"><label>${esc(pdf('preparedBy'))}</label><span>${esc(data.preparedBy)} — ${esc(data.companyName ? data.companyName.toUpperCase() : GC_NAME_UPPER)}</span></div>
     <div class="meta-cell"><label>${esc(pdf('tcoTarget'))}</label><span>${esc(data.tcoTarget || pdf('tcoDefault'))}</span></div>
   </div>
 

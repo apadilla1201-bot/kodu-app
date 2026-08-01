@@ -71,6 +71,8 @@ export type LookAheadPdfInput = {
   windowStart: Date;
   windowEnd: Date;
   preparedBy: string;
+  brandLogoHtml?: string;
+  brandName?: string;
   activities: LookAheadActivity[];
   executive: ExecutiveContent;
   technicalFocus?: TechnicalFocusItem[];
@@ -433,6 +435,7 @@ ${FONTS}
 </style></head><body>
 <div class="page">
   <div class="hdr">
+    <div style="margin-bottom:6px;">${input.brandLogoHtml ?? ''}</div>
     <div class="brand">${esc(projTitle)}</div>
     <div class="sub">${esc(residence)} &nbsp;•&nbsp; Executive Look Ahead &nbsp;•&nbsp; ${esc(windowLabel)}</div>
   </div>
@@ -572,11 +575,11 @@ function renderTable(
   return `<table class="${cls}">${renderTableHead(days)}<tbody>${renderTableBody(groups, days, windowStart)}</tbody></table>`;
 }
 
-function renderFootbar(projectNumber: string, revision: string, prepared: string): string {
+function renderFootbar(projectNumber: string, revision: string, prepared: string, brandName?: string): string {
   return `<div class="footbar">
     <span>RITZ CARLTON PRIVATE RESIDENCES — ${esc(projectNumber)}</span>
     <span>EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; REV. ${esc(revision)}</span>
-    <span>CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (PDG)</span>
+    <span>CONFIDENTIAL &nbsp;|&nbsp; PREPARED BY ${esc(prepared)} (${esc(brandName ?? 'PDG')})</span>
   </div>`;
 }
 
@@ -634,7 +637,7 @@ export function buildTechnicalLookaheadHtml(input: LookAheadPdfInput): string {
     ? `Note: TCO target milestone remains ${fmtMonthDay(input.tcoDate)}.`
     : 'Note: Period metrics aligned with Primavera P6 Master Schedule benchmarks.';
 
-  const footbar = renderFootbar(input.projectNumber, input.revision, prepared);
+  const footbar = renderFootbar(input.projectNumber, input.revision, prepared, input.brandName);
 
   const page2 =
     page2Groups.length > 0
@@ -716,6 +719,7 @@ ${FONTS}
 
 <section class="sheet">
   <div class="hdr">
+    <div style="margin-bottom:4px;">${input.brandLogoHtml ?? ''}</div>
     <div class="hdr-t">${esc(projTitle)}</div>
     <div class="hdr-s">EXECUTIVE TECHNICAL LOOK AHEAD &nbsp;|&nbsp; ${esc(residence)}</div>
   </div>

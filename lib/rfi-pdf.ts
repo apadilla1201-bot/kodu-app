@@ -1,6 +1,7 @@
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
-import { GC_ADDRESS_HTML, GC_NAME_UPPER } from '@/lib/gc-branding';
+import { GC_ADDRESS_HTML } from '@/lib/gc-branding';
+import type { PdfBrand } from '@/lib/company-brand';
 import { createTranslator, type AppLocale } from '@/lib/i18n';
 
 export type RfiPdfAttachment = {
@@ -88,7 +89,7 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
 export function buildRfiPdfHtml(
   rfi: RfiPdfData,
   project: RfiProjectData,
-  logoUrl: string,
+  brand: PdfBrand,
   locale: AppLocale = 'en',
 ): string {
   const t = createTranslator(locale);
@@ -177,9 +178,9 @@ export function buildRfiPdfHtml(
   <!-- Header -->
   <div class="header">
     <div class="header-left">
-      <img src="${logoUrl}" alt="PDG Logo" />
+      ${brand.logoHtml}
       <div class="company">
-        ${GC_NAME_UPPER}<br/>
+        ${esc(brand.nameUpper)}<br/>
         ${GC_ADDRESS_HTML}
       </div>
     </div>
@@ -279,7 +280,7 @@ export function buildRfiPdfHtml(
   <!-- Footer -->
   <div class="footer">
     <span>© Kodu GC · Confidential</span>
-    <span>${GC_NAME_UPPER}</span>
+    <span>${esc(brand.nameUpper)}</span>
     <span>Generated ${new Date().toLocaleDateString(locale === 'es' ? 'es-US' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
   </div>
 

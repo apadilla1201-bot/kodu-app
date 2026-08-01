@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
+import { appBaseUrl } from '@/lib/app-url';
+import { getPdfBrand } from '@/lib/company-brand';
 import {
   buildExecutiveLookaheadHtml,
   buildFallbackExecutiveContent,
@@ -177,6 +179,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
     const companyId = (session?.user as any)?.companyId ?? '';
+    const brand = await getPdfBrand(companyId, appBaseUrl(), 30);
 
     const schedule = await prisma.schedule.findFirst({
       where: { id: params.id, project: { companyId } },
@@ -248,6 +251,8 @@ export async function POST(
       windowStart,
       windowEnd,
       preparedBy: userName,
+      brandLogoHtml: brand.logoHtml,
+      brandName: brand.name,
       activities,
       executive: buildFallbackExecutiveContent({
         activities,

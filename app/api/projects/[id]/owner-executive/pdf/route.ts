@@ -5,7 +5,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
-import { GC_ADDRESS_FULL, GC_NAME, GC_NAME_UPPER } from '@/lib/gc-branding';
+import { GC_ADDRESS_FULL } from '@/lib/gc-branding';
+import { appBaseUrl } from '@/lib/app-url';
+import { getPdfBrand } from '@/lib/company-brand';
 
 /* ── Formatters ────────────────────────────────────────── */
 const fmtK = (v: number) => {
@@ -76,6 +78,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const companyId = (session.user as any)?.companyId ?? '';
+    const brand = await getPdfBrand(companyId, appBaseUrl(), 38);
 
     const project = await prisma.project.findFirst({
       where: { id: params.id, companyId },
@@ -367,6 +370,7 @@ export async function POST(
 <div class="page">
   <div class="hdr">
     <div class="hdr-left">
+      <div style="margin-bottom:8px;">${brand.logoHtml}</div>
       <div class="hdr-eyebrow">OWNER EQUITY POSITION REPORT <span>|</span> ${dataDateStr} <span>|</span> CONFIDENTIAL</div>
       <div class="hdr-project">${project.projectName.toUpperCase()}</div>
     </div>
@@ -446,7 +450,7 @@ export async function POST(
   <div style="position:absolute;bottom:28px;left:50px;right:50px;height:1px;background:#ddd"></div>
 
   <div class="ftr">
-    <div>${GC_NAME_UPPER} | ${GC_ADDRESS_FULL}</div>
+    <div>${brand.nameUpper} | ${GC_ADDRESS_FULL}</div>
     <div>Page 1 of 2</div>
     <div>CONFIDENTIAL</div>
   </div>
@@ -550,7 +554,7 @@ export async function POST(
   <div style="position:absolute;bottom:28px;left:50px;right:50px;height:1px;background:#ddd"></div>
 
   <div class="ftr">
-    <div>${GC_NAME_UPPER} | Prepared by ${GC_NAME} | Data Date: ${dataDateShort}</div>
+    <div>${brand.nameUpper} | Prepared by ${brand.name} | Data Date: ${dataDateShort}</div>
     <div>Page 2 of 2</div>
     <div>CONFIDENTIAL</div>
   </div>

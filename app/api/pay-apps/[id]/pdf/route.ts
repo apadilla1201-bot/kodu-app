@@ -6,7 +6,9 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { htmlToPdf } from '@/lib/pdf';
-import { GC_ADDRESS_FULL, GC_LICENSE, GC_NAME } from '@/lib/gc-branding';
+import { GC_ADDRESS_FULL, GC_LICENSE } from '@/lib/gc-branding';
+import { appBaseUrl } from '@/lib/app-url';
+import { getPdfBrand, type PdfBrand } from '@/lib/company-brand';
 import { createTranslator, type AppLocale } from '@/lib/i18n';
 import { exportDateLocale, exportNumberLocale } from '@/lib/i18n/export-locale';
 import { getSessionLocale } from '@/lib/i18n/server';
@@ -60,7 +62,7 @@ interface LineItem {
   sectionTitle: string;
 }
 
-function buildG702Html(pa: any, project: any, lines: LineItem[], locale: AppLocale = 'en'): string {
+function buildG702Html(pa: any, project: any, lines: LineItem[], brand: PdfBrand, locale: AppLocale = 'en'): string {
   const t = createTranslator(locale);
   const L = (key: string) => t(`pdf.payApp.${key}`);
   // Compute G702 values from line items
@@ -139,8 +141,9 @@ function buildG702Html(pa: any, project: any, lines: LineItem[], locale: AppLoca
 <div class="page">
   <div class="header">
     <div class="header-left">
-      <h1>${esc(L('g702Title'))}</h1>
-      <p>AIA Document G702 — ${esc(GC_NAME)}</p>
+      ${brand.logoHtml}
+      <h1 style="margin-top:6px;">${esc(L('g702Title'))}</h1>
+      <p>AIA Document G702 — ${esc(brand.name)}</p>
     </div>
     <div class="header-right">
       <div class="app-no">PA #${pa.applicationNumber}</div>
@@ -149,13 +152,13 @@ function buildG702Html(pa: any, project: any, lines: LineItem[], locale: AppLoca
     </div>
   </div>
   <div class="gold-bar">
-    <span>${esc(GC_NAME)} — ${esc(GC_ADDRESS_FULL)}</span>
+    <span>${esc(brand.name)} — ${esc(GC_ADDRESS_FULL)}</span>
     <span>License: ${GC_LICENSE}</span>
   </div>
 
   <div class="info-grid">
     <div class="info-cell"><div class="info-label">${esc(L('toOwner'))}</div>${esc(pa.ownerName || '')}<br/>${esc(pa.ownerAddress || '')}<br/>${esc(pa.ownerCity || '')}</div>
-    <div class="info-cell right"><div class="info-label">${esc(L('fromContractor'))}</div>${esc(GC_NAME)}<br/>Attn: ${esc(pa.contractorPrinted || 'Pedro Dominguez')}<br/>${esc(GC_ADDRESS_FULL)}</div>
+    <div class="info-cell right"><div class="info-label">${esc(L('fromContractor'))}</div>${esc(brand.name)}<br/>Attn: ${esc(pa.contractorPrinted || 'Pedro Dominguez')}<br/>${esc(GC_ADDRESS_FULL)}</div>
     <div class="info-cell"><div class="info-label">${esc(t('pdf.rfi.project'))}</div>${esc(pa.contractFor || project?.projectName || '')}</div>
     <div class="info-cell right"><div class="info-label">Architect</div>${esc(pa.architectName || '')}<br/>${esc(pa.architectAddress || '')}<br/>${esc(pa.architectCity || '')}</div>
     <div class="info-cell"><div class="info-label">Contract Date</div>${fmtDate(pa.contractDate)}</div>
@@ -216,13 +219,13 @@ function buildG702Html(pa: any, project: any, lines: LineItem[], locale: AppLoca
   </div>
 
   <div class="footer">
-    ${esc(GC_NAME)} &bull; ${esc(project?.projectNumber || '')} — ${esc(project?.projectName || '')} &bull; PA #${pa.applicationNumber} &bull; ${esc(L('generated'))} ${new Date().toLocaleDateString(exportDateLocale(locale))}
+    ${esc(brand.name)} &bull; ${esc(project?.projectNumber || '')} — ${esc(project?.projectName || '')} &bull; PA #${pa.applicationNumber} &bull; ${esc(L('generated'))} ${new Date().toLocaleDateString(exportDateLocale(locale))}
   </div>
 </div>
 </body></html>`;
 }
 
-function buildG703Html(pa: any, project: any, lines: LineItem[], locale: AppLocale = 'en'): string {
+function buildG703Html(pa: any, project: any, lines: LineItem[], brand: PdfBrand, locale: AppLocale = 'en'): string {
   const t = createTranslator(locale);
   const L = (key: string) => t(`pdf.payApp.${key}`);
   const regularLines = lines.filter((l: LineItem) => !l.isFee && !l.isBelowLine);
@@ -366,8 +369,9 @@ function buildG703Html(pa: any, project: any, lines: LineItem[], locale: AppLoca
 <div class="page">
   <div class="header">
     <div>
-      <h1>${esc(L('g703'))}</h1>
-      <div class="sub">${esc(GC_NAME)} — ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')}</div>
+      ${brand.logoHtml}
+      <h1 style="margin-top:4px;">${esc(L('g703'))}</h1>
+      <div class="sub">${esc(brand.name)} — ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')}</div>
     </div>
     <div class="right">
       <div class="app-no">PA #${pa.applicationNumber}</div>
@@ -407,7 +411,7 @@ function buildG703Html(pa: any, project: any, lines: LineItem[], locale: AppLoca
   </table>
 
   <div class="footer">
-    ${esc(GC_NAME)} &bull; PA #${pa.applicationNumber} &bull; ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')} &bull; ${esc(L('generated'))} ${new Date().toLocaleDateString(exportDateLocale(locale))}
+    ${esc(brand.name)} &bull; PA #${pa.applicationNumber} &bull; ${esc(project?.projectNumber || '')} ${esc(project?.projectName || '')} &bull; ${esc(L('generated'))} ${new Date().toLocaleDateString(exportDateLocale(locale))}
   </div>
 </div>
 </body></html>`;
@@ -455,13 +459,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }));
 
     const locale = await getSessionLocale();
+    const brand = await getPdfBrand((session.user as any)?.companyId ?? '', appBaseUrl(), 30);
 
     const htmlPages: string[] = [];
     if (type === 'g702' || type === 'both') {
-      htmlPages.push(buildG702Html(pa, pa.project, lines, locale));
+      htmlPages.push(buildG702Html(pa, pa.project, lines, brand, locale));
     }
     if (type === 'g703' || type === 'both') {
-      htmlPages.push(buildG703Html(pa, pa.project, lines, locale));
+      htmlPages.push(buildG703Html(pa, pa.project, lines, brand, locale));
     }
 
     // Generate PDFs locally

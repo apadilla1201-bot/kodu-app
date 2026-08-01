@@ -8,11 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { PDFDocument } from 'pdf-lib';
 import { downloadFileBuffer } from '@/lib/s3';
 import { htmlToPdf } from '@/lib/pdf';
-import {
-  GC_CONTACT_LINE,
-  GC_NAME,
-  GC_NAME_UPPER,
-} from '@/lib/gc-branding';
+import { GC_CONTACT_LINE } from '@/lib/gc-branding';
+import { getPdfBrand } from '@/lib/company-brand';
 
 function esc(str: string): string {
   return (str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -54,7 +51,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-    const logoUrl = `${baseUrl}/pdg_logo.png`;
+    const brand = await getPdfBrand(companyId, baseUrl);
     const supplierTotal = (cor?.subtotal ?? 0) + (cor?.salesTax ?? 0);
     const dateStr = fmtDate(cor?.date);
     const dateLong = fmtDateLong(cor?.date);
@@ -122,7 +119,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     </tr>
     <tr>
       <td style="padding:5px 8px;border:1px solid #ddd;font-weight:700;background:#f8f8f8;">GC:</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;">${esc(GC_NAME)}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;">${esc(brand.name)}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;font-weight:700;background:#f8f8f8;">Subcontractor:</td>
       <td style="padding:5px 8px;border:1px solid #ddd;">${esc(subcontractor)}</td>
     </tr>
@@ -287,7 +284,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   <table style="width:100%;margin-bottom:2px;">
     <tr>
       <td style="width:60%;">
-        <span style="font-size:16px;font-weight:700;color:#0F1B33;letter-spacing:0.5px;">${esc(GC_NAME_UPPER)}</span>
+        ${brand.logoHtml}
+        <div style="font-size:13px;font-weight:700;color:#0F1B33;letter-spacing:0.5px;margin-top:6px;">${esc(brand.nameUpper)}</div>
       </td>
       <td style="width:40%;text-align:right;">
         <span style="font-size:32px;font-weight:700;color:#C9A96E;font-style:italic;">${esc(corNum)}</span>
@@ -318,7 +316,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     </tr>
     <tr>
       <td style="padding:4px 8px;text-align:right;font-weight:700;font-size:9px;color:#666;">GC:</td>
-      <td style="padding:4px 8px;font-weight:700;">${esc(GC_NAME)}</td>
+      <td style="padding:4px 8px;font-weight:700;">${esc(brand.name)}</td>
       <td style="padding:4px 8px;text-align:right;font-weight:700;font-size:9px;color:#666;">PM:</td>
       <td style="padding:4px 8px;">Augusto Padilla</td>
     </tr>
@@ -415,7 +413,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         <p style="margin:4px 0;">Date: ________________________</p>
       </td>
       <td style="width:33%;vertical-align:top;">
-        <p style="font-weight:700;text-decoration:underline;margin:0 0 2px 0;">GC — ${esc(GC_NAME)}</p>
+        <p style="font-weight:700;text-decoration:underline;margin:0 0 2px 0;">GC — ${esc(brand.name)}</p>
         <p style="font-style:italic;margin:0 0 10px 0;">Augusto Padilla, PM</p>
         <p style="margin:4px 0;">Signature: ___________________</p>
         <p style="margin:4px 0;">Printed: _____________________</p>
@@ -432,7 +430,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   </table>
 
   <!-- Footer -->
-  <div style="margin-top:16px;text-align:right;font-size:8px;color:#999;">${esc(GC_NAME)} &middot; ${esc(projectName)} &middot; © Kodu GC</div>
+  <div style="margin-top:16px;text-align:right;font-size:8px;color:#999;">${esc(brand.name)} &middot; ${esc(projectName)} &middot; © Kodu GC</div>
 </div>
 `;
 

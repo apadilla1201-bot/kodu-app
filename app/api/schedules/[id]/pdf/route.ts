@@ -7,6 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
 import { createTranslator } from '@/lib/i18n';
 import { getSessionLocale } from '@/lib/i18n/server';
+import { appBaseUrl } from '@/lib/app-url';
+import { getPdfBrand } from '@/lib/company-brand';
 
 /* ── Helpers ──────────────────────────────────────────────── */
 function esc(s: string) {
@@ -68,6 +70,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return NextResponse.json({ error: 'Auth' }, { status: 401 });
     const companyId = (session?.user as any)?.companyId ?? '';
+    const brand = await getPdfBrand(companyId, appBaseUrl(), 26);
 
     // Accept optional filter from body
     let filterType = 'all';
@@ -317,7 +320,7 @@ export async function POST(
 </style></head><body>
 
 <div class="hdr">
-  <h1>${esc(projectName)} | Interactive CPM — ${esc(schedule.revision)}</h1>
+  <div style="display:flex;align-items:center;gap:10px;">${brand.logoHtml}<h1>${esc(projectName)} | Interactive CPM — ${esc(schedule.revision)}</h1></div>
   <div class="info">
     <span>Filter: <b>${filterLabel}</b></span>
     ${dateRangeLabel ? `<span><b>${dateRangeLabel}</b></span>` : ''}
@@ -375,7 +378,7 @@ export async function POST(
     ${schedule.projectFinish ? `<div>${esc(S('projectFinish'))}: ${fmtDate(schedule.projectFinish)}</div>` : ''}
     <div>Data Date: ${fmtDate(schedule.dataDate)}</div>
     ${tcoDate ? `<div>TCO: ${fmtDate(tcoDate)}</div>` : ''}
-    <div>Prepared: A. Padilla — PDG</div>
+    <div>Prepared: ${esc(brand.name)}</div>
   </div>
 </div>
 

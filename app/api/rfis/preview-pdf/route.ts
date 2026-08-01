@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
 import { appBaseUrl } from '@/lib/app-url';
+import { getPdfBrand } from '@/lib/company-brand';
 import { buildRfiPdfFilename, buildRfiPdfHtml, mergeRfiPdfWithAttachments, RfiPdfMergeError } from '@/lib/rfi-pdf';
 import { getSessionLocale } from '@/lib/i18n/server';
 
@@ -92,9 +93,9 @@ export async function POST(request: Request) {
       attachments: attachmentRows,
     };
 
-    const logoUrl = `${appBaseUrl()}/pdg_logo.png`;
+    const brand = await getPdfBrand(companyId, appBaseUrl(), 44);
     const locale = await getSessionLocale();
-    const htmlContent = buildRfiPdfHtml(mockRfi, project, logoUrl, locale);
+    const htmlContent = buildRfiPdfHtml(mockRfi, project, brand, locale);
     const pdfBuffer = await htmlToPdf(htmlContent);
 
     let finalPdfBytes: Uint8Array;

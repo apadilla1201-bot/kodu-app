@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { htmlToPdf } from '@/lib/pdf';
+import { appBaseUrl } from '@/lib/app-url';
+import { getPdfBrand } from '@/lib/company-brand';
 import { dateKey, logDateFromInput, weekRangeEnding } from '@/lib/daily-log';
 import {
   autoActionItems,
@@ -28,6 +30,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const companyId = (session.user as any)?.companyId ?? '';
+    const brand = await getPdfBrand(companyId, appBaseUrl(), 34);
 
     const project = await prisma.project.findFirst({
       where: { id: params.id, companyId },
@@ -191,6 +194,8 @@ export async function POST(
       from,
       to,
       preparedBy: session.user?.name || 'Project Team',
+      companyName: brand.name,
+      logoHtml: brand.logoHtml,
       tcoTarget: String(body?.tcoTarget || '').trim() || tcoFromSchedule,
       overview: String(body?.overview || '').trim() || autoOverview(project, mappedLogs),
       photoIntro: String(body?.photoIntro || '').trim() || autoPhotoIntro(),
