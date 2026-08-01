@@ -101,7 +101,12 @@ export function navForRole(role: AppRole): string[] {
   if (isFullAccess(role)) return NAV_BY_ROLE.full;
   if (role === 'superintendent') return NAV_BY_ROLE.superintendent;
   if (role === 'subcontractor') return NAV_BY_ROLE.subcontractor;
-  return NAV_BY_ROLE.projectViewer; // owner del proyecto, viewer, desconocidos
+  // Fallback seguro: cualquier rol desconocido/legacy ('user', '', null…)
+  // ve el menú COMPLETO. Los módulos sensibles (Budgets, Pay Apps, Approvals,
+  // Team) tienen su propia guarda en el servidor (redirect si no es gestión).
+  // Antes: un rol legacy como 'user' caía en "viewer" y veía solo el
+  // Dashboard — fue el bug reportado el 2026-08-02 con la cuenta PDG.
+  return NAV_BY_ROLE.full;
 }
 
 // ¿Puede acceder a una ruta del dashboard? (para middleware/guards)
