@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/hooks/use-i18n';
 import type { AppLocale } from '@/lib/i18n';
-import { ROLE_LABELS, canInvite } from '@/lib/permissions';
+import { ROLE_LABELS, canInvite, isFullAccess } from '@/lib/permissions';
 import Link from 'next/link';
-import { Loader2, Save, User, Languages, Users, ArrowRight, Crown } from 'lucide-react';
+import Image from 'next/image';
+import { Loader2, Save, User, Languages, Users, ArrowRight, Crown, Building2, Upload, Trash2 } from 'lucide-react';
 
 export function SettingsContent() {
   const { data: session, update } = useSession();
@@ -26,6 +27,11 @@ export function SettingsContent() {
   });
   const [plan, setPlan] = useState<string>('starter');
   const [companyName, setCompanyName] = useState<string>('');
+  // Logo de la compañía (solo admin/owner puede cambiarlo)
+  const canManageCompany = isFullAccess(userRole);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -59,7 +65,53 @@ export function SettingsContent() {
         // silencioso: la tarjeta muestra "starter" por defecto
       }
     })();
+    // Logo actual de la compañía
+    (async () => {
+      try {
+        const res = await fetch('/api/company/profile', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setCompanyLogo(data?.logoUrl ?? null);
+        }
+      } catch {
+        // silencioso
+      }
+    })();
   }, [toast, t]);
+
+  const uploadLogo = async (file: File) => {
+    setLogoBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/company/logo', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? 'Upload failed');
+      setCompanyLogo(data.logoUrl);
+      toast({ title: t('settings.logoSaved') });
+      // Refrescar para que el sidebar/login tomen el nuevo logo
+      window.location.reload();
+    } catch (e: any) {
+      toast({ title: e?.message ?? t('settings.logoFailed'), variant: 'destructive' });
+    } finally {
+      setLogoBusy(false);
+    }
+  };
+
+  const removeLogo = async () => {
+    setLogoBusy(true);
+    try {
+      const res = await fetch('/api/company/logo', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Remove failed');
+      setCompanyLogo(null);
+      toast({ title: t('settings.logoRemoved') });
+      window.location.reload();
+    } catch (e: any) {
+      toast({ title: t('settings.logoFailed'), variant: 'destructive' });
+    } finally {
+      setLogoBusy(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -213,6 +265,61 @@ export function SettingsContent() {
           </a>
         )}
       </div>
+
+      {/* Marca de la compañía: logo propio (solo admin/owner). Sin logo = wordmark koduPM. */}
+      {canManageCompany && (
+        <div className="bg-card border border-border rounded-xl p-6 space-y-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-[#C9A96E]" />
+            <h2 className="text-sm font-semibold">{t('settings.companyLogo')}</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">{t('settings.companyLogoHint')}</p>
+          <div className="flex items-center gap-4">
+            <div className="w-28 h-16 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden relative">
+              {companyLogo ? (
+                <Image src={companyLogo} alt="Company logo" fill className="object-contain p-1" unoptimized={companyLogo.startsWith('http')} />
+              ) : (
+                <div className="flex items-baseline select-none" aria-label="koduPM">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-[#0F1B33] text-[#C9A96E] font-bold text-[10px] mr-0.5 translate-y-[2px]">k</span>
+                  <span className="text-sm font-bold text-[#0F1B33]">kodu</span>
+                  <span className="text-sm font-bold text-[#C9A96E]">PM</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadLogo(f);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                disabled={logoBusy}
+                className="flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+              >
+                {logoBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {companyLogo ? t('settings.logoReplace') : t('settings.logoUpload')}
+              </button>
+              {companyLogo && (
+                <button
+                  onClick={removeLogo}
+                  disabled={logoBusy}
+                  className="flex items-center gap-2 border border-border px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-red-500 hover:border-red-300 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {t('settings.logoRemove')}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Gestión de equipo: solo visible para quien puede invitar (admin/PM) */}
       {canManageTeam && (

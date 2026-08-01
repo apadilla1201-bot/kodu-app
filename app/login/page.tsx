@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
@@ -21,6 +21,23 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Logo de la compañía del usuario ya autenticado (si volvió al login con
+  // sesión activa). null = fallback al wordmark koduPM (NUNCA PDG fijo).
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/company/profile', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.logoUrl) setCompanyLogo(data.logoUrl);
+        }
+      } catch {
+        // sin sesión o sin logo → wordmark koduPM
+      }
+    })();
+  }, []);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,8 +94,16 @@ function LoginForm() {
       <div className="hidden lg:flex lg:w-1/2 bg-[#0F1B33] relative items-center justify-center">
         <div className="absolute inset-0 bg-gradient-to-br from-[#0F1B33] via-[#1B2A4A] to-[#0F1B33]" />
         <div className="relative z-10 text-center px-12">
-          <div className="relative w-[280px] h-[130px] mx-auto mb-8">
-            <Image src="/pdg_logo.png" alt="The Project Delivery Group LLC" fill className="object-contain" />
+          <div className="relative w-[280px] h-[130px] mx-auto mb-8 flex items-center justify-center">
+            {companyLogo ? (
+              <Image src={companyLogo} alt="Company logo" fill className="object-contain" unoptimized={companyLogo.startsWith('http')} />
+            ) : (
+              <div className="flex items-baseline select-none" aria-label="koduPM">
+                <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-[#C9A96E] text-[#0F1B33] font-black text-2xl mr-2 translate-y-[6px]">k</span>
+                <span className="text-5xl font-black text-white tracking-tight">kodu</span>
+                <span className="text-5xl font-black text-[#C9A96E] tracking-tight">PM</span>
+              </div>
+            )}
           </div>
           <h1 className="text-3xl font-display font-bold text-[#C9A96E] tracking-tight mb-4">
             {t('auth.heroTitle')}
@@ -101,8 +126,16 @@ function LoginForm() {
       <div className="flex-1 flex items-center justify-center p-8 bg-[#FEFBF5]">
         <div className="w-full max-w-md">
           <div className="lg:hidden mb-8 flex justify-center">
-            <div className="relative w-[200px] h-[90px]">
-              <Image src="/pdg_logo_dark.png" alt="PDG Logo" fill className="object-contain" />
+            <div className="relative w-[200px] h-[90px] flex items-center justify-center">
+              {companyLogo ? (
+                <Image src={companyLogo} alt="Company logo" fill className="object-contain" unoptimized={companyLogo.startsWith('http')} />
+              ) : (
+                <div className="flex items-baseline select-none" aria-label="koduPM">
+                  <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[#0F1B33] text-[#C9A96E] font-black text-lg mr-1.5 translate-y-[4px]">k</span>
+                  <span className="text-3xl font-black text-[#0F1B33] tracking-tight">kodu</span>
+                  <span className="text-3xl font-black text-[#C9A96E] tracking-tight">PM</span>
+                </div>
+              )}
             </div>
           </div>
           <h2 className="text-2xl font-display font-bold text-[#0F1B33] tracking-tight mb-2">

@@ -77,21 +77,23 @@ const NAV_BY_ROLE: Record<string, string[]> = {
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
     '/dashboard/buyout', '/dashboard/pay-apps', '/dashboard/budgets', '/dashboard/photos',
     '/dashboard/daily-logs', '/dashboard/directory', '/dashboard/analytics',
-    '/dashboard/import', '/dashboard/settings', '/dashboard/team',
+    '/dashboard/import', '/dashboard/settings', '/dashboard/team', '/dashboard/approvals',
+    '/dashboard/help',
   ],
   superintendent: [
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
     '/dashboard/buyout', '/dashboard/photos', '/dashboard/daily-logs', '/dashboard/directory',
-    '/dashboard/analytics', '/dashboard/settings',
+    '/dashboard/analytics', '/dashboard/settings', '/dashboard/help',
     // SIN /dashboard/pay-apps ni /dashboard/budgets
   ],
   projectViewer: [
     // owner del proyecto / viewer: solo lectura de su proyecto
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
-    '/dashboard/photos', '/dashboard/settings',
+    '/dashboard/photos', '/dashboard/settings', '/dashboard/help',
   ],
   subcontractor: [
     '/dashboard', '/dashboard/rfis', '/dashboard/submittals', '/dashboard/settings',
+    '/dashboard/help',
   ],
 };
 

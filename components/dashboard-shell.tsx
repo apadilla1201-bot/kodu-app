@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useI18n } from '@/hooks/use-i18n';
 import { navForRole, ROLE_LABELS } from '@/lib/permissions';
+import { GlobalSearch } from '@/components/global-search';
+import { NotificationBell } from '@/components/notification-bell';
+import { Breadcrumbs } from '@/components/breadcrumbs';
+import { PlanBadge } from '@/components/plan-badge';
 import type { AppLocale } from '@/lib/i18n';
 import {
   LayoutDashboard,
@@ -28,12 +32,32 @@ import {
   Languages,
   Wallet,
   UserPlus,
+  Search,
+  Inbox,
+  BookOpen,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const { data: session } = useSession() || {};
+  // Logo de la compañía: subido por el admin en Settings; null = wordmark
+  // koduPM (NUNCA PDG fijo — PDG solo aparece si ES la compañía del usuario).
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/company/profile', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.logoUrl) setCompanyLogo(data.logoUrl);
+        }
+      } catch {
+        // sin logo → wordmark koduPM
+      }
+    })();
+  }, []);
   const { t, locale, setLocale } = useI18n();
 
   // PASO 3: menú filtrado por rol (Super no ve Pay Apps ni Budgets; owner/sub ven solo lo suyo)
@@ -52,8 +76,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
     { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
     { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
+    { href: '/dashboard/approvals', label: t('nav.approvals'), icon: Inbox },
     { href: '/dashboard/import', label: t('nav.importExcel'), icon: FileSpreadsheet },
     { href: '/dashboard/team', label: 'Team', icon: UserPlus },
+    { href: '/dashboard/help', label: t('nav.help'), icon: BookOpen },
     { href: '/dashboard/settings', label: t('nav.settings'), icon: Settings },
   ];
 
@@ -79,8 +105,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       >
         <div className="flex flex-col h-full">
           <div className="p-5 border-b border-white/10">
-            <div className="relative w-[180px] h-[60px] mx-auto">
-              <Image src="/pdg_logo.png" alt="PDG Logo" fill className="object-contain" />
+            <div className="relative w-[180px] h-[60px] mx-auto flex items-center justify-center">
+              {companyLogo ? (
+                <Image src={companyLogo} alt="Company logo" fill className="object-contain" unoptimized={companyLogo.startsWith('http')} />
+              ) : (
+                <div className="flex items-baseline select-none" aria-label="koduPM">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#C9A96E] text-[#0F1B33] font-black text-base mr-1.5 translate-y-[3px]">k</span>
+                  <span className="text-2xl font-black text-white tracking-tight">kodu</span>
+                  <span className="text-2xl font-black text-[#C9A96E] tracking-tight">PM</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -108,6 +142,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="p-4 border-t border-white/10">
+            <PlanBadge />
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-[#C9A96E]/20 flex items-center justify-center">
                 <User className="w-4 h-4 text-[#C9A96E]" />
@@ -138,11 +173,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-sm font-medium text-muted-foreground">
-              {t('nav.corSystem')}
+            <h1 className="flex items-baseline select-none" aria-label="koduPM">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#0F1B33] text-[#C9A96E] font-bold text-sm mr-1.5 translate-y-[3px]">k</span>
+              <span className="text-lg font-bold text-[#0F1B33] tracking-tight">kodu</span>
+              <span className="text-lg font-bold text-[#C9A96E] tracking-tight">PM</span>
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+              className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:border-[#C9A96E]/60 hover:text-foreground transition-colors"
+              aria-label="Search"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{t('search.trigger')}</span>
+              <kbd className="px-1 py-0.5 rounded border border-border text-[10px]">Ctrl K</kbd>
+            </button>
+            <NotificationBell />
             <Languages className="w-4 h-4 text-muted-foreground hidden sm:block" />
             <select
               value={locale}
@@ -157,8 +204,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          {children}
+          <style>{`@keyframes koduFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+          <Breadcrumbs />
+          <div key={pathname ?? 'page'} style={{ animation: 'koduFadeIn 180ms ease-out' }}>
+            {children}
+          </div>
         </main>
+        <GlobalSearch />
       </div>
     </div>
   );

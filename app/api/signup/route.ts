@@ -59,12 +59,19 @@ export async function POST(request: Request) {
     // nombre para que Augusto la contacte y la suba a mano tras el acuerdo.
     const isEnterpriseLead = requestedPlan === 'enterprise';
 
+    // Regla de marca (2026-08): el logo PDG queda EXCLUSIVO de la compañía
+    // "The Project Delivery Group LLC" (los proyectos reales de Augusto).
+    // Cualquier otra compañía nueva nace SIN logo → la app muestra el
+    // wordmark koduPM hasta que suba el suyo desde Settings.
+    const isPDG = /project\s*delivery\s*group/i.test(finalCompanyName);
+
     const company = await prisma.company.create({
       data: {
         name: isEnterpriseLead
           ? `${finalCompanyName} [ENTERPRISE LEAD]`
           : finalCompanyName,
         plan: isEnterpriseLead ? 'starter' : requestedPlan,
+        logoUrl: isPDG ? '/pdg_logo.png' : null,
       },
     });
 
