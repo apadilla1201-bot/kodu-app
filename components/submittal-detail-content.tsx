@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/hooks/use-i18n';
-import { ArrowLeft, FileStack, CheckCircle2, RotateCcw, Paperclip, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileStack, CheckCircle2, RotateCcw, Paperclip, Download, Loader2, FileText } from 'lucide-react';
 import { downloadStorageFile, uploadFileToStorage } from '@/lib/upload-client';
 
 interface SubmittalAttachment {
@@ -160,9 +160,19 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
           <h1 className="text-2xl font-bold">{submittal.submittalNumber}</h1>
           <p className="text-lg text-muted-foreground mt-1">{submittal.title}</p>
         </div>
-        <span className={`self-start px-3 py-1 rounded-full text-sm font-medium ${statusStyles[submittal.status] ?? 'bg-gray-100'}`}>
-          {submittal.status}
-        </span>
+        <div className="flex items-center gap-2 self-start">
+          <a
+            href={`/api/submittals/${submittal.id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-[#0F1B33] hover:bg-[#1B2A4A] text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+          >
+            <FileText className="w-4 h-4" /> PDF
+          </a>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusStyles[submittal.status] ?? 'bg-gray-100'}`}>
+            {submittal.status}
+          </span>
+        </div>
       </div>
 
       {submittal.ballInCourt && (

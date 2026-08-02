@@ -79,3 +79,36 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'Failed to update RFI' }, { status: 500 });
   }
 }
+
+
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const role = (session.user as any)?.role;
+    if (role !== 'admin' && role !== 'owner' && role !== 'pm') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const companyId = (session.user as any)?.companyId ?? '';
+
+    const rfi = await prisma.rFI.findFirst({
+      where: { id: params?.id ?? '', project: { companyId } },
+      select: { id: true },
+    });
+
+    if (!rfi) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    // Los adjuntos del RFI se borran primero por si la relación no tiene cascade.
+    await prisma.rFIAttachment.deleteMany({ where: { rfiId: rfi.id } });
+    await prisma.rFI.delete({ where: { id: rfi.id } });
+
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    console.error('DELETE /api/rfis/[id] error:', error);
+    return NextResponse.json({ error: 'Failed to delete RFI' }, { status: 500 });
+  }
+}

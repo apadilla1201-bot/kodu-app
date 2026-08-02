@@ -110,6 +110,26 @@ export async function htmlToPdf(html: string, options: HtmlToPdfOptions = {}): P
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
+    // Esperar a que TODAS las imágenes (logos de empresa) terminen de cargar.
+    // Sin esto, el PDF se imprime antes de que el navegador descargue el logo
+    // y el encabezado sale vacío (domcontentloaded no espera recursos).
+    await page.evaluate(async () => {
+      await Promise.all(
+        Array.from(document.images).map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => {
+                img.addEventListener('load', () => resolve());
+                img.addEventListener('error', () => resolve());
+                setTimeout(() => resolve(), 8000);
+              }),
+        ),
+      );
+      if (document.fonts?.ready) {
+        try { await document.fonts.ready; } catch { /* opcional */ }
+      }
+    });
+
     const pdfOptions: Record<string, unknown> = {
       printBackground: true,
       margin: options.margin ?? { top: '0.5in', bottom: '0.5in', left: '0.5in', right: '0.5in' },

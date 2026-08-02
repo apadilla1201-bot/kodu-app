@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
-  AlertTriangle, ClipboardList, DollarSign, RefreshCw, Upload, Mail, Search, Save, Loader2, Sparkles,
+  AlertTriangle, ClipboardList, DollarSign, RefreshCw, Upload, Mail, Search, Save, Loader2, Sparkles, FileText,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { BUYOUT_STATUSES } from '@/lib/buyout';
@@ -278,6 +278,14 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
           <button onClick={load} className="px-3 py-2 border border-border rounded-lg text-sm flex items-center gap-1 hover:bg-muted">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
+          <a
+            href={`/api/buyout/pdf?projectId=${projectId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`px-3 py-2 border border-border rounded-lg text-sm flex items-center gap-1 hover:bg-muted ${!projectId ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <FileText className="w-4 h-4" /> PDF
+          </a>
           <button
             onClick={handleGenerate}
             disabled={generating || !projectId}

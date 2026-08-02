@@ -1,50 +1,51 @@
-# EMPRESA-DATOS — Cada empresa pone su dirección y licencia en los reportes
+# MEJORAS 3 — Logos en PDFs corregidos + reportes nuevos + eliminar RFI
 
-## IMPORTANTE primero
+## Qué corrige / agrega
 
-Este paquete **incluye también todo lo del paquete REPORTES-LOGO** (el logo en
-los PDFs). Entonces:
+### 1. FIX: el logo ahora SÍ sale en los PDFs (RFI, Pay App, todos)
+La causa: el generador de PDF imprimía la página ANTES de que el navegador
+interno terminara de descargar la imagen del logo, y el encabezado salía vacío.
+Ahora espera a que todas las imágenes carguen antes de imprimir.
 
-- Si **NO subiste** el paquete anterior → sube **solo este**.
-- Si **YA subiste** el anterior → sube este encima, sin problema (reemplaza
-  esos archivos con la versión nueva).
+### 2. NUEVO: botón "Delete" en el detalle del RFI
+Junto al botón Download PDF. Pide confirmación. Solo admin/owner/PM pueden
+borrar (el servidor lo valida).
 
-## Qué hace este paquete
+### 3. NUEVO: reporte PDF de Budget
+En el detalle de cualquier presupuesto (Budgets → abrir uno) aparece un ícono
+de documento junto al basurero → descarga el PDF: logo y nombre de la empresa,
+resumen financiero (Construction, Furnishings, O&P, GL, Contingency, TOTAL),
+todas las partidas, exclusiones y supuestos. En el idioma de tu perfil.
 
-1. **Configuración → nueva tarjeta "Datos de la empresa para reportes"**:
-   dirección, ciudad, teléfono, sitio web y número de licencia de cada empresa.
-2. **Los reportes PDF ya no traen nada fijo de PDG**: toman nombre, logo,
-   dirección, contacto y licencia de la empresa que genera el reporte.
-3. Tu empresa **Project Delivery Group queda ya llenada** con sus datos reales
-   (Miami, licencia CGC1530498, etc.) — no tienes que escribir nada.
-4. Empresas sin datos: el PDF sale con el logo koduPM y sin líneas de
-   dirección (se ven limpios igual).
+### 4. NUEVO: reporte PDF de Buyout
+En Buyout hay un botón "PDF" junto a Refresh → descarga la matriz completa
+del proyecto seleccionado: resumen (presupuesto, contratado, CORs, invertido,
+restante) y tabla por oficio con montos, estados y fechas. Hoja tamaño Tabloid
+horizontal.
 
-## Pasos (5 minutos)
+### 5. NUEVO: reporte PDF de Submittal
+En el detalle de cualquier submittal hay un botón "PDF" junto al estado →
+ficha completa: logo, datos, ball in court, descripción, respuesta, notas
+y lista de adjuntos.
 
-### 1. Subir a GitHub
-Descomprime el ZIP. En tu repo **kodu-app**: **Add file → Upload files** →
-arrastra las **5 carpetas**: `app`, `components`, `lib`, `prisma`, `public`
-→ **Commit changes**.
+## Cómo subirlo (2 minutos)
 
-### 2. Esperar el despliegue
-1-2 minutos en Vercel.
+1. Descomprime el ZIP.
+2. Repo **kodu-app** → Add file → Upload files.
+3. Arrastra las **2 carpetas**: `app` y `components` → Commit changes.
+4. Espera 1-2 minutos a Vercel.
 
-### 3. Crear las columnas nuevas (una sola vez)
-Abre esta dirección en tu navegador:
+## Cómo verificar
 
-  https://app.kodupm.com/api/internal/company-columns?key=kodupm-migrar-2026
+1. Abre un **RFI** → Download PDF → ahora SÍ sale el logo de PDG arriba.
+2. En ese mismo RFI: botón **Delete** rojo junto al PDF (no lo uses en uno real
+   si no quieres borrarlo).
+3. Abre un **Pay App** → PDF → logo visible.
+4. Abre un **Budget** → ícono de documento (arriba a la derecha) → PDF completo.
+5. Ve a **Buyout** → botón **PDF** → matriz del proyecto.
+6. Abre un **Submittal** → botón **PDF** → ficha completa.
 
-Debes ver: **{"ok":true,...,"pdgSeeded":true}**
-
-### 4. BORRAR el archivo temporal (obligatorio)
-En GitHub: `app` → `api` → `internal` → `company-columns` → `route.ts` →
-menú **⋮** (arriba a la derecha) → **Delete file** → **Commit changes**.
-(Este archivo ya no se necesita y no debe quedar en el repo.)
-
-### 5. Verificar
-- Entra a **Configuración**: debes ver la tarjeta **"Datos de la empresa para
-  reportes"** ya llena con los datos de PDG. Puedes editarlos y Guardar.
-- Descarga el PDF de un **RFI** o un **Pay App**: el encabezado trae tu logo,
-  el nombre de la empresa y la dirección; el G702 trae la licencia en la
-  barra dorada.
+## Nota sobre info@kodupm.com
+(Ver el mensaje del chat: el dominio kodupm.com NO tiene buzón de correo
+activo todavía; hay que crearlo para que los correos de "cambio de plan"
+lleguen de verdad.)

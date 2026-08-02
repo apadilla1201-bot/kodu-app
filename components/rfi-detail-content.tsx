@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft, FileQuestion, Clock, CheckCircle2, AlertTriangle, Send,
   Paperclip, Upload, X, Download, MessageSquare, CalendarDays, User,
-  Building2, MapPin, FileText,
+  Building2, MapPin, FileText, Trash2,
 } from 'lucide-react';
 import { uploadFileToStorage, downloadStorageFile, downloadBlobFile, fetchRfiPdf } from '@/lib/upload-client';
 
@@ -105,6 +105,22 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
   const [respondLoading, setRespondLoading] = useState(false);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete RFI ${rfi?.rfiNumber ?? ''}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/rfis/${rfi.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? 'Delete failed');
+      toast({ title: 'RFI deleted' });
+      router.push('/dashboard/rfis');
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Failed to delete RFI', variant: 'destructive' });
+      setDeleting(false);
+    }
+  };
 
   const handleGeneratePdf = async () => {
     setPdfLoading(true);
@@ -222,6 +238,15 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
           >
             <FileText className="w-4 h-4" />
             {pdfLoading ? 'Generating...' : 'Download PDF'}
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Delete RFI"
+            className="inline-flex items-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" />
+            {deleting ? 'Deleting...' : 'Delete'}
           </button>
           <select
             value={rfi?.status ?? 'Open'}

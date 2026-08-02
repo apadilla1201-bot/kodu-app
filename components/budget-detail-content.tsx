@@ -79,10 +79,17 @@ export function BudgetDetailContent({ budget }: { budget: any }) {
               {budget.totalACSF ? <> · AC: {budget.totalACSF.toLocaleString()} SF · Rate: ${budget.sfRate?.toFixed(2)}/SF</> : null}
             </p>
           </div>
-          <button onClick={handleDelete} disabled={deleting}
-            className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <a href={`/api/budgets/${budget.id}/pdf`} target="_blank" rel="noopener noreferrer"
+              title="Download PDF report"
+              className="text-[#0F1B33] hover:text-[#C9A96E] p-2 rounded-lg hover:bg-muted transition-colors">
+              <FileText className="w-4 h-4" />
+            </a>
+            <button onClick={handleDelete} disabled={deleting}
+              className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 transition-colors">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Financial summary */}
