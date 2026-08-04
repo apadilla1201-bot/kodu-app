@@ -73,6 +73,7 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
       advancePayments: payApp.advancePayments ?? 0,
       advancePaymentsLabel: payApp.advancePaymentsLabel ?? '',
       directPayments: payApp.directPayments ?? 0,
+      directPaymentsCurrent: payApp.directPaymentsCurrent ?? 0,
       directPaymentsLabel: payApp.directPaymentsLabel ?? '',
       previousCertificates: payApp.previousCertificates ?? 0,
       contractorPrinted: payApp.contractorPrinted ?? '',
@@ -125,6 +126,7 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
         glInsuranceAmount: Number(editData.glInsuranceAmount) || 0,
         advancePayments: Number(editData.advancePayments) || 0,
         directPayments: Number(editData.directPayments) || 0,
+        directPaymentsCurrent: Number(editData.directPaymentsCurrent) || 0,
         previousCertificates: Number(editData.previousCertificates) || 0,
         lineItems: editLines.map((li: any, i: number) => ({
           sortOrder: i + 1,
@@ -219,7 +221,7 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
   const retPct = currentData.retainagePercent ?? 0.10;
   const retainageOnCompleted = totalCompleted * retPct;
   const calcEarnedLessRet = totalCompleted - retainageOnCompleted;
-  const calcPaymentDue = calcEarnedLessRet - (Number(currentData.advancePayments) || 0) - (Number(currentData.directPayments) || 0) - (Number(currentData.previousCertificates) || 0);
+  const calcPaymentDue = calcEarnedLessRet - (Number(currentData.advancePayments) || 0) - (Number(currentData.directPaymentsCurrent) || 0) - (Number(currentData.previousCertificates) || 0);
   // Use G702 fixed values when available (not editing)
   const totalEarnedLessRet = (!editing && (payApp as any).g702TotalEarned) ? (payApp as any).g702TotalEarned : calcEarnedLessRet;
   const currentPaymentDue = (!editing && (payApp as any).g702CurrentPaymentDue) ? (payApp as any).g702CurrentPaymentDue : calcPaymentDue;
@@ -381,16 +383,20 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
             </div>
           </div>
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">{t('payApps.deductions')}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.advancePayments')}</label>
               <input type="number" step="any" value={editData.advancePayments} onChange={e => setEditData({...editData, advancePayments: e.target.value})} className={inputClass} />
               <input placeholder={t('payApps.advanceLabelPlaceholder')} value={editData.advancePaymentsLabel} onChange={e => setEditData({...editData, advancePaymentsLabel: e.target.value})} className={inputClass + ' mt-1'} />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.directPayments')}</label>
-              <input type="number" step="any" value={editData.directPayments} onChange={e => setEditData({...editData, directPayments: e.target.value})} className={inputClass} />
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.directPayments')} (accumulated / acumulado — auto)</label>
+              <input type="number" step="any" value={editData.directPayments} readOnly title="Lo calcula el sistema: acumulado de la PA anterior" className={inputClass + ' bg-muted/40 text-muted-foreground'} />
               <input placeholder={t('payApps.directLabelPlaceholder')} value={editData.directPaymentsLabel} onChange={e => setEditData({...editData, directPaymentsLabel: e.target.value})} className={inputClass + ' mt-1'} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.directPayments')} — this period (deduction)</label>
+              <input type="number" step="any" value={editData.directPaymentsCurrent} onChange={e => setEditData({...editData, directPaymentsCurrent: e.target.value})} className={inputClass} />
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1">{t('payApps.previousCertificates')}</label>

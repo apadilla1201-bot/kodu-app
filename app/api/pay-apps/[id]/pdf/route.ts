@@ -93,11 +93,12 @@ function buildG702Html(pa: any, project: any, lines: LineItem[], brand: PdfBrand
   const advPay = pa.advancePayments || 0;
   const directPayDeduction = (pa as any).directPaymentsDeduction || pa.directPayments || 0;
   const directPayTotal = pa.directPayments || 0;
-  const directPayPrev = (pa as any).directPaymentsPrevious || 0;
+  const directPayCurrent = (pa as any).directPaymentsCurrent || 0;
+  const directPayAccum = pa.directPayments || 0;  // 7b: acumulado previo (igual que el Excel del GC)
   const prevCert = pa.previousCertificates || 0;
 
   // Line 8: use G702 fixed value or calculate
-  const currentPayment = (pa as any).g702CurrentPaymentDue ?? (totalEarned - prevCert - advPay - directPayDeduction);
+  const currentPayment = (pa as any).g702CurrentPaymentDue ?? (totalEarned - prevCert - advPay - (directPayCurrent || directPayDeduction));
   // Line 9: use G702 fixed value or calculate
   const balanceToFinish = (pa as any).g702BalanceToFinish ?? (contractSumToDate - totalEarned);
 
@@ -177,8 +178,9 @@ function buildG702Html(pa: any, project: any, lines: LineItem[], brand: PdfBrand
         <tr><td class="line-num">6.</td><td class="line-label">TOTAL EARNED LESS RETAINAGE (4 − 5)</td><td class="line-val">${fmtD(totalEarned)}</td></tr>
         <tr><td class="line-num">7.</td><td class="line-label">LESS PREVIOUS CERTIFICATES FOR PAYMENT</td><td class="line-val">${fmtD(prevCert)}</td></tr>
         ${advPay ? `<tr class="deduction-row"><td></td><td>7a. Advance Payments${pa.advancePaymentsLabel ? ` (${esc(pa.advancePaymentsLabel)})` : ''}</td><td class="line-val" style="font-size:8pt;">${fmtD(advPay)}</td></tr>` : ''}
-        ${directPayDeduction ? `<tr class="deduction-row"><td></td><td>7b. Direct Payments${pa.directPaymentsLabel ? ` (${esc(pa.directPaymentsLabel)})` : ''}</td><td class="line-val" style="font-size:8pt;">${fmtD(directPayDeduction)}</td></tr>` : (directPayTotal ? `<tr class="deduction-row"><td></td><td>7b. Direct Payments${pa.directPaymentsLabel ? ` (${esc(pa.directPaymentsLabel)})` : ''}</td><td class="line-val" style="font-size:8pt;">${fmtD(directPayTotal)}</td></tr>` : '')}
-        ${(directPayPrev > 0 || directPayDeduction > 0 || directPayTotal > 0) ? `<tr class="deduction-row" style="background:#F7F6F2;"><td></td><td style="font-weight:600;">7c. ${locale === 'es' ? 'Pagos directos del Owner' : 'Direct Payments by Owner'} — ${locale === 'es' ? 'acumulado previo' : 'previous'}: ${fmtD(directPayPrev)} · ${locale === 'es' ? 'TOTAL A LA FECHA' : 'TOTAL TO DATE'}</td><td class="line-val" style="font-weight:700;">${fmtD(directPayPrev + (directPayDeduction || directPayTotal))}</td></tr>` : ''}
+        ${directPayAccum ? `<tr class="deduction-row"><td></td><td>7b. ${locale === 'es' ? 'Pagos directos del Owner' : 'Direct Payments by Owner'} — ${locale === 'es' ? 'acumulado previo' : 'accumulated previous'}${pa.directPaymentsLabel ? ` (${esc(pa.directPaymentsLabel)})` : ''}</td><td class="line-val" style="font-size:8pt;">${fmtD(directPayAccum)}</td></tr>` : ''}
+        ${(directPayCurrent || directPayDeduction) ? `<tr class="deduction-row"><td></td><td>7c. ${locale === 'es' ? 'Pagos directos del Owner' : 'Direct Payments by Owner'} — ${locale === 'es' ? 'este período (deducción)' : 'this period (deduction)'}</td><td class="line-val" style="font-size:8pt;">${fmtD(directPayCurrent || directPayDeduction)}</td></tr>` : ''}
+        ${(directPayAccum || directPayCurrent || directPayDeduction) ? `<tr class="deduction-row" style="background:#F7F6F2;"><td></td><td style="font-weight:600;">7d. ${locale === 'es' ? 'TOTAL PAGOS DIRECTOS A LA FECHA (7b + 7c)' : 'TOTAL DIRECT PAYMENTS TO DATE (7b + 7c)'}</td><td class="line-val" style="font-weight:700;">${fmtD(directPayAccum + (directPayCurrent || directPayDeduction))}</td></tr>` : ''}
         <tr class="total"><td class="line-num">8.</td><td class="line-label">CURRENT PAYMENT DUE</td><td class="line-val">${fmtD(currentPayment)}</td></tr>
         <tr><td class="line-num">9.</td><td class="line-label">BALANCE TO FINISH, INCLUDING RETAINAGE</td><td class="line-val">${fmtD(balanceToFinish)}</td></tr>
       </table>
@@ -462,16 +464,21 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const locale = await getSessionLocale();
     const brand = await getPdfBrand((session.user as any)?.companyId ?? '', appBaseUrl(), 30);
 
-    // Acumulado "Paid by Owner": suma de los pagos directos de las PA anteriores
-    // del mismo proyecto (como el Excel del GC: previo + este período por separado).
-    const prevPas = await prisma.payApplication.findMany({
-      where: { projectId: pa.projectId, applicationNumber: { lt: pa.applicationNumber } },
-      select: { directPayments: true, directPaymentsDeduction: true },
-    });
-    (pa as any).directPaymentsPrevious = prevPas.reduce(
-      (sum: number, p: any) => sum + ((p.directPaymentsDeduction || p.directPayments || 0) as number),
-      0,
-    );
+    // Acumulado "Paid by Owner" (7b): lo calcula el sistema.
+    // Prioridad: 1) valor guardado en el registro; 2) si está vacío y hay PAs
+    // anteriores, se autollenan: total acumulado de la PA inmediata anterior
+    // (su 7b + su 7c). Así el G702 siempre sale correcto sin intervención.
+    if (!(pa.directPayments ?? 0)) {
+      const prevPa = await prisma.payApplication.findFirst({
+        where: { projectId: pa.projectId, applicationNumber: { lt: pa.applicationNumber } },
+        orderBy: { applicationNumber: 'desc' },
+        select: { directPayments: true, directPaymentsCurrent: true },
+      });
+      if (prevPa) {
+        (pa as any).directPayments =
+          (prevPa.directPayments ?? 0) + ((prevPa as any).directPaymentsCurrent ?? 0);
+      }
+    }
 
     const htmlPages: string[] = [];
     if (type === 'g702' || type === 'both') {

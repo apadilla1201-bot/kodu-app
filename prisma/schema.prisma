@@ -490,8 +490,9 @@ model PayApplication {
   glInsuranceAmount       Float            @default(0)
   advancePayments         Float            @default(0)
   advancePaymentsLabel    String?
-  directPayments          Float            @default(0)
-  directPaymentsDeduction Float            @default(0)
+  directPayments          Float            @default(0)   // 7b: acumulado PREVIO — lo calcula el sistema (PA anterior) o se siembra una vez
+  directPaymentsDeduction Float            @default(0)   // legacy (fallback)
+  directPaymentsCurrent   Float            @default(0)   // 7c: pago directo del Owner en ESTE período (deducción línea 8)
   directPaymentsLabel     String?
   previousCertificates    Float            @default(0)
   g702NetChange           Float?

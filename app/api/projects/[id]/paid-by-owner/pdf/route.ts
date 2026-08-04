@@ -70,6 +70,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         status: true,
         directPayments: true,
         directPaymentsDeduction: true,
+        directPaymentsCurrent: true,
         directPaymentsLabel: true,
       },
     });
@@ -81,16 +82,19 @@ export async function GET(request: Request, { params }: { params: { id: string }
     let running = 0;
     const rows: string[] = [];
     for (const pa of payApps) {
-      const amount = (pa.directPaymentsDeduction || pa.directPayments || 0) as number;
-      if (amount <= 0) continue;
+      const amount = ((pa as any).directPaymentsCurrent || pa.directPaymentsDeduction || 0) as number;
+      const accum = (pa.directPayments || 0) as number;
+      if (amount <= 0 && accum <= 0) continue;
       running += amount;
+      const accumShown = accum > 0 ? accum + amount : running;
+      if (accumShown > running) running = accumShown; // respeta la cifra oficial del contrato
       rows.push(`<tr>
         <td class="num">PA #${pa.applicationNumber}</td>
         <td>${esc(fmtDate(pa.periodFrom, locale))} — ${esc(fmtDate(pa.periodTo, locale))}</td>
         <td class="desc">${esc(pa.directPaymentsLabel || 'Direct payment by the Owner to SubS')}</td>
         <td>${esc(pa.status || '')}</td>
-        <td class="num">${fmtMoney(amount)}</td>
-        <td class="num strong">${fmtMoney(running)}</td>
+        <td class="num">${amount > 0 ? fmtMoney(amount) : '—'}</td>
+        <td class="num strong">${fmtMoney(accumShown)}</td>
       </tr>`);
     }
 

@@ -59,6 +59,14 @@ export async function POST(request: Request) {
     });
     const nextNum = (lastPA?.applicationNumber ?? 0) + 1;
 
+    // "Paid by Owner" AUTOMÁTICO: si el usuario no escribió el acumulado (7b),
+    // se hereda de la PA inmediata anterior (su 7b acumulado + su 7c período).
+    // El usuario solo responde "¿hubo pagos del Owner este período?" (7c).
+    if (!(Number(data.directPayments) > 0) && lastPA) {
+      data.directPayments =
+        (lastPA.directPayments ?? 0) + ((lastPA as any).directPaymentsCurrent ?? 0);
+    }
+
     const lineItems = data.lineItems ?? [];
     delete data.lineItems;
 

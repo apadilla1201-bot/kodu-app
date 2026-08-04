@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ArrowLeft, Loader2, Copy, FileText, FileSpreadsheet, Upload, Pencil, Check,
-  AlertCircle, ChevronRight, Plus, Trash2, GripVertical, ChevronDown, ChevronUp,
+  AlertCircle, ChevronRight, Plus, Trash2, GripVertical, ChevronDown, ChevronUp, DollarSign,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ interface ProjectOption {
   projectName: string;
   nextAppNumber: number;
   lastPayAppId: string | null;
+  paidByOwnerToDate?: number;
 }
 
 interface Props {
@@ -78,8 +79,18 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
   const [headerExpanded, setHeaderExpanded] = useState(false);
   const [editHeader, setEditHeader] = useState<any>({});
 
+  // "Paid by Owner" — el sistema pregunta y acumula solo
+  const [pboAnswered, setPboAnswered] = useState(false);
+  const [pboHas, setPboHas] = useState<boolean | null>(null);
+  const [pboAmount, setPboAmount] = useState('');
+  const [pboDetail, setPboDetail] = useState('');
+
   const selectedProject = projects.find(p => p.id === projectId);
   const appNumber = selectedProject?.nextAppNumber ?? 1;
+
+  // Acumulado "Paid by Owner" que el sistema heredará automáticamente (7b)
+  const pboCarry = selectedProject?.paidByOwnerToDate ?? 0;
+
 
   const today = new Date();
   const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -245,6 +256,19 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
   /* ── Create PA ── */
   const handleCreate = async () => {
     if (!projectId) return;
+    // "Paid by Owner": obligatorio responder — así nadie se lo salta por no saber.
+    if (!pboAnswered) {
+      toast.error(locale === 'es'
+        ? 'Responde si el Owner hizo pagos directos en este período (sí / no).'
+        : 'Please answer whether the Owner made direct payments this period (yes / no).');
+      return;
+    }
+    if (pboHas && !(Number(pboAmount) > 0)) {
+      toast.error(locale === 'es'
+        ? 'Escribe el monto pagado por el Owner en este período.'
+        : 'Enter the amount paid by the Owner this period.');
+      return;
+    }
     setSaving(true);
     try {
       const headerToSend = { ...(editHeader || importedHeader || {}) };
@@ -264,8 +288,15 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
         periodFrom,
         periodTo,
         ...headerToSend,
+        // "Paid by Owner" automático: 7b = acumulado heredado (el servidor también lo
+        // autollenar si falta), 7c = lo de este período que respondió el usuario.
+        directPayments: pboCarry,
+        directPaymentsCurrent: pboHas ? (Number(pboAmount) || 0) : 0,
         lineItems: importedLines.map((li, i) => ({ ...li, sortOrder: i + 1 })),
       };
+      if (pboHas && pboDetail.trim() && !body.directPaymentsLabel) {
+        body.directPaymentsLabel = pboDetail.trim();
+      }
       if (body.contractDate && typeof body.contractDate === 'string' && !body.contractDate.includes('T')) {
         try { body.contractDate = new Date(body.contractDate).toISOString(); } catch {}
       }
@@ -556,6 +587,67 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                   <Label className="text-xs">Período Hasta</Label>
                   <Input type="date" value={periodTo} onChange={e => setPeriodTo(e.target.value)} />
                 </div>
+              </div>
+
+              {/* ── Pagos directos del Owner (Paid by Owner) — el sistema acumula solo ── */}
+              <div className={`rounded-lg border p-4 space-y-3 ${pboAnswered ? 'border-green-200 bg-green-50/50' : 'border-[#C9A96E]/60 bg-[#F7F6F2]'}`}>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-[#C9A96E]" />
+                  {locale === 'es'
+                    ? '¿El Owner hizo pagos directos a subs o suplidores en este período?'
+                    : 'Did the Owner make direct payments to subs or suppliers this period?'}
+                </p>
+                {pboCarry > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'es' ? 'Acumulado a la fecha (automático)' : 'Accumulated to date (automatic)'}: <strong>{fmt(pboCarry)}</strong>
+                  </p>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={pboHas === false ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setPboHas(false); setPboAnswered(true); setPboAmount(''); }}
+                    className={pboHas === false ? 'bg-[#0F1B33] text-white' : ''}
+                  >
+                    {locale === 'es' ? 'No, ninguno' : 'No, none'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={pboHas === true ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setPboHas(true); setPboAnswered(true); }}
+                    className={pboHas === true ? 'bg-[#0F1B33] text-white' : ''}
+                  >
+                    {locale === 'es' ? 'Sí, hubo pagos' : 'Yes, there were payments'}
+                  </Button>
+                  {pboHas && (
+                    <>
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        placeholder={locale === 'es' ? 'Monto de este período' : 'Amount this period'}
+                        value={pboAmount}
+                        onChange={(e) => setPboAmount(e.target.value)}
+                        className="w-44"
+                      />
+                      <Input
+                        placeholder={locale === 'es' ? 'Detalle (a quién se pagó)' : 'Detail (who was paid)'}
+                        value={pboDetail}
+                        onChange={(e) => setPboDetail(e.target.value)}
+                        className="flex-1 min-w-[180px]"
+                      />
+                    </>
+                  )}
+                </div>
+                {pboHas && Number(pboAmount) > 0 && (
+                  <p className="text-xs text-green-800">
+                    {locale === 'es'
+                      ? `En el G702: 7b acumulado ${fmt(pboCarry)} · 7c este período ${fmt(Number(pboAmount))} · 7d total ${fmt(pboCarry + Number(pboAmount))}`
+                      : `On the G702: 7b accumulated ${fmt(pboCarry)} · 7c this period ${fmt(Number(pboAmount))} · 7d total ${fmt(pboCarry + Number(pboAmount))}`}
+                  </p>
+                )}
               </div>
 
               {/* G702 Header - collapsible */}
