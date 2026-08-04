@@ -700,7 +700,7 @@ export function CORWizard({ projects, initialProjectId }: { projects: ProjectOpt
                   {generating ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
                   ) : (
-                    <><FileText className="w-4 h-4" /> Create COR & Generate PDF</>
+                    <><FileText className="w-4 h-4" /> {ownerEmail ? 'Create & Send to Owner for Approval' : 'Create COR & Generate PDF'}</>
                   )}
                 </button>
               </div>

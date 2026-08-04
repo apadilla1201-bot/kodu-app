@@ -106,6 +106,39 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sendingApproval, setSendingApproval] = useState(false);
+
+  const handleSendApproval = async () => {
+    const defaultEmail = (rfi as any)?.assignedToEmail ?? '';
+    const defaultName = (rfi as any)?.assignedTo ?? '';
+    const email = prompt('Send this RFI to the Owner / Owner Rep for approval.\n\nApprover email:', defaultEmail);
+    if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast({ title: 'Invalid email', variant: 'destructive' });
+      return;
+    }
+    const name = prompt('Approver name (optional):', defaultName) ?? '';
+    setSendingApproval(true);
+    try {
+      const res = await fetch(`/api/rfis/${rfi.id}/send-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), name: name.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? 'Send failed');
+      toast({
+        title: 'RFI sent for approval',
+        description: data?.hasAccount
+          ? 'Sent. The approver has a koduPM account — they can also open it in the app.'
+          : 'Sent. The approver has no account — the secure link shows this RFI only.',
+      });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Failed to send', variant: 'destructive' });
+    } finally {
+      setSendingApproval(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm(`Delete RFI ${rfi?.rfiNumber ?? ''}? This cannot be undone.`)) return;
@@ -238,6 +271,15 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
           >
             <FileText className="w-4 h-4" />
             {pdfLoading ? 'Generating...' : 'Download PDF'}
+          </button>
+          <button
+            onClick={handleSendApproval}
+            disabled={sendingApproval}
+            title="Send to Owner / Owner Rep for approval (secure link)"
+            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-[#0F1B33] px-4 py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+          >
+            <Send className="w-4 h-4" />
+            {sendingApproval ? 'Sending...' : 'Send to Owner'}
           </button>
           <button
             onClick={handleDelete}

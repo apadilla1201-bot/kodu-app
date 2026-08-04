@@ -30,7 +30,7 @@ const disciplines = [
 ];
 
 const roles = [
-  'Project Manager', 'Superintendent', 'Owner', 'Architect', 'Engineer',
+  'Project Manager', 'Superintendent', 'Owner', "Owner's Rep", 'Architect', 'Engineer',
   'Subcontractor', 'Inspector', 'Consultant',
 ];
 

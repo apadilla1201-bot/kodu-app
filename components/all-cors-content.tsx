@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Search, FileText, Plus, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { Search, FileText, Plus, CheckCircle2, Clock, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface COR {
   id: string;
@@ -32,6 +32,24 @@ export function AllCorsContent({ projects }: { projects: ProjectWithCors[] }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [projectFilter, setProjectFilter] = useState('All');
+  const [sortField, setSortField] = useState<'corNumber' | 'date' | 'totalAmount'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const toggleSort = (field: 'corNumber' | 'date' | 'totalAmount') => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: 'corNumber' | 'date' | 'totalAmount' }) =>
+    sortField !== field
+      ? <ArrowUpDown className="w-3.5 h-3.5 inline ml-1 opacity-50" />
+      : sortDir === 'asc'
+        ? <ArrowUp className="w-3.5 h-3.5 inline ml-1 text-[#C9A96E]" />
+        : <ArrowDown className="w-3.5 h-3.5 inline ml-1 text-[#C9A96E]" />;
 
   const allCors = useMemo(() => {
     const items: (COR & { projectName: string; projectId: string })[] = [];
@@ -51,8 +69,14 @@ export function AllCorsContent({ projects }: { projects: ProjectWithCors[] }) {
       const matchStatus = statusFilter === 'All' || co?.status === statusFilter;
       const matchProject = projectFilter === 'All' || co?.projectId === projectFilter;
       return matchSearch && matchStatus && matchProject;
+    }).sort((a: any, b: any) => {
+      let cmp = 0;
+      if (sortField === 'corNumber') cmp = (a.corNumber ?? '').localeCompare(b.corNumber ?? '', undefined, { numeric: true });
+      else if (sortField === 'totalAmount') cmp = (a.totalAmount ?? 0) - (b.totalAmount ?? 0);
+      else cmp = new Date(a.date ?? 0).getTime() - new Date(b.date ?? 0).getTime();
+      return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [allCors, search, statusFilter, projectFilter]);
+  }, [allCors, search, statusFilter, projectFilter, sortField, sortDir]);
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-6">
@@ -100,12 +124,12 @@ export function AllCorsContent({ projects }: { projects: ProjectWithCors[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[#C9A96E]/10">
-                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider">CO #</th>
+                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider cursor-pointer select-none hover:text-[#C9A96E]" onClick={() => toggleSort('corNumber')}>CO #<SortIcon field="corNumber" /></th>
                 <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider">Project</th>
                 <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider">Date</th>
+                <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider cursor-pointer select-none hover:text-[#C9A96E]" onClick={() => toggleSort('date')}>Date<SortIcon field="date" /></th>
                 <th className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wider">Description</th>
-                <th className="text-right px-4 py-3 font-semibold text-xs uppercase tracking-wider">Total</th>
+                <th className="text-right px-4 py-3 font-semibold text-xs uppercase tracking-wider cursor-pointer select-none hover:text-[#C9A96E]" onClick={() => toggleSort('totalAmount')}>Total<SortIcon field="totalAmount" /></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

@@ -296,11 +296,17 @@ export async function sendCorApprovalRequestEmail(opts: {
   submittedBy: string;
   corId: string;
   externalApproveUrl?: string;
+  /** Si el aprobador ya tiene cuenta koduPM en esta empresa, enlace al COR dentro de la app. */
+  accountUrl?: string;
 }) {
   const link = `${appBaseUrl()}/dashboard/cors/${opts.corId}`;
   const externalLink = opts.externalApproveUrl
     ? `<p style="margin-top:12px;"><a href="${opts.externalApproveUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Review & Approve Without Login</a></p>
        <p style="font-size:11px;color:#9ca3af;margin-top:6px;">This secure link is unique to this Change Order and lets you review the amount and approve or reject it — no account needed.</p>`
+    : '';
+  const accountLink = opts.accountUrl
+    ? `<p style="margin-top:10px;"><a href="${opts.accountUrl}" style="display:inline-block;background:${NAVY};color:#C9A96E;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:2px solid #C9A96E;">Open in my koduPM account</a></p>
+       <p style="font-size:11px;color:#9ca3af;margin-top:6px;">You already have a koduPM account — sign in to view this Change Order with your permissions.</p>`
     : '';
   const html = wrapEmail(
     NAVY,
@@ -316,8 +322,9 @@ export async function sendCorApprovalRequestEmail(opts: {
         <p style="margin:4px 0 0 0;font-size:22px;font-weight:700;color:${NAVY};">${usd(opts.totalAmount)}</p>
       </div>
       <p><strong>Submitted By:</strong> ${opts.submittedBy}</p>
-      <p><a href="${link}" style="display:inline-block;background:${NAVY};color:${GOLD};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Change Order in Kodu</a></p>
+      ${opts.accountUrl ? '' : `<p><a href="${link}" style="display:inline-block;background:${NAVY};color:${GOLD};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Change Order in Kodu</a></p>`}
       ${externalLink}
+      ${accountLink}
     `,
   );
   return sendEmail({

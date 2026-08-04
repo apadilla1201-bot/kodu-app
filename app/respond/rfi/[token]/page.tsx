@@ -91,6 +91,9 @@ export default function ExternalRfiRespondPage() {
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-[#C9A96E]">Kodu PM — RFI Response</h1>
           <p className="text-white/70 mt-1">#{rfi.projectNumber} {rfi.projectName}</p>
+          <p className="text-white/50 text-xs mt-2">
+            Secure link — you are reviewing only this RFI. No account needed.
+          </p>
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">

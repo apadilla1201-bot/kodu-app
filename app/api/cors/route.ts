@@ -111,6 +111,13 @@ export async function POST(request: Request) {
       const primaryTo = toList.length ? toList : sendForApproval ? collectEmails(creatorEmail) : [];
       const ccList = collectEmails(creatorEmail).filter((e) => !primaryTo.includes(e));
 
+      // ¿El aprobador ya tiene cuenta en ESTA empresa? → botón "ver con mi cuenta"
+      const approverAccountUrl = approverEmail
+        ? (await prisma.user.findFirst({ where: { email: approverEmail, companyId }, select: { id: true } }))
+          ? `${appBaseUrl()}/dashboard/cors/${changeOrder.id}`
+          : null
+        : null;
+
       if (primaryTo.length) {
         await sendCorApprovalRequestEmail({
           to: primaryTo,
@@ -126,6 +133,7 @@ export async function POST(request: Request) {
           ownerName: ownerName ? String(ownerName) : null,
           submittedBy: session.user?.name || 'Project Manager',
           externalApproveUrl: `${appBaseUrl()}/respond/cor/${externalToken}`,
+          accountUrl: approverAccountUrl ?? undefined,
         });
       }
     } catch (emailErr) {

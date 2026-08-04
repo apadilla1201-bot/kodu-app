@@ -1,52 +1,42 @@
-# PAGO-OWNER AUTOMÁTICO — paquete ÚNICO (no necesitas el FIX-7B, este lo incluye todo)
+# ORDEN-Y-ENVIO — Orden en listas + Enviar al Owner + Owner's Rep
 
-## Cómo funciona ahora (sin saber nada del tema)
+## 1. Orden ascendente / descendente
+- **Change Orders**: ahora los encabezados CO #, Date y Total se pueden clicar
+  para ordenar ↑ ascendente / ↓ descendente (flecha dorada).
+- **RFIs**: ya tenían orden por columnas (clic en el encabezado).
 
-### Al crear una Pay App
-En el último paso (Review) aparece una tarjeta dorada que PREGUNTA:
+## 2. Enviar al Owner para aprobación
+### COR (ya lo hacía — ahora más claro)
+- En el wizard, si pones el email del owner, el botón final dice
+  **"Create & Send to Owner for Approval"**: crea el COR y le envía el email
+  con enlace seguro para aprobar/rechazar.
 
-  "¿El Owner hizo pagos directos a subs o suplidores en este período?"
-   [ No, ninguno ]   [ Sí, hubo pagos ]
+### RFI (NUEVO)
+- En el detalle de cualquier RFI hay un botón dorado **"Send to Owner"**
+  (junto a Download PDF): pide email y nombre del aprobador y le envía el RFI
+  con enlace seguro para verlo y responder.
 
-- **No** → todo queda en 0 y el G702 no muestra nada nuevo.
-- **Sí** → escribes el monto del período y (opcional) a quién se pagó.
-  La tarjeta te muestra en vivo cómo saldrá el G702:
-  7b acumulado · 7c este período · 7d total.
-- **No puedes crear la PA sin responder** — nadie se lo salta por no saber.
+### Regla de acceso (como pediste)
+- **Sin cuenta koduPM**: el enlace seguro le permite ver y responder
+  **SOLO ese documento** — la página lo dice expresamente ("you are reviewing
+  only this RFI/change order"). No ve nada más del sistema.
+- **Con cuenta koduPM**: el email incluye además el botón
+  **"Open in my koduPM account"** para abrirlo dentro de la app, donde solo
+  verá lo que sus credenciales/rol le permitan.
 
-### El acumulado se calcula SOLO (tú nunca lo escribes)
-- Al crear la PA, el sistema toma el acumulado de la PA anterior (su 7b + 7c).
-- El servidor lo rellena al guardar si faltara, y el PDF lo autocompleta al
-  generarse. Triple seguridad.
-- En la edición, el acumulado es **solo lectura** (gris, "auto") — solo se
-  edita el monto del período.
+## 3. Asignación para Owner's Rep
+- En Nuevo RFI, el campo "Assigned to / Role" ahora incluye la opción
+  **Owner's Rep** (además de Owner, Architect, etc.). Puedes asignarle RFIs
+  y se le envía el enlace seguro a su correo.
 
-### El G702 siempre cuadra
-7b = acumulado previo · 7c = este período (única deducción) ·
-7d = TOTAL A LA FECHA (7b + 7c) · Línea 8 correcta.
+## Cómo subir (2 minutos)
+1. Descomprime el ZIP.
+2. Repo kodu-app → Add file → Upload files.
+3. Arrastra las **3 carpetas**: `app`, `components`, `lib` → Commit changes.
+4. Espera 1-2 minutos a Vercel.
 
-## Pasos (3 minutos) — OLVIDA el FIX-7B, este paquete lo trae todo
-
-### 1. Subir
-Repo kodu-app → Add file → Upload files → arrastra las **3 carpetas**:
-`app`, `components`, `prisma` → Commit changes.
-
-### 2. Esperar Vercel (1-2 min)
-
-### 3. Ejecutar la configuración (una sola vez)
-Abre:
-  https://app.kodupm.com/api/internal/payapp-autofill?key=kodupm-migrar-2026
-Debe decir "ok":true, "pa12Seeded":true. Esto:
-- crea la columna nueva,
-- pone en la PA #12 de Arena Madness el acumulado oficial 242,681.21
-  y el período 6,992.50,
-- recalcula los acumulados de todas las PA viejas.
-
-### 4. BORRAR el archivo temporal
-Repo → app → api → internal → payapp-autofill → route.ts → ⋮ → Delete file → Commit.
-
-### 5. Verificar
-- PA #12 → descarga el G702: 7b 242,681.21 · 7c 6,992.50 · 7d 249,673.71 ·
-  CURRENT PAYMENT DUE 295,139.74 (igual que tu Excel).
-- Pay Apps → New Pay Application → paso Review → verás la tarjeta de la
-  pregunta (respóndela "No, ninguno" si solo estás mirando).
+## Verificar
+1. Change Orders: clic en "CO #" y "Total" → ordena ↑↓.
+2. Abre un RFI → botón **Send to Owner** → pon tu propio correo → te llega
+   el email con el enlace seguro (ábrelo en ventana incógnita: solo ves ese RFI).
+3. Nuevo RFI → campo Role → aparece **Owner's Rep**.
