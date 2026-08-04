@@ -1,32 +1,24 @@
-# MEJORAS 3 — Logos en PDFs corregidos + reportes nuevos + eliminar RFI
+# PAGO-OWNER — "Paid by Owner" completo en el G702 + reporte LOG
 
 ## Qué corrige / agrega
 
-### 1. FIX: el logo ahora SÍ sale en los PDFs (RFI, Pay App, todos)
-La causa: el generador de PDF imprimía la página ANTES de que el navegador
-interno terminara de descargar la imagen del logo, y el encabezado salía vacío.
-Ahora espera a que todas las imágenes carguen antes de imprimir.
+### 1. G702: ahora muestra el ACUMULADO de pagos directos del Owner
+Antes el G702 solo mostraba la línea 7b con el pago de ESTE período.
+Ahora, igual que tu Excel de Arena Madness:
+- **7b.** Direct Payments — el monto de ESTE período (se deduce del Current Payment Due).
+- **7c.** Direct Payments by Owner — **acumulado previo + TOTAL A LA FECHA**
+  (suma automática de todas las PA anteriores del proyecto).
+La línea 7c solo aparece cuando el proyecto tiene pagos directos — los demás
+proyectos no ven nada nuevo.
 
-### 2. NUEVO: botón "Delete" en el detalle del RFI
-Junto al botón Download PDF. Pide confirmación. Solo admin/owner/PM pueden
-borrar (el servidor lo valida).
-
-### 3. NUEVO: reporte PDF de Budget
-En el detalle de cualquier presupuesto (Budgets → abrir uno) aparece un ícono
-de documento junto al basurero → descarga el PDF: logo y nombre de la empresa,
-resumen financiero (Construction, Furnishings, O&P, GL, Contingency, TOTAL),
-todas las partidas, exclusiones y supuestos. En el idioma de tu perfil.
-
-### 4. NUEVO: reporte PDF de Buyout
-En Buyout hay un botón "PDF" junto a Refresh → descarga la matriz completa
-del proyecto seleccionado: resumen (presupuesto, contratado, CORs, invertido,
-restante) y tabla por oficio con montos, estados y fechas. Hoja tamaño Tabloid
-horizontal.
-
-### 5. NUEVO: reporte PDF de Submittal
-En el detalle de cualquier submittal hay un botón "PDF" junto al estado →
-ficha completa: logo, datos, ball in court, descripción, respuesta, notas
-y lista de adjuntos.
+### 2. NUEVO: reporte "Paid by Owner LOG" (el que te pidió el owner)
+En **Pay Applications**: selecciona el proyecto en el filtro (ej. Arena Madness)
+y aparece el botón azul **"Paid by Owner LOG"** → descarga un PDF con:
+- Logo y datos de la empresa.
+- Tabla cronológica: PA #, período, detalle, estado, **monto del período** y
+  **acumulado corrido**.
+- Fila final: **TOTAL PAID BY OWNER TO DATE**.
+- Sale en el idioma de tu perfil (ES/EN), listo para entregar al owner.
 
 ## Cómo subirlo (2 minutos)
 
@@ -37,15 +29,13 @@ y lista de adjuntos.
 
 ## Cómo verificar
 
-1. Abre un **RFI** → Download PDF → ahora SÍ sale el logo de PDG arriba.
-2. En ese mismo RFI: botón **Delete** rojo junto al PDF (no lo uses en uno real
-   si no quieres borrarlo).
-3. Abre un **Pay App** → PDF → logo visible.
-4. Abre un **Budget** → ícono de documento (arriba a la derecha) → PDF completo.
-5. Ve a **Buyout** → botón **PDF** → matriz del proyecto.
-6. Abre un **Submittal** → botón **PDF** → ficha completa.
+1. Abre la **PA #12 de Arena Madness** → descarga el G702 → debes ver:
+   - 7b. Direct Payments: **$6,992.50** (este período)
+   - 7c. ... acumulado previo: **$242,681.21** · TOTAL TO DATE: **$249,673.71**
+2. En **Pay Applications** → filtro "169 — Arena Madness Sports" → botón
+   **Paid by Owner LOG** → PDF con el log completo para el owner.
 
-## Nota sobre info@kodupm.com
-(Ver el mensaje del chat: el dominio kodupm.com NO tiene buzón de correo
-activo todavía; hay que crearlo para que los correos de "cambio de plan"
-lleguen de verdad.)
+## Nota
+El acumulado se calcula sumando el campo "Direct Payments" de cada PA anterior.
+Si alguna PA vieja no tiene ese dato cargado, el acumulado saldrá menor —
+en ese caso edita esa PA y ponle su monto en "Direct Payments".

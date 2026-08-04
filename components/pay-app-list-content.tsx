@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Receipt, Plus, Calendar, DollarSign, ChevronRight, Search, Building2 } from 'lucide-react';
+import { Receipt, Plus, Calendar, DollarSign, ChevronRight, Search, Building2, FileText } from 'lucide-react';
 
 function fmt(n: number): string {
   return `$${(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -76,6 +76,19 @@ export function PayAppListContent({ projects }: { projects: any[] }) {
             <option key={p.id} value={p.id}>#{p.projectNumber} — {p.projectName}</option>
           ))}
         </select>
+        <a
+          href={selectedProject !== 'all' ? `/api/projects/${selectedProject}/paid-by-owner/pdf` : '#'}
+          target={selectedProject !== 'all' ? '_blank' : undefined}
+          rel="noopener noreferrer"
+          title="Log de pagos directos del Owner (Paid by Owner LOG)"
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors ${
+            selectedProject !== 'all'
+              ? 'bg-[#0F1B33] text-[#C9A96E] border-[#0F1B33] hover:bg-[#1B2A4A]'
+              : 'border-border text-muted-foreground opacity-50 pointer-events-none'
+          }`}
+        >
+          <FileText className="w-4 h-4" /> Paid by Owner LOG
+        </a>
       </div>
 
       {/* Pay Apps by Project */}
