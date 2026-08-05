@@ -167,6 +167,7 @@ model Project {
   sitePhotos      SitePhoto[]
   dailyLogs       DailyLog[]
   lienWaivers     LienWaiver[]
+  punchItems      PunchItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -731,4 +732,45 @@ model LienWaiver {
 
   @@index([projectId])
   @@index([payApplicationId])
+}
+
+// ============================================================
+// PUNCH LIST — ítems de pendientes/corrección de cierre
+// ------------------------------------------------------------
+// Flujo: el GC crea el ítem (foto, ubicación, responsable) → se
+// asigna al sub por correo con enlace seguro → el sub lo marca
+// "Ready for Review" (puede subir foto de la corrección) → el GC
+// lo verifica y cierra. Estados: Open → In Progress →
+// Ready for Review → Completed. Prioridad: Low/Medium/High.
+// ============================================================
+model PunchItem {
+  id                  String    @id @default(cuid())
+  projectId           String
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  itemNumber          Int
+  title               String
+  description         String?   @db.Text
+  location            String?
+  trade               String?
+  assignedToName      String?
+  assignedToEmail     String?
+  priority            String    @default("Medium") // Low | Medium | High
+  status              String    @default("Open")   // Open | In Progress | Ready for Review | Completed
+  dueDate             DateTime?
+  photoUrl            String?
+  photoName           String?
+  completionPhotoUrl  String?
+  completionPhotoName String?
+  externalToken       String?   @unique
+  sentAt              DateTime?
+  completedAt         DateTime?
+  completedByName     String?
+  notes               String?   @db.Text
+  createdByName       String?
+  createdByEmail      String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([status])
 }

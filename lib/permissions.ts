@@ -75,7 +75,7 @@ export const ROLE_LABELS: Record<string, string> = {
 const NAV_BY_ROLE: Record<string, string[]> = {
   full: [
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
-    '/dashboard/buyout', '/dashboard/pay-apps', '/dashboard/lien-waivers', '/dashboard/budgets', '/dashboard/photos',
+    '/dashboard/buyout', '/dashboard/pay-apps', '/dashboard/lien-waivers', '/dashboard/punch-list', '/dashboard/budgets', '/dashboard/photos',
     '/dashboard/daily-logs', '/dashboard/directory', '/dashboard/analytics',
     '/dashboard/import', '/dashboard/settings', '/dashboard/team', '/dashboard/approvals',
     '/dashboard/help',
@@ -83,8 +83,8 @@ const NAV_BY_ROLE: Record<string, string[]> = {
   superintendent: [
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
     '/dashboard/buyout', '/dashboard/photos', '/dashboard/daily-logs', '/dashboard/directory',
-    '/dashboard/analytics', '/dashboard/settings', '/dashboard/help',
-    // SIN /dashboard/pay-apps ni /dashboard/budgets
+    '/dashboard/analytics', '/dashboard/settings', '/dashboard/help', '/dashboard/punch-list',
+    // SIN /dashboard/pay-apps ni /dashboard/budgets (punch-list SÍ: es su trabajo de campo)
   ],
   projectViewer: [
     // owner del proyecto / viewer: solo lectura de su proyecto

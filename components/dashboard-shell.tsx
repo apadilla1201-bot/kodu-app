@@ -36,6 +36,7 @@ import {
   Inbox,
   BookOpen,
   FileSignature,
+  ListChecks,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -76,6 +77,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: '/dashboard/budgets', label: 'Budgets', icon: Receipt },
     { href: '/dashboard/photos', label: t('nav.sitePhotos'), icon: Camera },
     { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
+    { href: '/dashboard/punch-list', label: t('nav.punchList'), icon: ListChecks },
     { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
     { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
     { href: '/dashboard/approvals', label: t('nav.approvals'), icon: Inbox },
