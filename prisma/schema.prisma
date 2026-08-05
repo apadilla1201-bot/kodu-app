@@ -166,6 +166,7 @@ model Project {
   invites         UserInvite[]
   sitePhotos      SitePhoto[]
   dailyLogs       DailyLog[]
+  lienWaivers     LienWaiver[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -507,6 +508,7 @@ model PayApplication {
   ownerPrinted            String?
   notes                   String?          @db.Text
   lineItems               PayAppLineItem[]
+  lienWaivers             LienWaiver[]
   createdAt               DateTime         @default(now())
   updatedAt               DateTime         @updatedAt
 
@@ -693,4 +695,40 @@ model ScheduleActivity {
   @@index([sortOrder])
   @@index([isCritical])
   @@index([status])
+}
+
+// ============================================================
+// LIEN WAIVERS — exenciones de gravamen de subs/proveedores
+// ------------------------------------------------------------
+// Flujo: el GC crea el waiver (por proyecto, opcionalmente ligado
+// a una Pay Application) → se envía al sub por correo con enlace
+// seguro → el sub descarga la forma, la firma y la sube → el GC
+// la aprueba. Estados: Pending → Sent → Received → Approved.
+// Tipos: conditional/unconditional × progress/final (estándar USA).
+// ============================================================
+model LienWaiver {
+  id               String          @id @default(cuid())
+  projectId        String
+  project          Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  payApplicationId String?
+  payApplication   PayApplication? @relation(fields: [payApplicationId], references: [id], onDelete: SetNull)
+  subcontractor    String
+  subEmail         String?
+  waiverType       String          @default("conditional_progress") // conditional_progress | unconditional_progress | conditional_final | unconditional_final
+  amount           Float           @default(0)
+  throughDate      DateTime?
+  status           String          @default("Pending") // Pending | Sent | Received | Approved
+  fileUrl          String?
+  fileName         String?
+  externalToken    String?         @unique
+  sentAt           DateTime?
+  receivedAt       DateTime?
+  notes            String?         @db.Text
+  createdByName    String?
+  createdByEmail   String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([projectId])
+  @@index([payApplicationId])
 }

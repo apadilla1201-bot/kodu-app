@@ -35,6 +35,7 @@ import {
   Search,
   Inbox,
   BookOpen,
+  FileSignature,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -71,6 +72,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: '/dashboard/submittals', label: t('nav.submittals'), icon: FileStack },
     { href: '/dashboard/buyout', label: t('nav.buyout'), icon: ClipboardList },
     { href: '/dashboard/pay-apps', label: 'Pay Applications', icon: Wallet },
+    { href: '/dashboard/lien-waivers', label: t('nav.lienWaivers'), icon: FileSignature },
     { href: '/dashboard/budgets', label: 'Budgets', icon: Receipt },
     { href: '/dashboard/photos', label: t('nav.sitePhotos'), icon: Camera },
     { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },

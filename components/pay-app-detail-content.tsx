@@ -10,6 +10,7 @@ import {
   ArrowLeft, Download, Pencil, Save, X, Loader2, Calendar, Building2,
   DollarSign, FileText, Receipt, Hash, User, Plus, Trash2,
 } from 'lucide-react';
+import { PayAppWaivers } from '@/components/pay-app-waivers';
 
 function fmt(n: number): string {
   return `$${(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -405,6 +406,9 @@ export function PayAppDetailContent({ payApp }: { payApp: any }) {
           </div>
         </motion.div>
       )}
+
+      {/* Lien Waivers checklist — subs que deben entregar waiver para esta PA */}
+      <PayAppWaivers payAppId={payApp.id} projectId={projectId} />
 
       {/* G703 Table */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-lg shadow-[var(--shadow-sm)] overflow-hidden">

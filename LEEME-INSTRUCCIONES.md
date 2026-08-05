@@ -1,42 +1,46 @@
-# ORDEN-Y-ENVIO — Orden en listas + Enviar al Owner + Owner's Rep
+# Lien Waivers — INSTRUCCIONES (léeme)
 
-## 1. Orden ascendente / descendente
-- **Change Orders**: ahora los encabezados CO #, Date y Total se pueden clicar
-  para ordenar ↑ ascendente / ↓ descendente (flecha dorada).
-- **RFIs**: ya tenían orden por columnas (clic en el encabezado).
+## Qué es esto
+El módulo nuevo de **Lien Waivers** (exenciones de gravamen): pides al sub su waiver
+antes de pagar, él lo firma y lo sube por un enlace seguro (sin cuenta), y tú lo apruebas.
+Todo queda registrado por proyecto y vinculado a la Pay Application correspondiente.
 
-## 2. Enviar al Owner para aprobación
-### COR (ya lo hacía — ahora más claro)
-- En el wizard, si pones el email del owner, el botón final dice
-  **"Create & Send to Owner for Approval"**: crea el COR y le envía el email
-  con enlace seguro para aprobar/rechazar.
+## Cómo subirlo (lo de siempre)
+1. Descomprime este ZIP.
+2. En GitHub → tu repo **kodu-app** → **Add file → Upload files**.
+3. Arrastra las **4 carpetas**: `app`, `components`, `lib`, `prisma`.
+4. Baja y haz clic en **Commit changes**.
+5. Espera 1-2 minutos a que Vercel termine el deploy.
 
-### RFI (NUEVO)
-- En el detalle de cualquier RFI hay un botón dorado **"Send to Owner"**
-  (junto a Download PDF): pide email y nombre del aprobador y le envía el RFI
-  con enlace seguro para verlo y responder.
+## PASO OBLIGATORIO después del deploy (30 segundos)
+Abre esta URL en tu navegador (con tu sesión iniciada en koduPM):
 
-### Regla de acceso (como pediste)
-- **Sin cuenta koduPM**: el enlace seguro le permite ver y responder
-  **SOLO ese documento** — la página lo dice expresamente ("you are reviewing
-  only this RFI/change order"). No ve nada más del sistema.
-- **Con cuenta koduPM**: el email incluye además el botón
-  **"Open in my koduPM account"** para abrirlo dentro de la app, donde solo
-  verá lo que sus credenciales/rol le permitan.
+    https://app.kodupm.com/api/internal/lien-waivers-migrate?key=kodupm-migrar-2026
 
-## 3. Asignación para Owner's Rep
-- En Nuevo RFI, el campo "Assigned to / Role" ahora incluye la opción
-  **Owner's Rep** (además de Owner, Architect, etc.). Puedes asignarle RFIs
-  y se le envía el enlace seguro a su correo.
+- Debe responder `"ok": true`.
+- Esto crea la tabla nueva en la base de datos.
+- **Después de que responda OK, BORRA del repo el archivo:**
+  `app/api/internal/lien-waivers-migrate/route.ts`
+  (entra al archivo en GitHub → menú ⋯ → Delete file → Commit).
 
-## Cómo subir (2 minutos)
-1. Descomprime el ZIP.
-2. Repo kodu-app → Add file → Upload files.
-3. Arrastra las **3 carpetas**: `app`, `components`, `lib` → Commit changes.
-4. Espera 1-2 minutos a Vercel.
+## Cómo probarlo
+1. Menú lateral → **Lien Waivers** (nuevo, con ícono de documento firmado).
+2. **New Waiver**: proyecto, sub, correo, tipo (Conditional/Unconditional — Progress/Final),
+   monto, fecha límite, y opcionalmente vincular a una Pay App.
+3. Acciones por waiver (íconos a la derecha):
+   - ⬇ Descargar la **forma PDF lista para firmar** (con tu logo, licencia y datos).
+   - ✈ **Enviar solicitud al sub** — le llega un correo con enlace seguro.
+   - ⬆ Subir copia firmada (si el sub te la mandó por otro lado).
+   - ✔ Aprobar.
+4. **Prueba el flujo del sub**: envíate una solicitud a un correo tuyo SIN cuenta,
+   ábrelo en incógnito → solo se ve ese waiver → sube un PDF firmado →
+   te llega correo de "recibido" y en el módulo pasa a **Received**.
+5. Abre una **Pay Application** → verás la tarjeta **"Lien Waivers — this Pay Application"**
+   con el checklist de los waivers vinculados (✔ recibidos / ⏱ pendientes).
 
-## Verificar
-1. Change Orders: clic en "CO #" y "Total" → ordena ↑↓.
-2. Abre un RFI → botón **Send to Owner** → pon tu propio correo → te llega
-   el email con el enlace seguro (ábrelo en ventana incógnita: solo ves ese RFI).
-3. Nuevo RFI → campo Role → aparece **Owner's Rep**.
+## Notas
+- Solo Admin/Owner/PM ven este módulo (como Pay Apps y Budgets).
+- El sub NO necesita cuenta: su enlace solo muestra su waiver, nada más del sistema.
+- La forma PDF es el formato estándar USA (condicional/incondicional × progreso/final).
+  Para Florida cumple el estilo §713.20; si tu contrato exige notarización, se notariza
+  después de imprimirla — el texto ya lo contempla.

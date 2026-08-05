@@ -75,7 +75,7 @@ export const ROLE_LABELS: Record<string, string> = {
 const NAV_BY_ROLE: Record<string, string[]> = {
   full: [
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
-    '/dashboard/buyout', '/dashboard/pay-apps', '/dashboard/budgets', '/dashboard/photos',
+    '/dashboard/buyout', '/dashboard/pay-apps', '/dashboard/lien-waivers', '/dashboard/budgets', '/dashboard/photos',
     '/dashboard/daily-logs', '/dashboard/directory', '/dashboard/analytics',
     '/dashboard/import', '/dashboard/settings', '/dashboard/team', '/dashboard/approvals',
     '/dashboard/help',
