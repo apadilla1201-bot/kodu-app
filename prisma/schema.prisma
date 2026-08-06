@@ -169,6 +169,7 @@ model Project {
   lienWaivers     LienWaiver[]
   punchItems      PunchItem[]
   punchSignoffs   PunchAreaSignoff[]
+  closeoutItems   CloseoutItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -807,5 +808,38 @@ model PunchAreaSignoff {
   signedAt      DateTime @default(now())
 
   @@unique([projectId, area])
+  @@index([projectId])
+}
+
+// ============================================================
+// CLOSEOUT — entregables documentales de cierre de proyecto
+// ------------------------------------------------------------
+// Tracker de documentos de closeout (estilo hoja CLOSEOUT del
+// Excel PDG Arena Madness): G704, affidavit FL §713, waivers
+// finales, permisos, certificados life safety, TAB, as-builts,
+// O&M, garantías, llaves, training, utilidades. Algunos los
+// entregan los subs — se solicitan con enlace seguro (magic link)
+// igual que los lien waivers. Estados: Pending → Requested →
+// Received → Verified.
+// ============================================================
+model CloseoutItem {
+  id             String    @id @default(cuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sortOrder      Int       @default(0)
+  category       String    // CONTRACTUAL / FL LIEN LAW / PERMITS / LIFE SAFETY / MEP / DOCUMENTS / TURNOVER
+  deliverable    String
+  responsible    String?
+  status         String    @default("Pending") // Pending | Requested | Received | Verified
+  dateReceived   DateTime?
+  fileUrl        String?
+  fileName       String?
+  externalToken  String?   @unique
+  requestedTo    String?
+  requestedAt    DateTime?
+  notes          String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
   @@index([projectId])
 }

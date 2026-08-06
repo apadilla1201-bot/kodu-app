@@ -1,38 +1,56 @@
-# Punch List v3 — SIGNOFF por área (AIA G704) — INSTRUCCIONES
+LEEME — SUBIDA ÚNICA A GITHUB (v7: TODO en uno)
+================================================
 
-## Qué trae esta versión
-1. **Pestaña "Firma por Área"** dentro de Punch List (activa cuando seleccionas
-   un proyecto): cada área muestra su progreso, y cuando está 100% cerrada se
-   habilita el botón **"Firmar área"** — registras Superintendente + PM +
-   Owner's Rep + observaciones, y queda guardado quién firmó y cuándo.
-   (El sistema NO deja firmar un área con ítems abiertos — igual que tu Excel.)
-2. **Anular firma**: si reabres un ítem del área, anulas la firma para mantener
-   el registro honesto.
-3. **El PDF ahora incluye la página "AREA ACCEPTANCE & FINAL SIGN-OFF"**:
-   tabla con todas las áreas, progreso, las 3 firmas y fecha — igual que tu hoja
-   SIGNOFF del Excel, soporte del AIA G704 para el cierre de Arena Madness.
+Este paquete reemplaza a TODOS los anteriores. NO subas ningún ZIP viejo.
+Incluye:
 
-## Cómo subirlo
-1. Descomprime → GitHub → kodu-app → Add file → Upload files → arrastra las
-   4 carpetas (app, components, lib, prisma) → Commit.
-2. Espera el deploy de Vercel (Ready ✅).
+1. LIEN WAIVERS — completo + repara los 2 archivos que faltaban en tu repo
+   (la lista principal y la ruta pública del sub).
+2. PUNCH LIST — estilo tu Excel de Arena Madness: áreas, prioridades A/B/C
+   (A=5 días hábiles, B/C=10), acción correctiva, DISPUTED con back-charge,
+   firma por área (SIGNOFF, soporte AIA G704) y PDF con página de firmas.
+3. CLOSEOUT — módulo nuevo "Cierre de Proyecto": 22 entregables agrupados,
+   solicitud por correo con enlace seguro, estados Pendiente → Solicitado →
+   Recibido → Verificado, reporte PDF con firmas.
+4. SUBMITTALS — reporte MERGE estilo COR: el botón PDF genera UN solo PDF
+   (portada koduPM + anexos del sub) y el botón nuevo "Email" lo envía
+   como adjunto al correo que tú digas. Esto NO necesita migración.
+5. IMPORTADOR Arena Madness (temporal): 112 ítems de punch (A=33/B=60/C=19)
+   con vencimientos recalculados desde hoy + 22 entregables de closeout.
 
-## PASO OBLIGATORIO después del deploy
-1. Migración (crea la tabla de firmas — es acumulativa, no toca nada existente):
-   https://app.kodupm.com/api/internal/punch-migrate?key=kodupm-migrar-2026
-   → debe responder "ok": true con el paso "tabla PunchAreaSignoff creada"
-2. BORRAR del repo la carpeta temporal:
-   - app/api/internal/punch-migrate/
-   (si todavía existe app/api/internal/punch-import/ de la importación, bórrala también)
+PASO 1 — SUBIR
+--------------
+1. github.com/apadilla1201-bot/kodu-app → Add file → Upload files.
+2. Arrastra las 4 CARPETAS de este paquete (app, components, lib, prisma).
+3. Commit changes. Espera el check verde de Vercel.
 
-## Cómo probarlo
-1. Menú → Punch List → selecciona Arena Madness en el filtro de proyecto.
-2. Clic en la pestaña **"Firma por Área"** → ves las 20 áreas con su progreso.
-3. Las áreas 100% cerradas tienen botón verde "Firmar área" → llena las 3 firmas
-   (S. Estrada / A. Padilla / Owner's Rep) → Confirmar.
-4. Botón **Punch List Report** → el PDF ahora trae la página final de signoff
-   con las firmas registradas.
+PASO 2 — EJECUTAR ESTAS URL (en orden, logueado en koduPM)
+----------------------------------------------------------
+  1) https://app.kodupm.com/api/internal/lien-waivers-migrate?key=kodupm-migrar-2026
+     (ya corrió una vez y la tabla está lista — correrla de nuevo no hace daño)
+  2) https://app.kodupm.com/api/internal/punch-migrate?key=kodupm-migrar-2026
+  3) https://app.kodupm.com/api/internal/punch-import?key=kodupm-migrar-2026
+     → importa los 112 ítems + 22 entregables de Arena Madness.
+Cada una debe responder {"ok":true,...}
 
-## Nota
-Si ya importaste los 112 ítems, no necesitas volver a importar nada —
-esta versión solo AGREGA las firmas por área.
+PASO 3 — BORRAR LOS TEMPORALES (MUY IMPORTANTE)
+-----------------------------------------------
+En GitHub entra a app/api/internal/ y BORRA las 3 carpetas:
+   - lien-waivers-migrate/
+   - punch-migrate/
+   - punch-import/
+Commit. Con eso cierras todas las puertas temporales.
+
+PASO 4 — VERIFICAR
+------------------
+- Lien Waivers: la lista carga sin error.
+- Punch List → Arena Madness: 112 ítems, tarjetas A=33 / B=60 / C=19,
+  pestaña "Firma por Área" con 20 áreas.
+- Cierre de Proyecto: 22 entregables agrupados por categoría.
+- Submittals: abre uno con anexos → botón PDF (portada + anexos en un
+  solo PDF) y botón Email (mándate una prueba a tu correo).
+
+NOTAS
+-----
+- Si Punch List o Closeout avisan "migración pendiente", falta el PASO 2.2.
+- El menú "Cierre de Proyecto" aparece para admin/owner/pm y superintendente.

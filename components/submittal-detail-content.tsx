@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/hooks/use-i18n';
-import { ArrowLeft, FileStack, CheckCircle2, RotateCcw, Paperclip, Download, Loader2, FileText } from 'lucide-react';
+import { ArrowLeft, FileStack, CheckCircle2, RotateCcw, Paperclip, Download, Loader2, FileText, Mail, Send, X } from 'lucide-react';
 import { downloadStorageFile, uploadFileToStorage } from '@/lib/upload-client';
 
 interface SubmittalAttachment {
@@ -66,6 +66,10 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
   const [loading, setLoading] = useState(false);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailMsg, setEmailMsg] = useState('');
+  const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const attachments = submittal.attachments ?? [];
@@ -133,6 +137,33 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
     }
   };
 
+  // Enviar el reporte (portada koduPM + anexos mergeados) como PDF adjunto
+  const handleSendReport = async () => {
+    if (!emailTo.trim()) return;
+    setSending(true);
+    try {
+      const res = await fetch(`/api/submittals/${submittal.id}/send-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: emailTo.trim(), message: emailMsg.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 413) {
+        toast({ title: t('submittals.reportTooLarge'), variant: 'destructive' });
+        return;
+      }
+      if (!res.ok) throw new Error(data?.error ?? t('submittals.sendReportError'));
+      toast({ title: t('submittals.reportSent', { email: data?.sentTo ?? emailTo.trim() }) });
+      setEmailOpen(false);
+      setEmailMsg('');
+    } catch (err: any) {
+      toast({ title: err?.message ?? t('submittals.sendReportError'), variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
+  };
+
   const detailFields = [
     [t('submittals.type'), submittal.submittalType],
     [t('submittals.priority'), submittal.priority],
@@ -169,6 +200,13 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
           >
             <FileText className="w-4 h-4" /> PDF
           </a>
+          <button
+            type="button"
+            onClick={() => setEmailOpen(true)}
+            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8955A] text-[#0F1B33] px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+          >
+            <Mail className="w-4 h-4" /> {t('submittals.sendByEmail')}
+          </button>
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusStyles[submittal.status] ?? 'bg-gray-100'}`}>
             {submittal.status}
           </span>
@@ -259,6 +297,68 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
           </>
         )}
       </div>
+
+      {/* Modal: enviar reporte por email (PDF merge con anexos) */}
+      {emailOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-[#0F1B33] px-5 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#C9A96E]" /> {t('submittals.sendReportTitle')}
+              </h3>
+              <button type="button" onClick={() => setEmailOpen(false)} className="text-white/70 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  {t('submittals.recipientEmail')}
+                </label>
+                <input
+                  type="email"
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  placeholder="name@company.com"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  {t('submittals.optionalMessage')}
+                </label>
+                <textarea
+                  value={emailMsg}
+                  onChange={(e) => setEmailMsg(e.target.value)}
+                  placeholder={t('submittals.messagePlaceholder')}
+                  rows={3}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                />
+              </div>
+              <p className="text-xs text-slate-500">{t('submittals.sendReportHint')}</p>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEmailOpen(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendReport}
+                  disabled={sending || !emailTo.trim()}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-[#0F1B33] text-white hover:bg-[#1B2A4A] disabled:opacity-50"
+                >
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {sending ? t('submittals.sendingReport') : t('submittals.sendNow')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

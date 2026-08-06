@@ -36,6 +36,7 @@ export async function sendEmail(opts: {
   subject: string;
   html: string;
   replyTo?: string;
+  attachments?: { filename: string; content: string /* base64 */ }[];
 }): Promise<{ ok: boolean; skipped?: boolean; id?: string; error?: string }> {
   const recipients = (Array.isArray(opts.to) ? opts.to : [opts.to])
     .map((e) => e.trim().toLowerCase())
@@ -70,6 +71,7 @@ export async function sendEmail(opts: {
       subject: opts.subject,
       html: opts.html,
       replyTo: opts.replyTo,
+      attachments: opts.attachments?.length ? opts.attachments : undefined,
     });
     if (result.error) {
       console.error('[email] Resend error:', result.error);
