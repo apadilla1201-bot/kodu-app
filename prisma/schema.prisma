@@ -168,6 +168,7 @@ model Project {
   dailyLogs       DailyLog[]
   lienWaivers     LienWaiver[]
   punchItems      PunchItem[]
+  punchSignoffs   PunchAreaSignoff[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -780,4 +781,31 @@ model PunchItem {
 
   @@index([projectId])
   @@index([status])
+}
+
+// ============================================================
+// PUNCH AREA SIGNOFF — aceptación de área (soporte AIA G704)
+// ------------------------------------------------------------
+// Cuando TODOS los ítems de un área están Completed, el área se
+// "firma": queda registro de quién (Super, PM, Owner's Rep) y
+// cuándo. Esas firmas por área respaldan el Certificate of
+// Substantial Completion (AIA G704). Si se reabre un ítem del
+// área, la firma debe deshacerse manualmente (Unlock) para
+// mantener la honestidad del registro.
+// ============================================================
+model PunchAreaSignoff {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  area          String
+  superName     String?
+  pmName        String?
+  ownerRepName  String?
+  signedByName  String?
+  signedByEmail String?
+  remarks       String?  @db.Text
+  signedAt      DateTime @default(now())
+
+  @@unique([projectId, area])
+  @@index([projectId])
 }

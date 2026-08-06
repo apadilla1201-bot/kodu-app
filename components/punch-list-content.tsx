@@ -7,7 +7,9 @@ import { useI18n } from '@/hooks/use-i18n';
 import {
   ListChecks, Plus, Send, CheckCircle2, Trash2, Loader2, Camera,
   Clock, CircleDot, Eye, Pencil, X, Download, AlertTriangle, RotateCcw, Ban,
+  PenLine,
 } from 'lucide-react';
+import { PunchSignoff } from '@/components/punch-signoff';
 
 type ProjectContact = { name: string; email: string; company: string | null; role: string };
 type ProjectOption = {
@@ -65,6 +67,7 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [responsibleSel, setResponsibleSel] = useState<string>('');
+  const [tab, setTab] = useState<'items' | 'signoff'>('items');
 
   const inputClass = 'w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]';
 
@@ -374,6 +377,23 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
         </div>
       </div>
 
+      {/* Pestañas: Ítems / Signoff (solo con proyecto seleccionado) */}
+      <div className="flex items-center gap-2 border-b border-border">
+        <button onClick={() => setTab('items')}
+          className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'items' ? 'border-[#C9A96E] text-[#0F1B33]' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+          <ListChecks className="w-4 h-4" /> {t('punch.tabItems')}
+        </button>
+        <button onClick={() => projectFilter && setTab('signoff')}
+          title={!projectFilter ? t('punch.tabSignoffHint') : ''}
+          className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'signoff' ? 'border-[#C9A96E] text-[#0F1B33]' : 'border-transparent text-muted-foreground hover:text-foreground'} ${!projectFilter ? 'opacity-40 cursor-not-allowed' : ''}`}>
+          <PenLine className="w-4 h-4" /> {t('punch.tabSignoff')}
+        </button>
+      </div>
+
+      {tab === 'signoff' && projectFilter ? (
+        <PunchSignoff projectId={projectFilter} />
+      ) : (
+      <>
       {/* Dashboard estilo Excel PDG */}
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
         {[
@@ -586,6 +606,9 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
           </table>
         </div>
       </div>
+
+      </>
+      )}
 
       {/* Diálogo DISPUTED / back-charge */}
       {disputeOpen && (

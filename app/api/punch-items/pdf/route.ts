@@ -63,6 +63,11 @@ export async function GET(request: Request) {
       orderBy: { itemNumber: 'asc' },
     });
 
+    const signoffs = await prisma.punchAreaSignoff.findMany({
+      where: { projectId },
+      orderBy: { area: 'asc' },
+    }).catch(() => [] as any[]);
+
     const brand = await getPdfBrand(companyId, appBaseUrl(), 38);
     const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const open = items.filter((i) => i.status !== 'Completed').length;
@@ -147,6 +152,34 @@ export async function GET(request: Request) {
       <th style="width:96px;">Status</th><th style="width:70px;">Completed</th>
     </tr></thead>
     <tbody>${rows || '<tr><td colspan="9" style="text-align:center;color:#777;padding:18px;">No punch items for this project.</td></tr>'}</tbody>
+  </table>
+
+  <div style="page-break-before: always;"></div>
+  <h1 style="margin-top:0;">AREA ACCEPTANCE &amp; FINAL SIGN-OFF</h1>
+  <p class="meta">Sign each area only when every item in that area is CLOSED. These area signatures support the Certificate of Substantial Completion (AIA G704). — Firme cada área solo cuando todos sus ítems estén cerrados.</p>
+  <table class="items">
+    <thead><tr>
+      <th>Area</th>
+      <th style="width:90px;">Progress</th>
+      <th style="width:150px;">Superintendent</th>
+      <th style="width:150px;">Project Manager</th>
+      <th style="width:150px;">Owner's Rep</th>
+      <th style="width:90px;">Date</th>
+    </tr></thead>
+    <tbody>
+      ${groups.map((g) => {
+        const closed = g.rows.filter((r) => r.status === 'Completed').length;
+        const so = signoffs.find((s: any) => s.area === g.name);
+        return `<tr>
+          <td style="font-weight:bold;">${esc(g.name)}</td>
+          <td style="text-align:center;">${closed}/${g.rows.length}${closed === g.rows.length ? ' ✓' : ''}</td>
+          <td>${so?.superName ? `<b>${esc(so.superName)}</b>` : '<span style="color:#999;">_______________</span>'}</td>
+          <td>${so?.pmName ? `<b>${esc(so.pmName)}</b>` : '<span style="color:#999;">_______________</span>'}</td>
+          <td>${so?.ownerRepName ? `<b>${esc(so.ownerRepName)}</b>` : '<span style="color:#999;">_______________</span>'}</td>
+          <td style="text-align:center;">${so ? new Date(so.signedAt).toLocaleDateString('en-US') : '—'}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
   </table>
 
   <table class="sig"><tr>
