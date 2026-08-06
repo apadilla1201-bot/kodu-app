@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ClipboardCheck, Loader2, Upload, FileText, Eye } from 'lucide-react';
-import { useDropzone } from 'react-dropzone';
+import { ClipboardCheck, Loader2, Upload, Eye } from 'lucide-react';
 
 interface PublicInfo {
   id: string;
@@ -18,6 +17,9 @@ interface PublicInfo {
   gcName: string;
 }
 
+const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,image/*';
+const MAX_MB = 25;
+
 export default function CloseoutRespondPage() {
   const params = useParams();
   const token = params.token as string;
@@ -26,6 +28,7 @@ export default function CloseoutRespondPage() {
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch(`/api/closeout-items/public/${token}`)
@@ -34,35 +37,29 @@ export default function CloseoutRespondPage() {
       .catch(() => setNotFound(true));
   }, [token]);
 
-  const onDrop = useCallback(
-    async (files: File[]) => {
-      const file = files[0];
-      if (!file || uploading) return;
-      setUploading(true);
-      setError('');
-      try {
-        const fd = new FormData();
-        fd.append('file', file);
-        const res = await fetch(`/api/closeout-items/public/${token}`, { method: 'POST', body: fd });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Upload failed');
-        }
-        setDone(true);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Upload failed');
-      } finally {
-        setUploading(false);
+  const upload = async (file: File) => {
+    if (uploading) return;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      setError(`File too large (max ${MAX_MB}MB)`);
+      return;
+    }
+    setUploading(true);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/closeout-items/public/${token}`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Upload failed');
       }
-    },
-    [token, uploading]
-  );
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    multiple: false,
-    accept: { 'application/pdf': ['.pdf'], 'image/*': [], 'application/msword': ['.doc'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'], 'application/vnd.ms-excel': ['.xls'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] },
-  });
+      setDone(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const brandHeader = (
     <div className="text-center mb-6">
@@ -126,21 +123,31 @@ export default function CloseoutRespondPage() {
                   </div>
                 )}
 
-                <div
-                  {...getRootProps()}
-                  className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-                    isDragActive ? 'border-[#C9A96E] bg-amber-50' : 'border-slate-300 hover:border-[#C9A96E] hover:bg-slate-50'
-                  } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ACCEPT}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (file) void upload(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full border-2 border-dashed rounded-xl p-8 text-center transition-colors border-slate-300 hover:border-[#C9A96E] hover:bg-slate-50 disabled:opacity-50"
                 >
-                  <input {...getInputProps()} />
                   {uploading ? (
                     <Loader2 className="w-10 h-10 text-slate-400 animate-spin mx-auto mb-3" />
                   ) : (
                     <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
                   )}
-                  <p className="font-medium text-slate-900">{uploading ? 'Uploading...' : 'Drop the document here, or click to browse'}</p>
-                  <p className="text-xs text-slate-500 mt-1">PDF, Word, Excel or image · max 25MB</p>
-                </div>
+                  <p className="font-medium text-slate-900">{uploading ? 'Uploading...' : 'Click to select the document'}</p>
+                  <p className="text-xs text-slate-500 mt-1">PDF, Word, Excel or image · max {MAX_MB}MB</p>
+                </button>
                 {error && <p className="text-sm text-red-600 text-center">{error}</p>}
               </>
             )}
