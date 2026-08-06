@@ -63,10 +63,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
         <tr><td style="padding:4px 14px 4px 0;color:#666;">Item</td><td><b>${item.title}</b></td></tr>
         ${item.location ? `<tr><td style="padding:4px 14px 4px 0;color:#666;">Location</td><td>${item.location}</td></tr>` : ''}
         ${item.trade ? `<tr><td style="padding:4px 14px 4px 0;color:#666;">Trade</td><td>${item.trade}</td></tr>` : ''}
-        <tr><td style="padding:4px 14px 4px 0;color:#666;">Priority</td><td>${item.priority}</td></tr>
+        <tr><td style="padding:4px 14px 4px 0;color:#666;">Priority</td><td><b>${item.priority}</b>${item.priority === 'A' ? ' — Life Safety / TCO (urgent)' : item.priority === 'B' ? ' — Functional' : ' — Cosmetic'}</td></tr>
         <tr><td style="padding:4px 14px 4px 0;color:#666;">Due date</td><td>${due}</td></tr>
       </table>
       ${item.description ? `<p style="margin:0 0 14px;color:#444;">${item.description}</p>` : ''}
+      ${item.correctiveAction ? `<p style="margin:0 0 14px;color:#0F1B33;"><b>Required corrective action:</b> ${item.correctiveAction}</p>` : ''}
       <p style="margin:0 0 6px;">When the work is corrected, use the secure link below to mark it ready and upload a photo:</p>
       <p style="margin:18px 0;"><a href="${respondUrl}" style="background:#0F1B33;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">Open Punch Item</a></p>
       <p style="margin:0;color:#666;font-size:13px;">No account needed — this link gives access to this punch item only.</p>

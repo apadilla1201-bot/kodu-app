@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useI18n } from '@/hooks/use-i18n';
 import {
   ListChecks, Plus, Send, CheckCircle2, Trash2, Loader2, Camera,
-  Clock, CircleDot, Eye, Pencil, X, Download, ExternalLink, RotateCcw,
+  Clock, CircleDot, Eye, Pencil, X, Download, AlertTriangle, RotateCcw, Ban,
 } from 'lucide-react';
 
 type ProjectContact = { name: string; email: string; company: string | null; role: string };
@@ -23,6 +23,8 @@ type PunchItem = {
   itemNumber: number;
   title: string;
   description: string | null;
+  correctiveAction: string | null;
+  area: string | null;
   location: string | null;
   trade: string | null;
   assignedToName: string | null;
@@ -30,6 +32,8 @@ type PunchItem = {
   priority: string;
   status: string;
   dueDate: string | null;
+  identifiedBy: string | null;
+  backCharge: number | null;
   photoUrl: string | null;
   completionPhotoUrl: string | null;
   externalToken: string | null;
@@ -37,12 +41,13 @@ type PunchItem = {
   project: { id: string; projectNumber: string; projectName: string };
 };
 
-const STATUSES = ['Open', 'In Progress', 'Ready for Review', 'Completed'];
-const PRIORITIES = ['Low', 'Medium', 'High'];
+const STATUSES = ['Open', 'In Progress', 'Ready for Review', 'Completed', 'Disputed'];
+const PRIORITIES = ['A', 'B', 'C'];
 
 const emptyForm = {
-  projectId: '', title: '', description: '', location: '', trade: '',
-  assignedToName: '', assignedToEmail: '', priority: 'Medium', dueDate: '', notes: '',
+  projectId: '', title: '', description: '', correctiveAction: '', area: '', location: '', trade: '',
+  assignedToName: '', assignedToEmail: '', priority: 'B', dueDate: '', identifiedBy: '', notes: '',
+  backCharge: '',
 };
 
 export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
@@ -51,13 +56,15 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
   const [loading, setLoading] = useState(true);
   const [projectFilter, setProjectFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [disputeOpen, setDisputeOpen] = useState<string | null>(null);
+  const [disputeForm, setDisputeForm] = useState({ backCharge: '', notes: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  // Responsable: índice del contacto del Directory, o 'manual' para escribirlo a mano
-  const [responsibleSel, setResponsibleSel] = useState<string>('manual');
+  const [responsibleSel, setResponsibleSel] = useState<string>('');
 
   const inputClass = 'w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]';
 
@@ -87,29 +94,61 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = useMemo(
-    () =>
-      items.filter(
-        (it) =>
-          (!projectFilter || it.projectId === projectFilter) &&
-          (!statusFilter || it.status === statusFilter),
-      ),
-    [items, projectFilter, statusFilter],
+  const scoped = useMemo(
+    () => (projectFilter ? items.filter((it) => it.projectId === projectFilter) : items),
+    [items, projectFilter],
   );
 
+  const areas = useMemo(
+    () => [...new Set(scoped.map((it) => it.area).filter(Boolean))].sort() as string[],
+    [scoped],
+  );
+
+  const filtered = useMemo(
+    () =>
+      scoped.filter(
+        (it) =>
+          (!statusFilter || it.status === statusFilter) &&
+          (!areaFilter || it.area === areaFilter),
+      ),
+    [scoped, statusFilter, areaFilter],
+  );
+
+  // Dashboard estilo Excel PDG: totales, % cerrado, abiertos por prioridad, por área y por trade
   const stats = useMemo(() => {
-    const scoped = projectFilter ? items.filter((it) => it.projectId === projectFilter) : items;
+    const open = (s: string) => scoped.filter((it) => it.status === s).length;
+    const notClosed = scoped.filter((it) => it.status !== 'Completed');
+    const closed = open('Completed');
+    const pct = scoped.length ? Math.round((closed / scoped.length) * 100) : 0;
+    const byArea = areas.map((a) => {
+      const inArea = scoped.filter((it) => it.area === a);
+      const closedArea = inArea.filter((it) => it.status === 'Completed').length;
+      return { area: a, total: inArea.length, open: inArea.length - closedArea, closed: closedArea };
+    });
+    const byTrade = new Map<string, number>();
+    notClosed.forEach((it) => {
+      const k = it.trade || t('punch.noTrade');
+      byTrade.set(k, (byTrade.get(k) ?? 0) + 1);
+    });
     return {
-      open: scoped.filter((it) => it.status === 'Open').length,
-      inProgress: scoped.filter((it) => it.status === 'In Progress').length,
-      ready: scoped.filter((it) => it.status === 'Ready for Review').length,
-      completed: scoped.filter((it) => it.status === 'Completed').length,
+      total: scoped.length,
+      open: open('Open'),
+      inProgress: open('In Progress'),
+      ready: open('Ready for Review'),
+      disputed: open('Disputed'),
+      closed,
+      pct,
+      prioA: notClosed.filter((it) => it.priority === 'A').length,
+      prioB: notClosed.filter((it) => it.priority === 'B').length,
+      prioC: notClosed.filter((it) => it.priority === 'C').length,
+      byArea,
+      byTrade: [...byTrade.entries()].sort((a, b) => b[1] - a[1]),
     };
-  }, [items, projectFilter]);
+  }, [scoped, areas, t]);
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ ...emptyForm, projectId: projectFilter || (projects[0]?.id ?? '') });
+    setForm({ ...emptyForm, projectId: projectFilter || (projects[0]?.id ?? ''), area: areaFilter || '' });
     setResponsibleSel('');
     setDialogOpen(true);
   };
@@ -120,15 +159,18 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
       projectId: it.projectId,
       title: it.title,
       description: it.description ?? '',
+      correctiveAction: it.correctiveAction ?? '',
+      area: it.area ?? '',
       location: it.location ?? '',
       trade: it.trade ?? '',
       assignedToName: it.assignedToName ?? '',
       assignedToEmail: it.assignedToEmail ?? '',
       priority: it.priority,
       dueDate: it.dueDate ? it.dueDate.split('T')[0] : '',
+      identifiedBy: it.identifiedBy ?? '',
       notes: it.notes ?? '',
+      backCharge: it.backCharge != null ? String(it.backCharge) : '',
     });
-    // Si el responsable actual coincide con un contacto del Directory, preseleccionarlo
     const proj = projects.find((p) => p.id === it.projectId);
     const idx = (proj?.contacts ?? []).findIndex(
       (c) => c.email.toLowerCase() === (it.assignedToEmail ?? '').toLowerCase() && it.assignedToEmail,
@@ -148,13 +190,17 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
         projectId: form.projectId,
         title: form.title,
         description: form.description || null,
+        correctiveAction: form.correctiveAction || null,
+        area: form.area || null,
         location: form.location || null,
         trade: form.trade || null,
         assignedToName: form.assignedToName || null,
         assignedToEmail: form.assignedToEmail || null,
         priority: form.priority,
         dueDate: form.dueDate || null,
+        identifiedBy: form.identifiedBy || null,
         notes: form.notes || null,
+        backCharge: form.backCharge === '' ? null : Number(form.backCharge),
       };
       const res = editingId
         ? await fetch(`/api/punch-items/${editingId}`, {
@@ -215,11 +261,11 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
     }
   };
 
-  const handleStatus = async (it: PunchItem, status: string) => {
+  const handleStatus = async (it: PunchItem, status: string, extra?: any) => {
     setBusyId(it.id);
     try {
       const res = await fetch(`/api/punch-items/${it.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, ...extra }),
       });
       if (!res.ok) throw new Error();
       toast.success(status === 'Completed' ? t('punch.completedToast') : t('punch.saved'));
@@ -229,6 +275,17 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const handleDispute = async (it: PunchItem) => {
+    await handleStatus(it, 'Disputed', {
+      backCharge: disputeForm.backCharge === '' ? null : Number(disputeForm.backCharge),
+      notes: disputeForm.notes
+        ? `${it.notes ? it.notes + ' | ' : ''}${t('punch.disputeNotePrefix')}: ${disputeForm.notes}`
+        : it.notes,
+    });
+    setDisputeOpen(null);
+    setDisputeForm({ backCharge: '', notes: '' });
   };
 
   const handleDelete = async (it: PunchItem) => {
@@ -252,22 +309,33 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
       'In Progress': 'bg-blue-100 text-blue-800 border-blue-300',
       'Ready for Review': 'bg-purple-100 text-purple-800 border-purple-300',
       Completed: 'bg-green-100 text-green-800 border-green-300',
+      Disputed: 'bg-red-100 text-red-800 border-red-300',
     };
     const key = s.replace(/ /g, '');
     return (
       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${styles[s] ?? styles.Open}`}>
         {s === 'Completed' && <CheckCircle2 className="w-3 h-3" />}
+        {s === 'Disputed' && <Ban className="w-3 h-3" />}
         {t(`punch.status${key}`)}
       </span>
     );
   };
 
   const priorityBadge = (p: string) => {
-    const colors: Record<string, string> = {
-      High: 'text-red-600', Medium: 'text-amber-600', Low: 'text-green-600',
+    const styles: Record<string, string> = {
+      A: 'bg-red-600 text-white',
+      B: 'bg-amber-500 text-white',
+      C: 'bg-slate-400 text-white',
     };
-    return <span className={`text-xs font-bold ${colors[p] ?? ''}`}>{t(`punch.priority${p}`)}</span>;
+    return (
+      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black ${styles[p] ?? styles.B}`} title={t(`punch.priority${p}_desc`)}>
+        {p}
+      </span>
+    );
   };
+
+  const isOverdue = (it: PunchItem) =>
+    it.dueDate && it.status !== 'Completed' && new Date(it.dueDate) < new Date(new Date().toDateString());
 
   const formProject = projects.find((p) => p.id === form.projectId);
   const formContacts = formProject?.contacts ?? [];
@@ -281,9 +349,6 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
       if (c) setForm({ ...form, assignedToName: c.name, assignedToEmail: c.email });
     }
   };
-
-  const isOverdue = (it: PunchItem) =>
-    it.dueDate && it.status !== 'Completed' && new Date(it.dueDate) < new Date(new Date().toDateString());
 
   return (
     <div className="space-y-6">
@@ -309,31 +374,78 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Dashboard estilo Excel PDG */}
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
         {[
-          { label: t('punch.statsOpen'), value: stats.open, icon: CircleDot, color: 'text-amber-600' },
-          { label: t('punch.statsInProgress'), value: stats.inProgress, icon: Clock, color: 'text-blue-600' },
-          { label: t('punch.statsReady'), value: stats.ready, icon: Eye, color: 'text-purple-600' },
-          { label: t('punch.statsCompleted'), value: stats.completed, icon: CheckCircle2, color: 'text-green-600' },
+          { label: t('punch.statsTotal'), value: stats.total, color: 'text-[#0F1B33]' },
+          { label: t('punch.statsOpen'), value: stats.open, color: 'text-amber-600' },
+          { label: t('punch.statsInProgress'), value: stats.inProgress, color: 'text-blue-600' },
+          { label: t('punch.statsReady'), value: stats.ready, color: 'text-purple-600' },
+          { label: t('punch.statsDisputed'), value: stats.disputed, color: 'text-red-600' },
+          { label: `${t('punch.statsCompleted')} (${stats.pct}%)`, value: stats.closed, color: 'text-green-600' },
         ].map((c, i) => (
-          <motion.div key={i} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+          <motion.div key={i} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
             className="bg-card rounded-lg p-4 shadow-[var(--shadow-sm)] border border-border min-w-0 overflow-hidden">
-            <div className="flex items-center gap-2 min-w-0">
-              <c.icon className={`w-4 h-4 shrink-0 ${c.color}`} />
-              <p className="text-xs text-muted-foreground truncate">{c.label}</p>
-            </div>
-            <p className="text-xl font-bold mt-1">{c.value}</p>
+            <p className="text-xs text-muted-foreground truncate">{c.label}</p>
+            <p className={`text-xl font-bold mt-1 ${c.color}`}>{c.value}</p>
           </motion.div>
         ))}
       </div>
 
+      {/* Abiertos por prioridad (A bloquea TCO) */}
+      {stats.total > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="bg-card rounded-lg p-4 border border-red-200 shadow-[var(--shadow-sm)]">
+            <p className="text-xs font-bold text-red-600 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> {t('punch.priorityA_desc')}
+            </p>
+            <p className="text-2xl font-black text-red-600 mt-1">{stats.prioA}</p>
+          </div>
+          <div className="bg-card rounded-lg p-4 border border-amber-200 shadow-[var(--shadow-sm)]">
+            <p className="text-xs font-bold text-amber-600">{t('punch.priorityB_desc')}</p>
+            <p className="text-2xl font-black text-amber-600 mt-1">{stats.prioB}</p>
+          </div>
+          <div className="bg-card rounded-lg p-4 border border-slate-200 shadow-[var(--shadow-sm)]">
+            <p className="text-xs font-bold text-slate-500">{t('punch.priorityC_desc')}</p>
+            <p className="text-2xl font-black text-slate-500 mt-1">{stats.prioC}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Progreso por área (signoff se siente) */}
+      {stats.byArea.length > 0 && (
+        <div className="bg-card rounded-lg p-4 shadow-[var(--shadow-sm)] border border-border">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">{t('punch.progressByArea')}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+            {stats.byArea.map((a) => {
+              const pct = a.total ? Math.round((a.closed / a.total) * 100) : 0;
+              return (
+                <button key={a.area} onClick={() => setAreaFilter(areaFilter === a.area ? '' : a.area)}
+                  className={`flex items-center gap-3 text-left group ${areaFilter === a.area ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}>
+                  <span className="text-xs w-52 truncate shrink-0 font-medium">{a.area}</span>
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                    <div className={`h-full rounded-full ${pct === 100 ? 'bg-green-600' : 'bg-[#C9A96E]'}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-xs text-muted-foreground w-16 text-right shrink-0">{a.closed}/{a.total} · {pct}%</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
-        <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className={inputClass + ' max-w-xs'}>
+        <select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setAreaFilter(''); }} className={inputClass + ' max-w-xs'}>
           <option value="">{t('punch.allProjects')}</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>{p.projectNumber} — {p.projectName}</option>
+          ))}
+        </select>
+        <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)} className={inputClass + ' max-w-xs'}>
+          <option value="">{t('punch.allAreas')}</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>{a}</option>
           ))}
         </select>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inputClass + ' max-w-[180px]'}>
@@ -350,11 +462,11 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[#0F1B33] text-white text-left">
-                <th className="px-4 py-3 font-semibold w-12">#</th>
+                <th className="px-4 py-3 font-semibold w-14">#</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colItem')}</th>
-                <th className="px-4 py-3 font-semibold">{t('punch.colLocation')}</th>
+                <th className="px-4 py-3 font-semibold">{t('punch.colArea')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colResponsible')}</th>
-                <th className="px-4 py-3 font-semibold">{t('punch.colPriority')}</th>
+                <th className="px-4 py-3 font-semibold w-16">{t('punch.colPriority')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colDue')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colPhotos')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colStatus')}</th>
@@ -374,15 +486,16 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
                 </td></tr>
               ) : (
                 filtered.map((it) => (
-                  <tr key={it.id} className={`border-t border-border hover:bg-muted/40 ${it.status === 'Completed' ? 'opacity-60' : ''}`}>
-                    <td className="px-4 py-3 font-bold text-[#0F1B33]">{it.itemNumber}</td>
-                    <td className="px-4 py-3 max-w-[260px]">
-                      <p className="font-medium truncate">{it.title}</p>
+                  <tr key={it.id} className={`border-t border-border hover:bg-muted/40 ${it.status === 'Completed' ? 'opacity-60' : ''} ${it.status === 'Disputed' ? 'bg-red-50/50' : ''}`}>
+                    <td className="px-4 py-3 font-bold text-[#0F1B33]">PL-{String(it.itemNumber).padStart(3, '0')}</td>
+                    <td className="px-4 py-3 max-w-[300px]">
+                      <p className="font-medium truncate" title={it.title}>{it.title}</p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {it.project.projectNumber}{it.trade ? ` · ${it.trade}` : ''}
+                        {[it.location, it.trade].filter(Boolean).join(' · ')}
+                        {it.backCharge ? ` · 💰 $${Number(it.backCharge).toLocaleString('en-US')}` : ''}
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{it.location || '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs max-w-[160px] truncate" title={it.area ?? ''}>{it.area || '—'}</td>
                     <td className="px-4 py-3">
                       {it.assignedToName ? (
                         <>
@@ -392,7 +505,7 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3">{priorityBadge(it.priority)}</td>
-                    <td className={`px-4 py-3 text-sm ${isOverdue(it) ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>
+                    <td className={`px-4 py-3 text-sm whitespace-nowrap ${isOverdue(it) ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>
                       {it.dueDate ? new Date(it.dueDate).toLocaleDateString() : '—'}
                       {isOverdue(it) && <span className="block text-xs">{t('punch.overdue')}</span>}
                     </td>
@@ -441,7 +554,14 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
                                 <CheckCircle2 className="w-4 h-4" />
                               </button>
                             )}
-                            {it.status === 'Completed' && (
+                            {it.status !== 'Completed' && it.status !== 'Disputed' && (
+                              <button onClick={() => { setDisputeOpen(it.id); setDisputeForm({ backCharge: it.backCharge != null ? String(it.backCharge) : '', notes: '' }); }}
+                                title={t('punch.markDisputed')}
+                                className="p-1.5 rounded hover:bg-muted text-red-600">
+                                <Ban className="w-4 h-4" />
+                              </button>
+                            )}
+                            {(it.status === 'Completed' || it.status === 'Disputed') && (
                               <button onClick={() => handleStatus(it, 'Open')} title={t('punch.reopen')}
                                 className="p-1.5 rounded hover:bg-muted text-amber-600">
                                 <RotateCcw className="w-4 h-4" />
@@ -467,6 +587,48 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
         </div>
       </div>
 
+      {/* Diálogo DISPUTED / back-charge */}
+      {disputeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+            className="bg-card rounded-xl shadow-xl w-full max-w-md border border-border">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-red-700 rounded-t-xl">
+              <h2 className="text-white font-bold flex items-center gap-2">
+                <Ban className="w-4 h-4" /> {t('punch.disputeTitle')}
+              </h2>
+              <button onClick={() => setDisputeOpen(null)} className="text-white/70 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-muted-foreground">{t('punch.disputeDesc')}</p>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.backChargeAmount')}</label>
+                <input type="number" step="any" value={disputeForm.backCharge}
+                  onChange={(e) => setDisputeForm({ ...disputeForm, backCharge: e.target.value })}
+                  className={inputClass} placeholder="0.00" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.disputeNotes')}</label>
+                <textarea value={disputeForm.notes}
+                  onChange={(e) => setDisputeForm({ ...disputeForm, notes: e.target.value })}
+                  className={inputClass + ' min-h-[70px]'} placeholder={t('punch.disputeNotesPlaceholder')} />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setDisputeOpen(null)}
+                  className="px-4 py-2 rounded-md border border-border text-sm font-medium hover:bg-muted">
+                  {t('common.cancel')}
+                </button>
+                <button onClick={() => { const it = items.find((x) => x.id === disputeOpen); if (it) handleDispute(it); }}
+                  className="px-4 py-2 rounded-md bg-red-700 text-white text-sm font-bold hover:bg-red-800">
+                  {t('punch.confirmDispute')}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Diálogo crear/editar */}
       {dialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -482,14 +644,30 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formProject')} *</label>
-                <select value={form.projectId} onChange={(e) => { setForm({ ...form, projectId: e.target.value, assignedToName: '', assignedToEmail: '' }); setResponsibleSel(''); }} className={inputClass} disabled={Boolean(editingId)}>
-                  <option value="">—</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.projectNumber} — {p.projectName}</option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formProject')} *</label>
+                  <select value={form.projectId}
+                    onChange={(e) => { setForm({ ...form, projectId: e.target.value, area: '', assignedToName: '', assignedToEmail: '' }); setResponsibleSel(''); }}
+                    className={inputClass} disabled={Boolean(editingId)}>
+                    <option value="">—</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.projectNumber} — {p.projectName}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formArea')}</label>
+                  <select value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className={inputClass}>
+                    <option value="">{t('punch.noArea')}</option>
+                    {[...new Set(items.filter((it) => it.projectId === form.projectId).map((it) => it.area).filter(Boolean))].sort().map((a) => (
+                      <option key={a as string} value={a as string}>{a as string}</option>
+                    ))}
+                    {form.area && ![...new Set(items.filter((it) => it.projectId === form.projectId).map((it) => it.area))].includes(form.area) && (
+                      <option value={form.area}>{form.area}</option>
+                    )}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formTitle')} *</label>
@@ -497,8 +675,9 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
                   placeholder={t('punch.formTitlePlaceholder')} />
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formDescription')}</label>
-                <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass + ' min-h-[70px]'} />
+                <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formCorrective')}</label>
+                <textarea value={form.correctiveAction} onChange={(e) => setForm({ ...form, correctiveAction: e.target.value })}
+                  className={inputClass + ' min-h-[60px]'} placeholder={t('punch.formCorrectivePlaceholder')} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -539,18 +718,23 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formPriority')}</label>
                   <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className={inputClass}>
                     {PRIORITIES.map((p) => (
-                      <option key={p} value={p}>{t(`punch.priority${p}`)}</option>
+                      <option key={p} value={p}>{p} — {t(`punch.priority${p}_short`)}</option>
                     ))}
                   </select>
+                  <p className="text-[11px] text-muted-foreground mt-1">{t('punch.dueAutoHint')}</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formDueDate')}</label>
                   <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground block mb-1">{t('punch.formIdentifiedBy')}</label>
+                  <input value={form.identifiedBy} onChange={(e) => setForm({ ...form, identifiedBy: e.target.value })} className={inputClass} />
                 </div>
               </div>
               <div>

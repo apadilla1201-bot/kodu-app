@@ -6,8 +6,8 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { isFullAccess } from '@/lib/permissions';
 
-const VALID_PRIORITY = ['Low', 'Medium', 'High'];
-const VALID_STATUS = ['Open', 'In Progress', 'Ready for Review', 'Completed'];
+const VALID_PRIORITY = ['A', 'B', 'C'];
+const VALID_STATUS = ['Open', 'In Progress', 'Ready for Review', 'Completed', 'Disputed'];
 
 function guard(role: string): boolean {
   return isFullAccess(role) || role === 'superintendent';
@@ -38,6 +38,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (body.description !== undefined) data.description = body.description ? String(body.description) : null;
     if (body.location !== undefined) data.location = body.location ? String(body.location) : null;
     if (body.trade !== undefined) data.trade = body.trade ? String(body.trade) : null;
+    if (body.area !== undefined) data.area = body.area ? String(body.area) : null;
+    if (body.correctiveAction !== undefined) data.correctiveAction = body.correctiveAction ? String(body.correctiveAction) : null;
+    if (body.identifiedBy !== undefined) data.identifiedBy = body.identifiedBy ? String(body.identifiedBy) : null;
+    if (body.backCharge !== undefined) data.backCharge = body.backCharge === null || body.backCharge === '' ? null : Number(body.backCharge) || 0;
     if (body.assignedToName !== undefined) data.assignedToName = body.assignedToName ? String(body.assignedToName) : null;
     if (body.assignedToEmail !== undefined) data.assignedToEmail = body.assignedToEmail ? String(body.assignedToEmail).trim().toLowerCase() : null;
     if (body.priority !== undefined && VALID_PRIORITY.includes(body.priority)) data.priority = body.priority;
@@ -53,6 +57,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         data.completedAt = null;
         data.completedByName = null;
       }
+      // Disputed sin back-charge informado → mantener null (se documenta en notes)
     }
 
     const item = await prisma.punchItem.update({

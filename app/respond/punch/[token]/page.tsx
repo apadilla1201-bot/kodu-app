@@ -10,6 +10,7 @@ type PunchPublic = {
   location: string | null;
   trade: string | null;
   priority: string;
+  correctiveAction: string | null;
   status: string;
   dueDate: string | null;
   photoUrl: string | null;
@@ -120,12 +121,18 @@ export default function ExternalPunchRespondPage() {
               <>
                 <h2 className="text-base font-bold text-foreground">{item.title}</h2>
                 {item.description && <p className="text-sm text-muted-foreground">{item.description}</p>}
+                {item.correctiveAction && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm">
+                    <span className="font-bold text-[#0F1B33]">Required corrective action: </span>
+                    {item.correctiveAction}
+                  </div>
+                )}
 
                 <table className="w-full text-sm">
                   <tbody>
                     {item.location && <tr className="border-b"><td className="py-2 text-muted-foreground w-32">Location</td><td className="py-2">{item.location}</td></tr>}
                     {item.trade && <tr className="border-b"><td className="py-2 text-muted-foreground">Trade</td><td className="py-2">{item.trade}</td></tr>}
-                    <tr className="border-b"><td className="py-2 text-muted-foreground">Priority</td><td className="py-2">{item.priority}</td></tr>
+                    <tr className="border-b"><td className="py-2 text-muted-foreground">Priority</td><td className="py-2 font-semibold">{item.priority}{item.priority === 'A' ? ' — Life Safety / TCO (urgent)' : item.priority === 'B' ? ' — Functional' : item.priority === 'C' ? ' — Cosmetic' : ''}</td></tr>
                     <tr className="border-b"><td className="py-2 text-muted-foreground">Due date</td><td className="py-2">{item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '—'}</td></tr>
                     <tr><td className="py-2 text-muted-foreground">Status</td><td className="py-2 font-semibold">{item.status}</td></tr>
                   </tbody>

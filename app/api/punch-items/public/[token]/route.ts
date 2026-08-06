@@ -33,6 +33,7 @@ export async function GET(_request: Request, { params }: { params: { token: stri
       itemNumber: item.itemNumber,
       title: item.title,
       description: item.description,
+      correctiveAction: item.correctiveAction,
       location: item.location,
       trade: item.trade,
       priority: item.priority,

@@ -2,9 +2,10 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 // ============================================================
-// RUTA TEMPORAL — migración PunchItem (BORRAR DESPUÉS DE USAR)
+// RUTA TEMPORAL — migración PunchItem v2 (BORRAR DESPUÉS DE USAR)
 // Uso: https://app.kodupm.com/api/internal/punch-migrate?key=kodupm-migrar-2026
-// Crea la tabla PunchItem + índices + llave foránea.
+// Crea la tabla PunchItem si no existe Y agrega las columnas v2
+// (area, correctiveAction, identifiedBy, backCharge) si faltan.
 // Cuando responda ok:true, BORRA este archivo del repo.
 // ============================================================
 
@@ -75,6 +76,13 @@ export async function GET(request: Request) {
       END $$
     `);
     steps.push('llave foránea verificada');
+
+    // Columnas v2 (idempotentes — IF NOT EXISTS)
+    await prisma.$executeRawUnsafe('ALTER TABLE "PunchItem" ADD COLUMN IF NOT EXISTS "area" TEXT');
+    await prisma.$executeRawUnsafe('ALTER TABLE "PunchItem" ADD COLUMN IF NOT EXISTS "correctiveAction" TEXT');
+    await prisma.$executeRawUnsafe('ALTER TABLE "PunchItem" ADD COLUMN IF NOT EXISTS "identifiedBy" TEXT');
+    await prisma.$executeRawUnsafe('ALTER TABLE "PunchItem" ADD COLUMN IF NOT EXISTS "backCharge" DOUBLE PRECISION');
+    steps.push('columnas v2 agregadas (area, correctiveAction, identifiedBy, backCharge)');
 
     const check: any[] = await prisma.$queryRawUnsafe(
       `SELECT column_name FROM information_schema.columns WHERE table_name = 'PunchItem' ORDER BY ordinal_position`

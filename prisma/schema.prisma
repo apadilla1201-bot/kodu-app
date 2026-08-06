@@ -737,11 +737,14 @@ model LienWaiver {
 // ============================================================
 // PUNCH LIST — ítems de pendientes/corrección de cierre
 // ------------------------------------------------------------
-// Flujo: el GC crea el ítem (foto, ubicación, responsable) → se
-// asigna al sub por correo con enlace seguro → el sub lo marca
-// "Ready for Review" (puede subir foto de la corrección) → el GC
-// lo verifica y cierra. Estados: Open → In Progress →
-// Ready for Review → Completed. Prioridad: Low/Medium/High.
+// Flujo (estilo Excel PDG Arena Madness): el GC camina el proyecto
+// ÁREA por ÁREA y crea ítems (deficiencia + acción correctiva, foto,
+// trade → sub) → asigna al sub por correo con enlace seguro → el sub
+// marca "Ready for Review" (foto de la corrección) → SOLO el GC
+// verifica y cierra (two-step closeout: nadie cierra su propio trabajo).
+// Prioridad: A = Life Safety/TCO (vence 5 días hábiles, bloquea cierre),
+// B = Functional (10 días), C = Cosmetic (10 días).
+// Si el sub no responde: Disputed + backCharge (AIA A201 §2.5 y 6.3).
 // ============================================================
 model PunchItem {
   id                  String    @id @default(cuid())
@@ -754,9 +757,13 @@ model PunchItem {
   trade               String?
   assignedToName      String?
   assignedToEmail     String?
-  priority            String    @default("Medium") // Low | Medium | High
-  status              String    @default("Open")   // Open | In Progress | Ready for Review | Completed
+  priority            String    @default("B")      // A (Life Safety/TCO) | B (Functional) | C (Cosmetic)
+  status              String    @default("Open")   // Open | In Progress | Ready for Review | Completed | Disputed
   dueDate             DateTime?
+  area                String?                        // área predefinida del proyecto (walkthrough ordenado)
+  correctiveAction    String?   @db.Text             // acción correctiva requerida (separada de la deficiencia)
+  identifiedBy        String?                        // quién lo encontró en el walk
+  backCharge          Float?                         // monto de back-charge si está Disputed
   photoUrl            String?
   photoName           String?
   completionPhotoUrl  String?

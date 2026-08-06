@@ -23,6 +23,13 @@ const STATUS_COLORS: Record<string, string> = {
   'In Progress': '#1d4ed8',
   'Ready for Review': '#7e22ce',
   Completed: '#15803d',
+  Disputed: '#b91c1c',
+};
+
+const PRIO_LABELS: Record<string, string> = {
+  A: 'A — Life Safety / TCO',
+  B: 'B — Functional',
+  C: 'C — Cosmetic',
 };
 
 export async function GET(request: Request) {
@@ -60,21 +67,35 @@ export async function GET(request: Request) {
     const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const open = items.filter((i) => i.status !== 'Completed').length;
 
-    const rows = items.map((it) => {
+    // Agrupado por área (estilo Excel PDG Arena Madness)
+    const areaOrder = [...new Set(items.map((it) => it.area).filter(Boolean))].sort() as string[];
+    const noArea = items.filter((it) => !it.area);
+    const groups: { name: string; rows: typeof items }[] = [
+      ...areaOrder.map((a) => ({ name: a, rows: items.filter((it) => it.area === a) })),
+      ...(noArea.length ? [{ name: 'General / No area', rows: noArea }] : []),
+    ];
+
+    const renderRow = (it: (typeof items)[number]) => {
       const color = STATUS_COLORS[it.status] ?? '#333';
       const due = it.dueDate ? new Date(it.dueDate).toLocaleDateString('en-US') : '—';
       const completed = it.completedAt ? new Date(it.completedAt).toLocaleDateString('en-US') : '—';
       return `<tr>
-        <td style="text-align:center;font-weight:bold;">${it.itemNumber}</td>
-        <td><b>${esc(it.title)}</b>${it.description ? `<br/><span style="color:#555;font-size:8.5pt;">${esc(it.description)}</span>` : ''}</td>
+        <td style="text-align:center;font-weight:bold;">PL-${String(it.itemNumber).padStart(3, '0')}</td>
+        <td><b>${esc(it.title)}</b>${it.correctiveAction ? `<br/><span style="color:#0F1B33;font-size:8.5pt;"><b>Action:</b> ${esc(it.correctiveAction)}</span>` : ''}${it.backCharge ? `<br/><span style="color:#b91c1c;font-size:8.5pt;font-weight:bold;">BACK-CHARGE: $${Number(it.backCharge).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>` : ''}</td>
         <td>${esc(it.location) || '—'}</td>
         <td>${esc(it.trade) || '—'}</td>
         <td>${esc(it.assignedToName) || '—'}</td>
-        <td style="text-align:center;">${it.priority}</td>
+        <td style="text-align:center;" title="${PRIO_LABELS[it.priority] ?? it.priority}"><b>${it.priority}</b></td>
         <td style="text-align:center;">${due}</td>
         <td style="text-align:center;"><span style="background:${color};color:#fff;padding:2px 8px;border-radius:10px;font-size:8pt;font-weight:bold;white-space:nowrap;">${it.status}</span></td>
         <td style="text-align:center;">${completed}</td>
       </tr>`;
+    };
+
+    const rows = groups.map((g) => {
+      const closedInArea = g.rows.filter((r) => r.status === 'Completed').length;
+      return `<tr><td colspan="9" style="background:#f2f0ea;font-weight:bold;color:#0F1B33;padding:7px 8px;border-bottom:1px solid #bbb;">${esc(g.name)} <span style="font-weight:normal;color:#666;">(${closedInArea}/${g.rows.length} closed)</span></td></tr>`
+        + g.rows.map(renderRow).join('');
     }).join('');
 
     const html = `<!DOCTYPE html>
@@ -112,9 +133,12 @@ export async function GET(request: Request) {
   <div class="summary">
     <div class="card"><b>${items.length}</b>Total items</div>
     <div class="card"><b>${open}</b>Open items</div>
-    <div class="card"><b>${items.length - open}</b>Completed</div>
+    <div class="card"><b>${items.length - open}</b>Completed (${items.length ? Math.round(((items.length - open) / items.length) * 100) : 0}%)</div>
     <div class="card"><b>${items.filter((i) => i.status === 'Ready for Review').length}</b>Ready for review</div>
+    <div class="card"><b>${items.filter((i) => i.status === 'Disputed').length}</b>Disputed</div>
+    <div class="card"><b>${items.filter((i) => i.priority === 'A' && i.status !== 'Completed').length}</b>Priority A open (blocks TCO)</div>
   </div>
+  <p style="font-size:8pt;color:#777;margin:-8px 0 12px;">Priority: A = Life Safety / TCO (blocks turnover) · B = Functional · C = Cosmetic. Two-step closeout: subcontractor marks Ready for Review; only the GC verifies and closes.</p>
 
   <table class="items">
     <thead><tr>
