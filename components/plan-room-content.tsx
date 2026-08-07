@@ -445,9 +445,13 @@ function HistoryDialog({ sheet, canUpload, onClose, onChanged }: {
 // ─── Modal: subida múltiple de planos ───────────────────────────────────────
 interface UploadRow {
   file: File; sheetNumber: string; title: string; label: string;
-  status: 'pending' | 'uploading' | 'done' | 'error'; note?: string;
+  status: 'pending' | 'uploading' | 'saving' | 'done' | 'error';
+  progress: number; note?: string; errorMsg?: string;
 }
 
+const MAX_PLAN_MB = 50;
+
+// ─── Modal: subir planos (pasos claros + progreso real por archivo) ─────────
 function UploadDialog({ projectId, sets, existingSheets, onClose, onDone }: {
   projectId: string; sets: PlanSet[]; existingSheets: PlanSheet[]; onClose: () => void; onDone: () => void;
 }) {
@@ -455,9 +459,21 @@ function UploadDialog({ projectId, sets, existingSheets, onClose, onDone }: {
   const [rows, setRows] = useState<UploadRow[]>([]);
   const [planSetId, setPlanSetId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const patchRow = (idx: number, patch: Partial<UploadRow>) =>
+    setRows((rs) => rs.map((r, j) => (j === idx ? { ...r, ...patch } : r)));
 
   const addFiles = (files: File[]) => {
     const newRows: UploadRow[] = files.map((file) => {
+      const isOkType = file.type === 'application/pdf' || file.type.startsWith('image/') || /\.pdf$/i.test(file.name);
+      if (!isOkType) {
+        return { file, sheetNumber: '', title: file.name, label: 'Original', status: 'error' as const, progress: 0, errorMsg: t('plans.badType') };
+      }
+      if (file.size > MAX_PLAN_MB * 1024 * 1024) {
+        return { file, sheetNumber: '', title: file.name, label: 'Original', status: 'error' as const, progress: 0, errorMsg: t('plans.tooLarge') };
+      }
       const parsed = parseFileName(file.name);
       const exists = existingSheets.some((s) => s.sheetNumber === parsed.sheetNumber);
       return {
@@ -465,49 +481,116 @@ function UploadDialog({ projectId, sets, existingSheets, onClose, onDone }: {
         sheetNumber: parsed.sheetNumber,
         title: parsed.title,
         label: exists ? '' : 'Original',
-        status: 'pending',
-        note: exists ? t('plans.willAddRevision') : undefined,
+        status: 'pending' as const,
+        progress: 0,
+        note: exists
+          ? t('plans.willAddRevision')
+          : parsed.sheetNumber ? undefined : t('plans.missingNumber'),
       };
     });
     setRows((r) => [...r, ...newRows]);
   };
 
+  const uploadOne = async (row: UploadRow, idx: number): Promise<any | null> => {
+    patchRow(idx, { status: 'uploading', progress: 1, errorMsg: undefined });
+    const file = row.file;
+    try {
+      let cloudPath = '';
+      let blobFailed: Error | null = null;
+      try {
+        const { upload } = await import('@vercel/blob/client');
+        const safeName = (file.name || 'file').replace(/[/\\]/g, '_');
+        const blob = await upload(`uploads/${Date.now()}-${safeName}`, file, {
+          access: 'public',
+          handleUploadUrl: '/api/upload/blob-token',
+          contentType: file.type || 'application/pdf',
+          multipart: file.size > 10 * 1024 * 1024,
+          onUploadProgress: (ev: any) => {
+            const raw = Number(ev?.percentage ?? 0);
+            const pct = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+            patchRow(idx, { progress: Math.max(2, Math.min(99, pct)) });
+          },
+        });
+        cloudPath = `vercel-blob:${blob.url}`;
+      } catch (e: any) {
+        if (String(e?.message ?? '').includes('blob-not-configured')) {
+          const fd = new FormData();
+          fd.append('file', file, file.name);
+          fd.append('fileName', file.name);
+          fd.append('contentType', file.type || 'application/pdf');
+          fd.append('isPublic', 'true');
+          const res = await fetch('/api/upload/server', { method: 'POST', body: fd, credentials: 'include' });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.error ?? t('plans.saveError'));
+          cloudPath = data?.cloud_storage_path ?? '';
+          patchRow(idx, { progress: 99 });
+        } else {
+          blobFailed = e instanceof Error ? e : new Error(String(e?.message ?? 'upload failed'));
+          throw blobFailed;
+        }
+      }
+      patchRow(idx, { progress: 100 });
+      return {
+        fileName: row.file.name,
+        fileUrl: cloudPath,
+        fileIsPublic: true,
+        sheetNumber: row.sheetNumber,
+        title: row.title,
+        label: row.label.trim() || 'Original',
+        rowIdx: idx,
+      };
+    } catch (e: any) {
+      patchRow(idx, { status: 'error', errorMsg: e?.message ?? t('plans.saveError') });
+      return null;
+    }
+  };
+
   const submit = async () => {
-    if (rows.length === 0) return;
+    const targets = rows
+      .map((r, idx) => ({ r, idx }))
+      .filter(({ r }) => (r.status === 'pending' || r.status === 'error') && r.sheetNumber.trim() !== '');
+    if (targets.length === 0) return;
     setBusy(true);
     try {
+      // Subida de archivos, 2 en paralelo, con barra de progreso por archivo
       const items: any[] = [];
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        setRows((rs) => rs.map((r, j) => (j === i ? { ...r, status: 'uploading' } : r)));
-        try {
-          const uploaded = await uploadFileToStorage(row.file);
-          items.push({
-            fileName: row.file.name,
-            fileUrl: uploaded.cloud_storage_path,
-            fileIsPublic: (uploaded as any).isPublic ?? true,
-            sheetNumber: row.sheetNumber,
-            title: row.title,
-            label: row.label.trim() || 'Original',
-          });
-          setRows((rs) => rs.map((r, j) => (j === i ? { ...r, status: 'done' } : r)));
-        } catch {
-          setRows((rs) => rs.map((r, j) => (j === i ? { ...r, status: 'error' } : r)));
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < targets.length) {
+          const { r, idx } = targets[cursor++];
+          const item = await uploadOne(r, idx);
+          if (item) items.push(item);
         }
-      }
+      };
+      await Promise.all([worker(), worker()]);
+
+      // Registro en el log, en lotes de 25 (el API acepta máx. 50)
       if (items.length > 0) {
-        const res = await fetch('/api/plan-sheets/bulk', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, planSetId: planSetId || null, items }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data?.error ?? t('plans.saveError'));
+        items.forEach((it) => patchRow(it.rowIdx, { status: 'saving' }));
+        for (let off = 0; off < items.length; off += 25) {
+          const batch = items.slice(off, off + 25).map(({ rowIdx, ...rest }) => rest);
+          const res = await fetch('/api/plan-sheets/bulk', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId, planSetId: planSetId || null, items: batch }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            items.slice(off, off + 25).forEach((it) => patchRow(it.rowIdx, { status: 'error', errorMsg: data?.error ?? t('plans.saveError') }));
+          } else {
+            items.slice(off, off + 25).forEach((it) => patchRow(it.rowIdx, { status: 'done' }));
+          }
         }
       }
-      toast.success(t('plans.uploadDone', { count: items.length }));
-      onDone();
+
+      const doneCount = rows.filter((r) => r.status === 'done').length + items.length;
+      const failCount = targets.length - items.length;
+      if (failCount === 0) {
+        toast.success(t('plans.uploadDone', { count: doneCount }));
+        onDone();
+      } else {
+        toast.error(t('plans.uploadPartial', { done: doneCount, errors: failCount }));
+      }
     } catch (e: any) {
       toast.error(e?.message ?? t('plans.saveError'));
     } finally {
@@ -515,82 +598,137 @@ function UploadDialog({ projectId, sets, existingSheets, onClose, onDone }: {
     }
   };
 
+  const pendingCount = rows.filter((r) => r.status === 'pending' && r.sheetNumber.trim() !== '').length;
+  const doneCount = rows.filter((r) => r.status === 'done').length;
+  const errorCount = rows.filter((r) => r.status === 'error').length;
+  const overallPct = rows.length > 0 ? Math.round((doneCount / Math.max(1, rows.filter((r) => r.sheetNumber.trim() !== '').length)) * 100) : 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="bg-[#0F1B33] px-5 py-4 flex items-center justify-between sticky top-0">
           <h3 className="text-white font-bold flex items-center gap-2"><Upload className="w-4 h-4 text-[#C9A96E]" /> {t('plans.uploadTitle')}</h3>
-          <button onClick={onClose} className="text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} disabled={busy} className="text-white/70 hover:text-white disabled:opacity-40"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div>
+
+          {/* PASO 1 — zona de arrastre */}
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{t('plans.stepChoose')}</p>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => { e.preventDefault(); setDragActive(false); addFiles(Array.from(e.dataTransfer?.files ?? [])); }}
+              onClick={() => !busy && fileRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${dragActive ? 'border-[#C9A96E] bg-amber-50' : 'border-slate-300 hover:border-[#C9A96E] hover:bg-slate-50'} ${busy ? 'opacity-60 pointer-events-none' : ''}`}
+            >
+              <Upload className="w-10 h-10 text-[#C9A96E] mx-auto mb-2" />
+              <p className="font-semibold text-[#0F1B33]">{dragActive ? t('plans.dropActive') : t('plans.dropzone')}</p>
+              <p className="text-sm text-slate-500">{t('plans.dropzoneOr')}</p>
+              <p className="text-xs text-slate-400 mt-2">{t('plans.dropzoneRules')}</p>
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept="application/pdf,image/*"
+              className="hidden"
+              onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }}
+            />
+            <div className="mt-3">
               <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">{t('plans.assignToSet')}</label>
-              <select value={planSetId} onChange={(e) => setPlanSetId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+              <select value={planSetId} onChange={(e) => setPlanSetId(e.target.value)} disabled={busy} className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white w-full sm:w-auto">
                 <option value="">{t('plans.noSet')}</option>
                 {sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            <div className="flex-1" />
-            <label className="inline-flex items-center gap-2 bg-[#C9A96E] text-[#0F1B33] px-4 py-2 rounded-lg font-semibold text-sm cursor-pointer hover:bg-[#B8955A]">
-              <Plus className="w-4 h-4" /> {t('plans.pickFiles')}
-              <input
-                type="file"
-                multiple
-                accept="application/pdf,image/*"
-                className="hidden"
-                onChange={(e) => { addFiles(Array.from(e.target.files ?? [])); e.target.value = ''; }}
-              />
-            </label>
           </div>
 
+          {/* PASO 2 — lista revisable */}
           {rows.length > 0 && (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase text-slate-500 border-b">
-                  <th className="py-2 pr-2">{t('plans.colFile')}</th>
-                  <th className="py-2 pr-2 w-28">{t('plans.colSheet')}</th>
-                  <th className="py-2 pr-2">{t('plans.colTitle')}</th>
-                  <th className="py-2 pr-2 w-28">{t('plans.colRev')}</th>
-                  <th className="py-2 w-8" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="py-1.5 pr-2 text-xs text-slate-500 max-w-[180px] truncate">
-                      {row.file.name}
-                      {row.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin inline ml-1" />}
-                      {row.status === 'done' && <Check className="w-3 h-3 text-green-600 inline ml-1" />}
-                      {row.note && <p className="text-[10px] text-amber-600">{row.note}</p>}
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <input value={row.sheetNumber} onChange={(e) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, sheetNumber: e.target.value.toUpperCase() } : r)))} className="w-full border border-slate-200 rounded px-2 py-1 text-xs font-bold" />
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <input value={row.title} onChange={(e) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, title: e.target.value } : r)))} className="w-full border border-slate-200 rounded px-2 py-1 text-xs" />
-                    </td>
-                    <td className="py-1.5 pr-2">
-                      <input list="rev-presets" value={row.label} onChange={(e) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))} placeholder="Original" className="w-full border border-slate-200 rounded px-2 py-1 text-xs" />
-                    </td>
-                    <td className="py-1.5">
-                      <button onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-500"><X className="w-4 h-4" /></button>
-                    </td>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{t('plans.stepReview')}</p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase text-slate-500 border-b">
+                    <th className="py-2 pr-2">{t('plans.colFile')}</th>
+                    <th className="py-2 pr-2 w-28">{t('plans.colSheet')}</th>
+                    <th className="py-2 pr-2">{t('plans.colTitle')}</th>
+                    <th className="py-2 pr-2 w-28">{t('plans.colRev')}</th>
+                    <th className="py-2 w-8" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((row, i) => (
+                    <tr key={i} className="border-b last:border-0 align-top">
+                      <td className="py-1.5 pr-2 text-xs text-slate-500 max-w-[180px]">
+                        <p className="truncate">{row.file.name}</p>
+                        <p className="text-[10px] text-slate-400">{(row.file.size / 1024 / 1024).toFixed(1)} MB</p>
+                        {row.note && row.status === 'pending' && <p className="text-[10px] text-amber-600">{row.note}</p>}
+                        {row.status === 'error' && <p className="text-[10px] text-red-600 font-semibold">{row.errorMsg}</p>}
+                        {(row.status === 'uploading' || row.status === 'saving') && (
+                          <div className="mt-1 h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-[#C9A96E] transition-all" style={{ width: `${row.status === 'saving' ? 100 : row.progress}%` }} />
+                          </div>
+                        )}
+                        {row.status === 'uploading' && <p className="text-[10px] text-slate-500">{row.progress}%</p>}
+                        {row.status === 'saving' && <p className="text-[10px] text-slate-500">{t('plans.savingLog')}</p>}
+                        {row.status === 'done' && <Check className="w-3.5 h-3.5 text-green-600 mt-0.5" />}
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input value={row.sheetNumber} disabled={busy || row.status === 'done'} onChange={(e) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, sheetNumber: e.target.value.toUpperCase(), note: undefined } : r)))} className="w-full border border-slate-200 rounded px-2 py-1 text-xs font-bold disabled:bg-slate-50" />
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input value={row.title} disabled={busy || row.status === 'done'} onChange={(e) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, title: e.target.value } : r)))} className="w-full border border-slate-200 rounded px-2 py-1 text-xs disabled:bg-slate-50" />
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <input value={row.label} disabled={busy || row.status === 'done'} list="rev-presets" placeholder="Original" onChange={(e) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, label: e.target.value } : r)))} className="w-full border border-slate-200 rounded px-2 py-1 text-xs disabled:bg-slate-50" />
+                      </td>
+                      <td className="py-1.5">
+                        {!busy && row.status !== 'done' && (
+                          <button title={t('plans.removeFile')} onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <datalist id="rev-presets">
+                {REV_PRESETS.map((p) => <option key={p} value={p} />)}
+              </datalist>
+            </div>
+          )}
+
+          {/* PASO 3 — subir, con progreso global */}
+          {rows.length > 0 && (
+            <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{t('plans.stepUpload')}</p>
+              {(busy || doneCount > 0) && (
+                <div>
+                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#0F1B33] transition-all" style={{ width: `${overallPct}%` }} />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{t('plans.overallProgress', { done: doneCount, total: rows.filter((r) => r.sheetNumber.trim() !== '').length })}</p>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button onClick={onClose} disabled={busy} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40">{t('common.cancel')}</button>
+                {errorCount > 0 && !busy && (
+                  <button onClick={() => void submit()} className="inline-flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                    {t('plans.retryFailed')}
+                  </button>
+                )}
+                <button onClick={() => void submit()} disabled={busy || pendingCount === 0} className="inline-flex items-center gap-2 bg-[#0F1B33] text-white px-5 py-2 rounded-lg text-sm font-semibold disabled:opacity-50">
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {busy ? t('plans.uploading') : t('plans.uploadBtn', { count: pendingCount })}
+                </button>
+              </div>
+            </div>
           )}
 
           <p className="text-xs text-slate-500">{t('plans.uploadHint')}</p>
-
-          <div className="flex justify-end gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">{t('common.cancel')}</button>
-            <button onClick={() => void submit()} disabled={busy || rows.length === 0} className="inline-flex items-center gap-2 bg-[#0F1B33] text-white px-5 py-2 rounded-lg text-sm font-semibold disabled:opacity-50">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {busy ? t('plans.uploading') : t('plans.uploadBtn', { count: rows.length })}
-            </button>
-          </div>
         </div>
       </div>
     </div>
