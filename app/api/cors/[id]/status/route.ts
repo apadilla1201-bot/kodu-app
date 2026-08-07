@@ -34,7 +34,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         decidedBy: session.user?.name || session.user?.email || 'Internal User',
         approvalDate: status === 'Approved' ? new Date() : null,
       },
-      include: { project: { select: { projectName: true, projectNumber: true } } },
+      include: { project: { select: { projectName: true, projectNumber: true, companyId: true } } },
     });
 
     // Notify the approver contact (Owner) about the internal decision
