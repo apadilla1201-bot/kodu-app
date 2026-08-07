@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       ${item.description ? `<p style="margin:0 0 14px;color:#444;">${item.description}</p>` : ''}
       ${item.correctiveAction ? `<p style="margin:0 0 14px;color:#0F1B33;"><b>Required corrective action:</b> ${item.correctiveAction}</p>` : ''}
       <p style="margin:0 0 6px;">When the work is corrected, use the secure link below to mark it ready and upload a photo:</p>
-      <p style="margin:18px 0;"><a href="${respondUrl}" style="background:#0F1B33;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">Open Punch Item</a></p>
+      <p style="margin:18px 0;"><a href="${respondUrl}" style="background:#0F1B33;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">Open Punch Item — Abrir Ítem de Punch</a></p><p style="margin-top:14px;font-size:11px;color:#9ca3af;">¿Prefieres español? Abre el enlace y toca «ES» arriba. / Prefer English? Open the link and tap «EN» at the top.</p>
       <p style="margin:0;color:#666;font-size:13px;">No account needed — this link gives access to this punch item only.</p>
     `;
 

@@ -20,9 +20,52 @@ interface PublicInfo {
 const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,image/*';
 const MAX_MB = 25;
 
+const STR = {
+  en: {
+    brandSub: 'Closeout Document Request',
+    notAvailable: 'Link not available',
+    notAvailableMsg: 'This document request link is invalid or has expired.',
+    title: 'Closeout Document Requested',
+    received: 'Document received!',
+    receivedMsg: 'Thank you. The GC team has been notified.',
+    category: 'Category:',
+    deliverable: 'Deliverable:',
+    responsible: 'Responsible:',
+    alreadyMsg: (f: string | null) => `A document (${f || 'file'}) was already received. Uploading a new one will replace it.`,
+    uploading: 'Uploading...',
+    selectDoc: 'Click to select the document',
+    formats: (mb: number) => `PDF, Word, Excel or image · max ${mb}MB`,
+    tooLarge: (mb: number) => `File too large (max ${mb}MB)`,
+    failed: 'Upload failed',
+    secureNote: 'Secure link — no account needed. Do not share this link.',
+    powered: 'Powered by',
+  },
+  es: {
+    brandSub: 'Solicitud de Documento de Cierre',
+    notAvailable: 'Enlace no disponible',
+    notAvailableMsg: 'Este enlace de solicitud de documento no es válido o expiró.',
+    title: 'Documento de Cierre Solicitado',
+    received: '¡Documento recibido!',
+    receivedMsg: 'Gracias. El equipo del GC fue notificado.',
+    category: 'Categoría:',
+    deliverable: 'Entregable:',
+    responsible: 'Responsable:',
+    alreadyMsg: (f: string | null) => `Ya se recibió un documento (${f || 'archivo'}). Si subes uno nuevo, lo reemplazará.`,
+    uploading: 'Subiendo...',
+    selectDoc: 'Haz clic para seleccionar el documento',
+    formats: (mb: number) => `PDF, Word, Excel o imagen · máx. ${mb}MB`,
+    tooLarge: (mb: number) => `Archivo muy grande (máx. ${mb}MB)`,
+    failed: 'Error al subir',
+    secureNote: 'Enlace seguro — no necesitas cuenta. No compartas este enlace.',
+    powered: 'Desarrollado por',
+  },
+} as const;
+
 export default function CloseoutRespondPage() {
   const params = useParams();
   const token = params.token as string;
+  const [lang, setLang] = useState<'en' | 'es'>('en');
+  const L = STR[lang];
   const [info, setInfo] = useState<PublicInfo | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,7 +83,7 @@ export default function CloseoutRespondPage() {
   const upload = async (file: File) => {
     if (uploading) return;
     if (file.size > MAX_MB * 1024 * 1024) {
-      setError(`File too large (max ${MAX_MB}MB)`);
+      setError(L.tooLarge(MAX_MB));
       return;
     }
     setUploading(true);
@@ -51,30 +94,44 @@ export default function CloseoutRespondPage() {
       const res = await fetch(`/api/closeout-items/public/${token}`, { method: 'POST', body: fd });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data.error || L.failed);
       }
       setDone(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed');
+      setError(e instanceof Error ? e.message : L.failed);
     } finally {
       setUploading(false);
     }
   };
 
+  const langToggle = (
+    <div className="flex justify-center gap-1 mb-4 text-xs font-semibold">
+      {(['en', 'es'] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => setLang(l)}
+          className={`px-3 py-1 rounded-full uppercase tracking-wide ${lang === l ? 'bg-[#C9A96E] text-[#0F1B33]' : 'text-white/60 hover:text-white'}`}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+
   const brandHeader = (
     <div className="text-center mb-6">
       <p className="text-2xl font-bold text-white tracking-tight">koduPM</p>
-      <p className="text-xs text-[#C9A96E] uppercase tracking-[0.25em] mt-1">Closeout Document Request</p>
+      <p className="text-xs text-[#C9A96E] uppercase tracking-[0.25em] mt-1">{L.brandSub}</p>
     </div>
   );
 
   if (notFound) {
     return (
       <div className="min-h-screen bg-[#0F1B33] flex items-center justify-center p-4">
-        <div className="max-w-md w-full">{brandHeader}
+        <div className="max-w-md w-full">{langToggle}{brandHeader}
           <div className="bg-white rounded-2xl p-8 text-center shadow-2xl">
-            <h1 className="text-xl font-bold text-slate-900 mb-2">Link not available</h1>
-            <p className="text-slate-600 text-sm">This document request link is invalid or has expired.</p>
+            <h1 className="text-xl font-bold text-slate-900 mb-2">{L.notAvailable}</h1>
+            <p className="text-slate-600 text-sm">{L.notAvailableMsg}</p>
           </div>
         </div>
       </div>
@@ -92,10 +149,11 @@ export default function CloseoutRespondPage() {
   return (
     <div className="min-h-screen bg-[#0F1B33] py-8 px-4">
       <div className="max-w-lg mx-auto">
+        {langToggle}
         {brandHeader}
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
           <div className="bg-[#C9A96E] px-6 py-4">
-            <h1 className="text-lg font-bold text-[#0F1B33]">Closeout Document Requested</h1>
+            <h1 className="text-lg font-bold text-[#0F1B33]">{L.title}</h1>
             <p className="text-sm text-[#0F1B33]/80">{info.projectName}{info.projectNumber ? ` · #${info.projectNumber}` : ''} · {info.gcName}</p>
           </div>
           <div className="p-6 space-y-5">
@@ -104,22 +162,22 @@ export default function CloseoutRespondPage() {
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <ClipboardCheck className="w-8 h-8 text-green-600" />
                 </div>
-                <h2 className="text-xl font-bold text-slate-900 mb-1">Document received!</h2>
-                <p className="text-slate-600 text-sm">Thank you. The GC team has been notified.</p>
+                <h2 className="text-xl font-bold text-slate-900 mb-1">{L.received}</h2>
+                <p className="text-slate-600 text-sm">{L.receivedMsg}</p>
               </div>
             ) : (
               <>
                 <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-500">Category:</span><span className="font-medium text-slate-900">{info.category}</span></div>
-                  <div className="flex justify-between gap-4"><span className="text-slate-500 shrink-0">Deliverable:</span><span className="font-medium text-slate-900 text-right">{info.deliverable}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">{L.category}</span><span className="font-medium text-slate-900">{info.category}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-slate-500 shrink-0">{L.deliverable}</span><span className="font-medium text-slate-900 text-right">{info.deliverable}</span></div>
                   {info.responsible && (
-                    <div className="flex justify-between"><span className="text-slate-500">Responsible:</span><span className="font-medium text-slate-900">{info.responsible}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">{L.responsible}</span><span className="font-medium text-slate-900">{info.responsible}</span></div>
                   )}
                 </div>
 
                 {info.alreadyUploaded && (
                   <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-sm text-purple-800">
-                    A document (<span className="font-medium">{info.fileName}</span>) was already received. Uploading a new one will replace it.
+                    {L.alreadyMsg(info.fileName)}
                   </div>
                 )}
 
@@ -145,8 +203,8 @@ export default function CloseoutRespondPage() {
                   ) : (
                     <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
                   )}
-                  <p className="font-medium text-slate-900">{uploading ? 'Uploading...' : 'Click to select the document'}</p>
-                  <p className="text-xs text-slate-500 mt-1">PDF, Word, Excel or image · max {MAX_MB}MB</p>
+                  <p className="font-medium text-slate-900">{uploading ? L.uploading : L.selectDoc}</p>
+                  <p className="text-xs text-slate-500 mt-1">{L.formats(MAX_MB)}</p>
                 </button>
                 {error && <p className="text-sm text-red-600 text-center">{error}</p>}
               </>
@@ -154,10 +212,10 @@ export default function CloseoutRespondPage() {
           </div>
           <div className="border-t border-slate-100 px-6 py-3 flex items-center gap-2 text-xs text-slate-400">
             <Eye className="w-3.5 h-3.5" />
-            Secure link — no account needed. Do not share this link.
+            {L.secureNote}
           </div>
         </div>
-        <p className="text-center text-xs text-slate-400 mt-6">Powered by <span className="font-semibold text-slate-300">koduPM</span> — Construction Project Management</p>
+        <p className="text-center text-xs text-slate-400 mt-6">{L.powered} <span className="font-semibold text-slate-300">koduPM</span> — Construction Project Management</p>
       </div>
     </div>
   );

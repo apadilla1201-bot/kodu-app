@@ -61,7 +61,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         <tr><td style="padding:4px 14px 4px 0;color:#666;">Deliverable</td><td><b>${item.deliverable}</b></td></tr>
       </table>
       <p style="margin:0 0 6px;">Use the secure link below to upload the document (PDF or photo):</p>
-      <p style="margin:18px 0;"><a href="${respondUrl}" style="background:#0F1B33;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">Upload Document</a></p>
+      <p style="margin:18px 0;"><a href="${respondUrl}" style="background:#0F1B33;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">Upload Document — Subir Documento</a></p><p style="margin-top:14px;font-size:11px;color:#9ca3af;">¿Prefieres español? Abre el enlace y toca «ES» arriba. / Prefer English? Open the link and tap «EN» at the top.</p>
       <p style="margin:0;color:#666;font-size:13px;">No account needed — this link gives access to this deliverable only.</p>
     `;
 

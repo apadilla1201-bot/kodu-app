@@ -112,6 +112,7 @@ function wrapEmail(headerBg: string, headerTitle: string, headerColor: string, b
       <div style="background:#f9fafb;padding:20px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
         ${body}
         <p style="margin-top:16px;font-size:11px;color:#9ca3af;">The Project Delivery Group LLC · Kodu PM · <a href="${appBaseUrl()}" style="color:#9ca3af;">app.kodupm.com</a></p>
+        <p style="margin-top:6px;font-size:11px;color:#9ca3af;">¿Prefieres español? Abre el enlace de este correo y toca «ES» en la parte superior de la página. / Prefer English? Open the link and tap «EN» at the top.</p>
       </div>
     </div>
   `;
@@ -138,7 +139,7 @@ export async function sendRfiAssignedEmail(opts: {
 }) {
   const link = `${appBaseUrl()}/dashboard/rfis/${opts.rfiId}`;
   const externalLink = opts.externalRespondUrl
-    ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond Without Login</a></p>`
+    ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond — Responder</a></p>`
     : '';
   const html = wrapEmail(
     '#0F1B33',
@@ -189,8 +190,8 @@ export async function sendRfiAnsweredEmail(opts: {
     ? `
       <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin:14px 0;">
         <p style="margin:0 0 10px 0;font-size:13px;color:#374151;"><strong>¿Qué hacemos con esta respuesta?</strong></p>
-        <a href="${opts.closeUrl}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;">✓ Close RFI (response OK)</a>
-        <a href="${link}" style="display:inline-block;background:#fff;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid #0F1B33;">↪ Reassign / Review in Kodu</a>
+        <a href="${opts.closeUrl}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;">✓ Close RFI — Cerrar RFI</a>
+        <a href="${link}" style="display:inline-block;background:#fff;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid #0F1B33;">↪ Reassign / Review — Reasignar / Revisar</a>
         <p style="margin:10px 0 0 0;font-size:11px;color:#9ca3af;">“Close RFI” works without login (secure one-item link). To reassign to someone else, open it in Kodu.</p>
       </div>
     `
@@ -248,7 +249,7 @@ export async function sendSubmittalEmail(opts: {
   const t = titles[opts.event];
   const link = `${appBaseUrl()}/dashboard/submittals/${opts.submittalId}`;
   const externalLink = opts.externalRespondUrl
-    ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond Without Login</a></p>`
+    ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond — Responder</a></p>`
     : '';
   const html = wrapEmail(
     t.bg,
@@ -303,7 +304,7 @@ export async function sendCorApprovalRequestEmail(opts: {
 }) {
   const link = `${appBaseUrl()}/dashboard/cors/${opts.corId}`;
   const externalLink = opts.externalApproveUrl
-    ? `<p style="margin-top:12px;"><a href="${opts.externalApproveUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Review & Approve Without Login</a></p>
+    ? `<p style="margin-top:12px;"><a href="${opts.externalApproveUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Review & Approve — Revisar y Aprobar</a></p>
        <p style="font-size:11px;color:#9ca3af;margin-top:6px;">This secure link is unique to this Change Order and lets you review the amount and approve or reject it — no account needed.</p>`
     : '';
   const accountLink = opts.accountUrl
@@ -391,8 +392,8 @@ export async function sendSubmittalRespondedEmail(opts: {
     ? `
       <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:14px;margin:14px 0;">
         <p style="margin:0 0 10px 0;font-size:13px;color:#374151;"><strong>¿Qué hacemos con esta respuesta?</strong></p>
-        <a href="${opts.closeUrl}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;">✓ Close Submittal (response OK)</a>
-        <a href="${link}" style="display:inline-block;background:#fff;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid #0F1B33;">↪ Reassign / Review in Kodu</a>
+        <a href="${opts.closeUrl}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px;">✓ Close Submittal — Cerrar Submittal</a>
+        <a href="${link}" style="display:inline-block;background:#fff;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid #0F1B33;">↪ Reassign / Review — Reasignar / Revisar</a>
         <p style="margin:10px 0 0 0;font-size:11px;color:#9ca3af;">“Close Submittal” works without login (secure one-item link).</p>
       </div>
     `
