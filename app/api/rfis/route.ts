@@ -153,6 +153,7 @@ export async function POST(request: Request) {
 
       if (primaryTo.length) {
         await sendRfiAssignedEmail({
+          companyId: project.companyId,
           to: primaryTo,
           cc: ccList,
           replyTo: pmEmail || undefined,
@@ -181,6 +182,7 @@ export async function POST(request: Request) {
       const creatorTo = collectEmails(pmEmail, session.user?.email);
       if (creatorTo.length && assigneeName) {
         await sendItemSentConfirmationEmail({
+          companyId: project.companyId,
           to: creatorTo,
           kind: 'RFI',
           number: rfi.rfiNumber,

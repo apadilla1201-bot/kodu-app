@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { isFullAccess } from '@/lib/permissions';
-import { sendEmail } from '@/lib/email';
+import { buildBrandedEmailHtml, sendEmail } from '@/lib/email';
 import { appBaseUrl } from '@/lib/app-url';
 import { randomBytes } from 'crypto';
 
@@ -55,8 +55,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       ? new Date(item.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
       : '—';
 
-    const html = `
-      <h2 style="margin:0 0 12px;color:#0F1B33;">Punch List Item Assigned</h2>
+    const html = await buildBrandedEmailHtml({ companyId: companyId, headerTitle: 'Punch List Item Assigned', body: `
       <p style="margin:0 0 14px;">Hello${item.assignedToName ? ` ${item.assignedToName}` : ''},</p>
       <p style="margin:0 0 14px;"><b>${gcName}</b> assigned you punch list item <b>#${item.itemNumber}</b> on project <b>${item.project.projectNumber} — ${item.project.projectName}</b>:</p>
       <table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;">
@@ -71,7 +70,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       <p style="margin:0 0 6px;">When the work is corrected, use the secure link below to mark it ready and upload a photo:</p>
       <p style="margin:18px 0;"><a href="${respondUrl}" style="background:#0F1B33;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">Open Punch Item — Abrir Ítem de Punch</a></p><p style="margin-top:14px;font-size:11px;color:#9ca3af;">¿Prefieres español? Abre el enlace y toca «ES» arriba. / Prefer English? Open the link and tap «EN» at the top.</p>
       <p style="margin:0;color:#666;font-size:13px;">No account needed — this link gives access to this punch item only.</p>
-    `;
+    ` });
 
     const result = await sendEmail({
       to: toEmail,
@@ -84,7 +83,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       await sendEmail({
         to: creatorEmail,
         subject: `✓ Punch item #${item.itemNumber} sent to ${toEmail} — ${item.project.projectNumber}`,
-        html: `<p>Punch item <b>#${item.itemNumber} — ${item.title}</b> (project <b>${item.project.projectNumber}</b>) was sent to <b>${toEmail}</b>.</p><p>You will be notified when it is marked ready for review.</p>`,
+        html: await buildBrandedEmailHtml({ companyId: companyId, headerTitle: '✓ Punch Item Sent', body: `<p>Punch item <b>#${item.itemNumber} — ${item.title}</b> (project <b>${item.project.projectNumber}</b>) was sent to <b>${toEmail}</b>.</p><p>You will be notified when it is marked ready for review.</p>` }),
       });
     }
 

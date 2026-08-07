@@ -126,6 +126,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
           if (primaryTo.length) {
             await sendSubmittalEmail({
+          companyId: updated.project.companyId,
               to: primaryTo,
               cc: ccList,
               replyTo: sub.submittedByEmail || undefined,

@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { isFullAccess } from '@/lib/permissions';
-import { sendEmail } from '@/lib/email';
+import { buildBrandedEmailHtml, sendEmail } from '@/lib/email';
 import { appBaseUrl } from '@/lib/app-url';
 import { randomBytes } from 'crypto';
 
@@ -66,8 +66,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       ? new Date(waiver.throughDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
       : '—';
 
-    const html = `
-      <h2 style="margin:0 0 12px;color:#0F1B33;">Lien Waiver Requested</h2>
+    const html = await buildBrandedEmailHtml({ companyId: companyId, headerTitle: 'Lien Waiver Requested', body: `
       <p style="margin:0 0 14px;">Hello${waiver.subcontractor ? ` ${waiver.subcontractor}` : ''},</p>
       <p style="margin:0 0 14px;"><b>${gcName}</b> requests the following lien waiver for project <b>${waiver.project.projectNumber} — ${waiver.project.projectName}</b>:</p>
       <table style="border-collapse:collapse;margin:0 0 16px;font-size:14px;">
@@ -78,7 +77,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       <p style="margin:0 0 6px;">Use the secure link below to download the waiver form, sign it, and upload the signed copy:</p>
       <p style="margin:18px 0;"><a href="${respondUrl}" style="background:#0F1B33;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">Open Secure Waiver Link — Abrir Enlace Seguro</a></p><p style="margin-top:14px;font-size:11px;color:#9ca3af;">¿Prefieres español? Abre el enlace y toca «ES» arriba. / Prefer English? Open the link and tap «EN» at the top.</p>
       <p style="margin:0;color:#666;font-size:13px;">No account needed — this link gives access to this waiver only.</p>
-    `;
+    ` });
 
     const result = await sendEmail({
       to: toEmail,
@@ -91,7 +90,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       await sendEmail({
         to: creatorEmail,
         subject: `✓ Lien waiver request sent to ${toEmail} — ${waiver.project.projectNumber}`,
-        html: `<p>Your lien waiver request (<b>${typeLabel}</b>, ${amount}) for <b>${waiver.subcontractor}</b> on project <b>${waiver.project.projectNumber} — ${waiver.project.projectName}</b> was sent to <b>${toEmail}</b>.</p><p>You will be notified when the signed waiver is uploaded.</p>`,
+        html: await buildBrandedEmailHtml({ companyId: companyId, headerTitle: '✓ Lien Waiver Request Sent', body: `<p>Your lien waiver request (<b>${typeLabel}</b>, ${amount}) for <b>${waiver.subcontractor}</b> on project <b>${waiver.project.projectNumber} — ${waiver.project.projectName}</b> was sent to <b>${toEmail}</b>.</p><p>You will be notified when the signed waiver is uploaded.</p>` }),
       });
     }
 

@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/email';
+import { buildBrandedEmailHtml, sendEmail } from '@/lib/email';
 import { uploadBufferToStorage } from '@/lib/s3';
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -59,7 +59,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
   try {
     const waiver = await prisma.lienWaiver.findFirst({
       where: { externalToken: params.token },
-      include: { project: { select: { projectNumber: true, projectName: true } } },
+      include: { project: { select: { projectNumber: true, projectName: true, companyId: true } } },
     });
     if (!waiver) {
       return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
@@ -96,7 +96,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       await sendEmail({
         to: waiver.createdByEmail,
         subject: `✓ Signed lien waiver received — ${waiver.subcontractor} (${waiver.project.projectNumber})`,
-        html: `<p><b>${waiver.subcontractor}</b> uploaded the signed lien waiver for project <b>${waiver.project.projectNumber} — ${waiver.project.projectName}</b>.</p><p>Open koduPM → Lien Waivers to review and approve it.</p>`,
+        html: await buildBrandedEmailHtml({ companyId: waiver.project.companyId, headerTitle: '✓ Signed Lien Waiver Received', body: `<p><b>${waiver.subcontractor}</b> uploaded the signed lien waiver for project <b>${waiver.project.projectNumber} — ${waiver.project.projectName}</b>.</p><p>Open koduPM → Lien Waivers to review and approve it.</p>` }),
       });
     }
 

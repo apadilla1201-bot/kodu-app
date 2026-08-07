@@ -98,6 +98,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     try {
       if (creatorEmail) {
         await sendItemSentConfirmationEmail({
+          companyId: rfi.project.companyId,
           to: [creatorEmail],
           kind: 'RFI',
           number: rfi.rfiNumber,

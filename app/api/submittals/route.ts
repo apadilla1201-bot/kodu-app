@@ -127,6 +127,7 @@ export async function POST(request: Request) {
 
         if (primaryTo.length) {
           await sendSubmittalEmail({
+          companyId: project.companyId,
             to: primaryTo,
             cc: ccList,
             replyTo: pmEmail || undefined,
@@ -153,6 +154,7 @@ export async function POST(request: Request) {
         const assigned = assigneeName || submittal.ballInCourt || 'Reviewer';
         if (creatorTo.length) {
           await sendItemSentConfirmationEmail({
+          companyId: project.companyId,
             to: creatorTo,
             kind: 'Submittal',
             number: submittal.submittalNumber,

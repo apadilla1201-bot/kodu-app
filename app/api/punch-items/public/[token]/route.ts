@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/email';
+import { buildBrandedEmailHtml, sendEmail } from '@/lib/email';
 import { uploadBufferToStorage } from '@/lib/s3';
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
   try {
     const item = await prisma.punchItem.findFirst({
       where: { externalToken: params.token },
-      include: { project: { select: { projectNumber: true, projectName: true } } },
+      include: { project: { select: { projectNumber: true, projectName: true, companyId: true } } },
     });
     if (!item) {
       return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
@@ -86,7 +86,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       await sendEmail({
         to: item.createdByEmail,
         subject: `✓ Punch item #${item.itemNumber} ready for review — ${item.project.projectNumber}`,
-        html: `<p>Punch item <b>#${item.itemNumber} — ${item.title}</b> (project <b>${item.project.projectNumber} — ${item.project.projectName}</b>) was marked <b>Ready for Review</b>${data.completionPhotoUrl ? ' with a correction photo' : ''}.</p><p>Open koduPM → Punch List to verify and close it.</p>`,
+        html: await buildBrandedEmailHtml({ companyId: item.project.companyId, headerTitle: '✓ Punch Item Ready for Review', body: `<p>Punch item <b>#${item.itemNumber} — ${item.title}</b> (project <b>${item.project.projectNumber} — ${item.project.projectName}</b>) was marked <b>Ready for Review</b>${data.completionPhotoUrl ? ' with a correction photo' : ''}.</p><p>Open koduPM → Punch List to verify and close it.</p>` }),
       });
     }
 

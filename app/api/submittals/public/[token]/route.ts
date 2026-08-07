@@ -96,6 +96,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
       if (toList.length) {
         await sendSubmittalRespondedEmail({
+          companyId: submittal.project.companyId,
           to: toList,
           cc: ccList,
           submittalId: submittal.id,

@@ -42,6 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const toList = collectEmails((co as any).ownerEmail);
       if (toList.length) {
         await sendCorDecisionEmail({
+          companyId: updated.project.companyId,
           to: toList,
           corId: updated.id,
           corNumber: updated.corNumber,

@@ -88,6 +88,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
       if (notifyTo.length) {
         await sendCorDecidedNoticeEmail({
+          companyId: cor.project.companyId,
           to: notifyTo,
           cc: notifyCc,
           corId: cor.id,

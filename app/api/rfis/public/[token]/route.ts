@@ -102,6 +102,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
 
       if (toList.length) {
         await sendRfiAnsweredEmail({
+          companyId: rfi.project.companyId,
           to: toList,
           cc: ccList,
           rfiId: rfi.id,

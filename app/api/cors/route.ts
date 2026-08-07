@@ -120,6 +120,7 @@ export async function POST(request: Request) {
 
       if (primaryTo.length) {
         await sendCorApprovalRequestEmail({
+          companyId: project.companyId,
           to: primaryTo,
           cc: ccList,
           replyTo: creatorEmail || undefined,
@@ -147,6 +148,7 @@ export async function POST(request: Request) {
         const approverName = ownerName ? String(ownerName) : approverEmail ? String(approverEmail) : 'Approver';
         if (creatorTo.length) {
           await sendItemSentConfirmationEmail({
+          companyId: project.companyId,
             to: creatorTo,
             kind: 'Change Order',
             number: changeOrder.corNumber,

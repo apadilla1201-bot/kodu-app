@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { sendEmail } from '@/lib/email';
+import { buildBrandedEmailHtml, sendEmail } from '@/lib/email';
 import { uploadBufferToStorage } from '@/lib/s3';
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -50,7 +50,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
   try {
     const item = await prisma.closeoutItem.findFirst({
       where: { externalToken: params.token },
-      include: { project: { select: { projectNumber: true, projectName: true } } },
+      include: { project: { select: { projectNumber: true, projectName: true, companyId: true } } },
     });
     if (!item) {
       return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
@@ -94,7 +94,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
       await sendEmail({
         to: notify,
         subject: `✓ Closeout document received: ${item.deliverable} — ${item.project.projectNumber}`,
-        html: `<p>The closeout deliverable <b>${item.deliverable}</b> (project <b>${item.project.projectNumber} — ${item.project.projectName}</b>) was uploaded.</p><p>Open koduPM → Closeout to review and verify it.</p>`,
+        html: await buildBrandedEmailHtml({ companyId: item.project.companyId, headerTitle: '✓ Closeout Document Received', body: `<p>The closeout deliverable <b>${item.deliverable}</b> (project <b>${item.project.projectNumber} — ${item.project.projectName}</b>) was uploaded.</p><p>Open koduPM → Closeout to review and verify it.</p>` }),
       });
     }
 

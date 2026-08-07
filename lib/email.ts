@@ -1,5 +1,7 @@
 import { Resend } from 'resend';
 import { appBaseUrl } from '@/lib/app-url';
+import { getPdfBrand } from '@/lib/company-brand';
+import type { PdfBrand } from '@/lib/company-brand';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -93,32 +95,76 @@ const GOLD = '#C9A96E';
  * que era el problema reportado — blanco sobre blanco, ilegible).
  * La URL pública del logo puede sobreescribirse con EMAIL_LOGO_URL en Vercel.
  */
-function emailLogoUrl(): string {
-  const explicit = process.env.EMAIL_LOGO_URL?.trim();
-  if (explicit) return explicit;
-  return `${appBaseUrl()}/pdg_logo.png`;
+type EmailBrand = PdfBrand;
+
+/** Marca de respaldo cuando el correo no lleva companyId (no debería ocurrir). */
+const KODU_FALLBACK: EmailBrand = {
+  name: 'koduPM',
+  nameUpper: 'KODUPM',
+  logoHtml: `<span style="display:inline-block;background:#0F1B33;padding:6px 12px;border-radius:6px;"><span style="color:#C9A96E;font-weight:800;font-size:20px;font-family:Arial,Helvetica,sans-serif;">kodu</span><span style="color:#ffffff;font-weight:800;font-size:20px;font-family:Arial,Helvetica,sans-serif;">PM</span></span>`,
+  address: null, addressCity: null, addressFull: null, addressHtml: null,
+  phone: null, website: null, license: null, contactLine: null,
+};
+
+function escHtml(s: string): string {
+  return (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function wrapEmail(headerBg: string, headerTitle: string, headerColor: string, body: string): string {
-  const logo = emailLogoUrl();
+/**
+ * Envoltura visual común de todos los correos.
+ * La marca (logo + nombre) viene de la empresa dueña del dato (multi-tenant):
+ * cada cliente ve SU logo, no el de otra empresa. Sin logo en BD → logo koduPM.
+ * EMAIL_LOGO_URL (env) sigue teniendo prioridad como override manual.
+ */
+function wrapEmail(headerBg: string, headerTitle: string, headerColor: string, body: string, brand: EmailBrand): string {
+  const envLogo = process.env.EMAIL_LOGO_URL?.trim();
+  const logoBlock = envLogo
+    ? `<img src="${envLogo}" alt="${escHtml(brand.name)}" width="190" style="display:block;margin:0 auto;max-width:190px;height:auto;border:0;" />`
+    : brand.logoHtml;
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;">
       <div style="background:${NAVY};padding:18px 20px;border-radius:8px 8px 0 0;text-align:center;">
-        <img src="${logo}" alt="The Project Delivery Group LLC" width="190" style="display:block;margin:0 auto;max-width:190px;height:auto;border:0;" />
+        ${logoBlock}
       </div>
       <div style="background:${headerBg};padding:12px 20px;border-top:3px solid ${GOLD};">
-        <h2 style="color:${headerColor};margin:0;font-size:18px;">${headerTitle}</h2>
+        <h2 style="color:${headerColor};margin:0;font-size:18px;">${escHtml(headerTitle)}</h2>
       </div>
       <div style="background:#f9fafb;padding:20px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;">
         ${body}
-        <p style="margin-top:16px;font-size:11px;color:#9ca3af;">The Project Delivery Group LLC · Kodu PM · <a href="${appBaseUrl()}" style="color:#9ca3af;">app.kodupm.com</a></p>
+        <p style="margin-top:16px;font-size:11px;color:#9ca3af;">${escHtml(brand.name)} · Kodu PM · <a href="${appBaseUrl()}" style="color:#9ca3af;">app.kodupm.com</a></p>
         <p style="margin-top:6px;font-size:11px;color:#9ca3af;">¿Prefieres español? Abre el enlace de este correo y toca «ES» en la parte superior de la página. / Prefer English? Open the link and tap «EN» at the top.</p>
       </div>
     </div>
   `;
 }
 
+/** Resuelve la marca de la empresa para un correo (BD; respaldo koduPM). */
+async function emailBrand(companyId?: string | null): Promise<EmailBrand> {
+  if (!companyId) return KODU_FALLBACK;
+  try {
+    return await getPdfBrand(companyId, appBaseUrl(), 40);
+  } catch {
+    return KODU_FALLBACK;
+  }
+}
+
+/**
+ * Helper exportado para rutas que arman su propio cuerpo de correo
+ * (punch, lien waivers, closeout): mismo encabezado con logo de la empresa.
+ */
+export async function buildBrandedEmailHtml(opts: {
+  companyId?: string | null;
+  headerTitle: string;
+  headerBg?: string;
+  headerColor?: string;
+  body: string;
+}): Promise<string> {
+  const brand = await emailBrand(opts.companyId);
+  return wrapEmail(opts.headerBg ?? NAVY, opts.headerTitle, opts.headerColor ?? GOLD, opts.body, brand);
+}
+
 export async function sendRfiAssignedEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   cc?: string | string[];
   replyTo?: string;
@@ -141,6 +187,7 @@ export async function sendRfiAssignedEmail(opts: {
   const externalLink = opts.externalRespondUrl
     ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond — Responder</a></p>`
     : '';
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     '#0F1B33',
     'New RFI Assigned',
@@ -163,6 +210,7 @@ export async function sendRfiAssignedEmail(opts: {
       <p><a href="${link}" style="display:inline-block;background:#0F1B33;color:#C9A96E;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View RFI in Kodu</a></p>
       ${externalLink}
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
@@ -174,6 +222,7 @@ export async function sendRfiAssignedEmail(opts: {
 }
 
 export async function sendRfiAnsweredEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   cc?: string | string[];
   rfiNumber: string;
@@ -196,6 +245,7 @@ export async function sendRfiAnsweredEmail(opts: {
       </div>
     `
     : '';
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     '#2E7D32',
     'RFI Answered',
@@ -213,6 +263,7 @@ export async function sendRfiAnsweredEmail(opts: {
       ${actionBlock}
       <p><a href="${link}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View RFI in Kodu</a></p>
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
@@ -223,6 +274,7 @@ export async function sendRfiAnsweredEmail(opts: {
 }
 
 export async function sendSubmittalEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   cc?: string | string[];
   replyTo?: string;
@@ -251,6 +303,7 @@ export async function sendSubmittalEmail(opts: {
   const externalLink = opts.externalRespondUrl
     ? `<p style="margin-top:12px;"><a href="${opts.externalRespondUrl}" style="display:inline-block;background:#C9A96E;color:#0F1B33;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">Respond — Responder</a></p>`
     : '';
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     t.bg,
     t.label,
@@ -267,6 +320,7 @@ export async function sendSubmittalEmail(opts: {
       <p><a href="${link}" style="display:inline-block;background:${t.bg};color:${t.color};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:1px solid ${t.color};">View Submittal in Kodu</a></p>
       ${externalLink}
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
@@ -286,6 +340,7 @@ const usd = (n: number) =>
 
 /** COR creado / enviado para aprobación — incluye enlace seguro para aprobar sin login. */
 export async function sendCorApprovalRequestEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   cc?: string | string[];
   replyTo?: string;
@@ -311,6 +366,7 @@ export async function sendCorApprovalRequestEmail(opts: {
     ? `<p style="margin-top:10px;"><a href="${opts.accountUrl}" style="display:inline-block;background:${NAVY};color:#C9A96E;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;border:2px solid #C9A96E;">Open in my koduPM account</a></p>
        <p style="font-size:11px;color:#9ca3af;margin-top:6px;">You already have a koduPM account — sign in to view this Change Order with your permissions.</p>`
     : '';
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     NAVY,
     'Change Order — Approval Requested',
@@ -329,6 +385,7 @@ export async function sendCorApprovalRequestEmail(opts: {
       ${externalLink}
       ${accountLink}
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
@@ -341,6 +398,7 @@ export async function sendCorApprovalRequestEmail(opts: {
 
 /** COR aprobado o rechazado (por un usuario o vía enlace seguro). */
 export async function sendCorDecisionEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   cc?: string | string[];
   corNumber: string;
@@ -354,6 +412,7 @@ export async function sendCorDecisionEmail(opts: {
   const approved = opts.decision === 'Approved';
   const bg = approved ? '#2E7D32' : '#B91C1C';
   const link = `${appBaseUrl()}/dashboard/cors/${opts.corId}`;
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     bg,
     `Change Order ${opts.decision}`,
@@ -366,6 +425,7 @@ export async function sendCorDecisionEmail(opts: {
       <p><strong>${opts.decision} By:</strong> ${opts.decidedBy}</p>
       <p><a href="${link}" style="display:inline-block;background:${bg};color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Change Order in Kodu</a></p>
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
@@ -377,6 +437,7 @@ export async function sendCorDecisionEmail(opts: {
 
 /** Submittal respondido vía enlace seguro (externo). */
 export async function sendSubmittalRespondedEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   cc?: string | string[];
   submittalNumber: string;
@@ -398,6 +459,7 @@ export async function sendSubmittalRespondedEmail(opts: {
       </div>
     `
     : '';
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     '#2E7D32',
     'Submittal — External Response',
@@ -414,6 +476,7 @@ export async function sendSubmittalRespondedEmail(opts: {
       ${actionBlock}
       <p><a href="${link}" style="display:inline-block;background:#2E7D32;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Submittal in Kodu</a></p>
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
@@ -429,6 +492,7 @@ export async function sendSubmittalRespondedEmail(opts: {
 
 /** Al creador: "tu ítem fue enviado al assignee — te avisaremos cuando responda". */
 export async function sendItemSentConfirmationEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   kind: 'RFI' | 'Submittal' | 'Change Order';
   number: string;
@@ -437,6 +501,7 @@ export async function sendItemSentConfirmationEmail(opts: {
   assignedTo: string;
   itemUrl: string;
 }) {
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     NAVY,
     `${opts.kind} Sent`,
@@ -450,6 +515,7 @@ export async function sendItemSentConfirmationEmail(opts: {
       <p style="color:#374151;">Te avisaremos por correo cuando <strong>${opts.assignedTo}</strong> responda, con opciones para cerrar o reasignar.</p>
       <p><a href="${opts.itemUrl}" style="display:inline-block;background:${NAVY};color:${GOLD};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View in Kodu</a></p>
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
@@ -460,6 +526,7 @@ export async function sendItemSentConfirmationEmail(opts: {
 
 /** Al creador cuando el OWNER decidió un COR vía enlace seguro. */
 export async function sendCorDecidedNoticeEmail(opts: {
+  companyId?: string | null;
   to: string | string[];
   cc?: string | string[];
   corNumber: string;
@@ -473,6 +540,7 @@ export async function sendCorDecidedNoticeEmail(opts: {
   const approved = opts.decision === 'Approved';
   const bg = approved ? '#2E7D32' : '#B91C1C';
   const link = `${appBaseUrl()}/dashboard/cors/${opts.corId}`;
+  const brand = await emailBrand(opts.companyId);
   const html = wrapEmail(
     bg,
     `Your Change Order was ${opts.decision}`,
@@ -485,6 +553,7 @@ export async function sendCorDecidedNoticeEmail(opts: {
       <p><strong>${opts.decision} By:</strong> ${opts.decidedBy} (via secure link)</p>
       <p><a href="${link}" style="display:inline-block;background:${bg};color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Change Order in Kodu</a></p>
     `,
+    brand
   );
   return sendEmail({
     to: opts.to,
