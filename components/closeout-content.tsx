@@ -62,6 +62,7 @@ export function CloseoutContent({ projects }: { projects: ProjectOption[] }) {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     load(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps

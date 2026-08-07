@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useI18n } from '@/hooks/use-i18n';
 import { uploadFileToStorage, downloadStorageFile } from '@/lib/upload-client';
@@ -53,7 +53,7 @@ export function PlanRoomContent({ projects }: { projects: ProjectOpt[] }) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [setOpen, setSetOpen] = useState(false);
 
-  const load = useCallback(async (pid: string) => {
+  const load = async (pid: string) => {
     if (!pid) return;
     setLoading(true);
     try {
@@ -70,9 +70,10 @@ export function PlanRoomContent({ projects }: { projects: ProjectOpt[] }) {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  };
 
-  useEffect(() => { void load(projectId); }, [projectId, load]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(projectId); }, [projectId]);
 
   // Agrupar: por disciplina → planos
   const filtered = useMemo(() => {
@@ -92,7 +93,7 @@ export function PlanRoomContent({ projects }: { projects: ProjectOpt[] }) {
       map.get(key)!.push(s);
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [filtered, t]);
+  }, [filtered]);
 
   const stats = useMemo(() => ({
     total: sheets.length,

@@ -147,7 +147,7 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
       byArea,
       byTrade: [...byTrade.entries()].sort((a, b) => b[1] - a[1]),
     };
-  }, [scoped, areas, t]);
+  }, [scoped, areas]);
 
   const openCreate = () => {
     setEditingId(null);

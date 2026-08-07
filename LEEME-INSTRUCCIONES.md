@@ -1,4 +1,4 @@
-LEEME — SUBIDA A GITHUB (v9: TODO + PLAN ROOM nuevo)
+LEEME — SUBIDA A GITHUB (v9b: TODO + PLAN ROOM + FIX titileo)
 =====================================================
 
 Este paquete reemplaza a TODOS los anteriores. NO subas ningún ZIP viejo.
@@ -53,6 +53,11 @@ PASO 4 — VERIFICAR
   verifica que detecta número/título, añade una "Rev A" a uno de ellos,
   y descarga el Drawing Log en PDF.
 - Prueba en incógnito: un enlace de COR sigue abriendo solo ese COR.
+
+FIX v9b (06-ago, tarde): corregido el titileo (parpadeo) del Plan Room — era un
+bucle de recarga por una función inestable en el useEffect. También se aplicó
+la misma corrección preventiva al módulo Closeout. Si ya subiste la v9,
+sube ESTA versión encima (mismo procedimiento, mismas URL de migración).
 
 NOTA SOBRE REFERENCIAS EN RFI/COR/SUBMITTAL
 -------------------------------------------
