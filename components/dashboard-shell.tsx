@@ -38,6 +38,7 @@ import {
   FileSignature,
   ListChecks,
   ClipboardCheck,
+  DraftingCompass,
 } from 'lucide-react';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -80,6 +81,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
     { href: '/dashboard/punch-list', label: t('nav.punchList'), icon: ListChecks },
     { href: '/dashboard/closeout', label: t('nav.closeout'), icon: ClipboardCheck },
+    { href: '/dashboard/plans', label: t('nav.plans'), icon: DraftingCompass },
     { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
     { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
     { href: '/dashboard/approvals', label: t('nav.approvals'), icon: Inbox },

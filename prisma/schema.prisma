@@ -170,6 +170,8 @@ model Project {
   punchItems      PunchItem[]
   punchSignoffs   PunchAreaSignoff[]
   closeoutItems   CloseoutItem[]
+  planSets        PlanSet[]
+  planSheets      PlanSheet[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -195,6 +197,8 @@ model ChangeOrder {
   generalLiability    Float              @default(0)
   salesTax            Float              @default(0)
   totalAmount         Float              @default(0)
+  drawingRef          String?            // referencia a plano (texto)
+  planSheetId         String?            // vínculo Plan Room
   reasonForChange     String?            @db.Text
   reasonsParticular   String?            @db.Text
   marketAnalysisNotes String?            @db.Text
@@ -316,6 +320,7 @@ model RFI {
   question           String          @db.Text
   discipline         String?
   drawingReference   String?
+  planSheetId      String?          // vínculo Plan Room (texto histórico conservado)
   specReference      String?
   priority           String          @default("Normal")
   status             String          @default("Open")
@@ -377,6 +382,7 @@ model Submittal {
   description     String?              @db.Text
   submittalType   String               @default("Shop Drawing")
   specSection     String?
+  planSheetId      String?          // vínculo Plan Room (texto histórico conservado)
   subcontractor   String?
   priority        String               @default("Normal")
   status          String               @default("Draft")
@@ -756,6 +762,7 @@ model PunchItem {
   title               String
   description         String?   @db.Text
   location            String?
+  planSheetId         String?                        // vínculo Plan Room (plano de referencia)
   trade               String?
   assignedToName      String?
   assignedToEmail     String?
@@ -843,3 +850,59 @@ model CloseoutItem {
 
   @@index([projectId])
 }
+
+/// ─── PLAN ROOM (drawing log con control de revisiones) ────────────────────
+
+model PlanSet {
+  id        String      @id @default(cuid())
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String      // "Contract Drawings", "Permit Set", "Addendum 2"…
+  setType   String      @default("Original") // Original | Permit | Addendum | ASI | Revision | Other
+  issueDate DateTime?
+  notes     String?
+  sortOrder Int         @default(0)
+  sheets    PlanSheet[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([projectId])
+}
+
+model PlanSheet {
+  id          String         @id @default(cuid())
+  projectId   String
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  planSetId   String?
+  planSet     PlanSet?       @relation(fields: [planSetId], references: [id], onDelete: SetNull)
+  sheetNumber String         // "A-101"
+  title       String         // "First Floor Plan"
+  discipline  String?        // auto por la letra del número: Architectural, Structural…
+  notes       String?
+  revisions   PlanRevision[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([projectId, sheetNumber])
+  @@index([projectId])
+  @@index([planSetId])
+}
+
+model PlanRevision {
+  id               String    @id @default(cuid())
+  planSheetId      String
+  planSheet        PlanSheet @relation(fields: [planSheetId], references: [id], onDelete: Cascade)
+  label            String    // "Original", "Permit", "Rev A", "Rev B"…
+  revisionDate     DateTime?
+  fileUrl          String?
+  fileName         String?
+  fileIsPublic     Boolean   @default(false)
+  isCurrent        Boolean   @default(true) // la revisión vigente (una por plano)
+  uploadedByName   String?
+  uploadedByEmail  String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+
+  @@index([planSheetId])
+}
+
