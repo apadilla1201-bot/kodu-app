@@ -7,9 +7,10 @@ import { useI18n } from '@/hooks/use-i18n';
 import {
   ListChecks, Plus, Send, CheckCircle2, Trash2, Loader2, Camera,
   Clock, CircleDot, Eye, Pencil, X, Download, AlertTriangle, RotateCcw, Ban,
-  PenLine,
+  PenLine, Zap, UserPlus,
 } from 'lucide-react';
 import { PunchSignoff } from '@/components/punch-signoff';
+import { QuickCaptureDialog } from '@/components/punch-quick-capture';
 
 type ProjectContact = { name: string; email: string; company: string | null; role: string };
 type ProjectOption = {
@@ -68,6 +69,11 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [responsibleSel, setResponsibleSel] = useState<string>('');
   const [tab, setTab] = useState<'items' | 'signoff'>('items');
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkContact, setBulkContact] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const inputClass = 'w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]';
 
@@ -133,6 +139,13 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
       const k = it.trade || t('punch.noTrade');
       byTrade.set(k, (byTrade.get(k) ?? 0) + 1);
     });
+    const todayStart = new Date(new Date().toDateString()).getTime();
+    const overdueItems = notClosed.filter((it) => it.dueDate && new Date(it.dueDate).getTime() < todayStart);
+    const byOverdueSub = new Map<string, number>();
+    overdueItems.forEach((it) => {
+      const k = it.assignedToName || it.assignedToEmail || t('punch.noTrade');
+      byOverdueSub.set(k, (byOverdueSub.get(k) ?? 0) + 1);
+    });
     return {
       total: scoped.length,
       open: open('Open'),
@@ -146,6 +159,8 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
       prioC: notClosed.filter((it) => it.priority === 'C').length,
       byArea,
       byTrade: [...byTrade.entries()].sort((a, b) => b[1] - a[1]),
+      overdue: overdueItems.length,
+      byOverdueSub: [...byOverdueSub.entries()].sort((a, b) => b[1] - a[1]),
     };
   }, [scoped, areas]);
 
@@ -340,6 +355,71 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
   const isOverdue = (it: PunchItem) =>
     it.dueDate && it.status !== 'Completed' && new Date(it.dueDate) < new Date(new Date().toDateString());
 
+  const daysOpen = (it: PunchItem) => {
+    if (it.status === 'Completed') return 0;
+    const base = it.dueDate ? null : null;
+    const created = (it as any).createdAt ? new Date((it as any).createdAt).getTime() : null;
+    const from = created ?? (it.dueDate ? new Date(it.dueDate).getTime() - 10 * 86400000 : Date.now());
+    return Math.max(0, Math.floor((Date.now() - from) / 86400000));
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    setSelected((prev) => (prev.size === filtered.length ? new Set() : new Set(filtered.map((it) => it.id))));
+  };
+  const selectedItems = filtered.filter((it) => selected.has(it.id));
+
+  const bulkAssign = async () => {
+    if (selectedItems.length === 0) return;
+    const proj = projects.find((p) => p.id === (projectFilter || selectedItems[0]?.projectId));
+    const c = bulkContact !== '' ? (proj?.contacts ?? [])[Number(bulkContact)] : null;
+    if (!c) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/punch-items/bulk', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedItems.map((it) => it.id), action: 'assign', assignedToName: c.name, assignedToEmail: c.email }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(t('punch.bulkAssigned', { count: selectedItems.length }));
+      setSelected(new Set());
+      setBulkOpen(false);
+      setBulkContact('');
+      await load();
+    } catch {
+      toast.error(t('punch.bulkError'));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const bulkReopen = async () => {
+    if (selectedItems.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/punch-items/bulk', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedItems.map((it) => it.id), action: 'reopen' }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(t('punch.saved'));
+      setSelected(new Set());
+      await load();
+    } catch {
+      toast.error(t('punch.bulkError'));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   const formProject = projects.find((p) => p.id === form.projectId);
   const formContacts = formProject?.contacts ?? [];
 
@@ -370,6 +450,11 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
               <Download className="w-4 h-4" /> {t('punch.reportPdf')}
             </a>
           )}
+          <button onClick={() => projectFilter && setQuickOpen(true)}
+            title={!projectFilter ? t('punch.tabSignoffHint') : ''}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#C9A96E] text-[#0F1B33] text-sm font-bold hover:bg-[#B8955A] transition-colors ${!projectFilter ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            <Zap className="w-4 h-4" /> {t('punch.quickCapture')}
+          </button>
           <button onClick={openCreate}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0F1B33] text-white text-sm font-semibold hover:bg-[#1B365D] transition-colors">
             <Plus className="w-4 h-4" /> {t('punch.newItem')}
@@ -454,6 +539,46 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
         </div>
       )}
 
+      {/* Vencidos por responsable (accountability) */}
+      {stats.overdue > 0 && (
+        <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+          <p className="text-xs font-bold text-red-700 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> {t('punch.agingBySub')} · {stats.overdue} {t('punch.agingOverdue')}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {stats.byOverdueSub.map(([name, count]) => (
+              <span key={name} className="inline-flex items-center gap-1.5 bg-white border border-red-200 rounded-full px-3 py-1 text-xs font-semibold text-red-700">
+                {name} <span className="bg-red-600 text-white rounded-full px-1.5 py-0.5 text-[10px] font-black">{count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Barra de acciones masivas */}
+      {selected.size > 0 && (
+        <div className="sticky top-2 z-20 bg-[#0F1B33] rounded-lg p-3 flex flex-wrap items-center gap-3 shadow-xl">
+          <span className="text-white text-sm font-bold">{t('punch.bulkSelected', { count: selected.size })}</span>
+          <div className="flex-1" />
+          <select value={bulkContact} onChange={(e) => setBulkContact(e.target.value)}
+            className="px-3 py-2 rounded-md border border-white/20 bg-white/10 text-white text-sm max-w-xs [&>option]:text-black">
+            <option value="">{t('punch.formResponsible')}</option>
+            {(projects.find((p) => p.id === (projectFilter || selectedItems[0]?.projectId))?.contacts ?? []).map((c, i) => (
+              <option key={i} value={i}>{c.name}{c.company ? ` (${c.company})` : ''}</option>
+            ))}
+          </select>
+          <button onClick={() => void bulkAssign()} disabled={bulkBusy || bulkContact === ''}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#C9A96E] text-[#0F1B33] text-sm font-bold disabled:opacity-40">
+            {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} {t('punch.bulkAssign')}
+          </button>
+          <button onClick={() => void bulkReopen()} disabled={bulkBusy}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-white/30 text-white text-sm font-semibold disabled:opacity-40">
+            <RotateCcw className="w-4 h-4" /> {t('punch.bulkReopen')}
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
+        </div>
+      )}
+
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
         <select value={projectFilter} onChange={(e) => { setProjectFilter(e.target.value); setAreaFilter(''); }} className={inputClass + ' max-w-xs'}>
@@ -482,12 +607,16 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-[#0F1B33] text-white text-left">
+                <th className="px-3 py-3 w-10">
+                  <input type="checkbox" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleSelectAll} className="w-4 h-4 accent-[#C9A96E]" />
+                </th>
                 <th className="px-4 py-3 font-semibold w-14">#</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colItem')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colArea')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colResponsible')}</th>
                 <th className="px-4 py-3 font-semibold w-16">{t('punch.colPriority')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colDue')}</th>
+                <th className="px-4 py-3 font-semibold w-14" title={t('punch.colOpenDays')}>{t('punch.colOpenDays')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colPhotos')}</th>
                 <th className="px-4 py-3 font-semibold">{t('punch.colStatus')}</th>
                 <th className="px-4 py-3 font-semibold text-right">{t('punch.colActions')}</th>
@@ -495,18 +624,21 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                <tr><td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                   <Loader2 className="w-5 h-5 animate-spin inline-block" />
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center">
+                <tr><td colSpan={10} className="px-4 py-10 text-center">
                   <ListChecks className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
                   <p className="font-medium text-foreground">{t('punch.noItems')}</p>
                   <p className="text-sm text-muted-foreground">{t('punch.noItemsDesc')}</p>
                 </td></tr>
               ) : (
                 filtered.map((it) => (
-                  <tr key={it.id} className={`border-t border-border hover:bg-muted/40 ${it.status === 'Completed' ? 'opacity-60' : ''} ${it.status === 'Disputed' ? 'bg-red-50/50' : ''}`}>
+                  <tr key={it.id} className={`border-t border-border hover:bg-muted/40 ${it.status === 'Completed' ? 'opacity-60' : ''} ${it.status === 'Disputed' ? 'bg-red-50/50' : ''} ${selected.has(it.id) ? 'bg-amber-50' : ''}`}>
+                    <td className="px-3 py-3">
+                      <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggleSelect(it.id)} className="w-4 h-4 accent-[#C9A96E]" />
+                    </td>
                     <td className="px-4 py-3 font-bold text-[#0F1B33]">PL-{String(it.itemNumber).padStart(3, '0')}</td>
                     <td className="px-4 py-3 max-w-[300px]">
                       <p className="font-medium truncate" title={it.title}>{it.title}</p>
@@ -528,6 +660,9 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
                     <td className={`px-4 py-3 text-sm whitespace-nowrap ${isOverdue(it) ? 'text-red-600 font-bold' : 'text-muted-foreground'}`}>
                       {it.dueDate ? new Date(it.dueDate).toLocaleDateString() : '—'}
                       {isOverdue(it) && <span className="block text-xs">{t('punch.overdue')}</span>}
+                    </td>
+                    <td className={`px-4 py-3 text-sm font-semibold whitespace-nowrap ${it.status !== 'Completed' && daysOpen(it) > 10 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                      {it.status === 'Completed' ? '—' : t('punch.agingDays', { n: daysOpen(it) })}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
@@ -778,6 +913,42 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
             </div>
           </motion.div>
         </div>
+      )}
+
+      {quickOpen && projectFilter && (
+        <QuickCaptureDialog
+          projectId={projectFilter}
+          projectNumber={projects.find((p) => p.id === projectFilter)?.projectNumber ?? ''}
+          areas={areas}
+          trades={[...new Set(scoped.map((it) => it.trade).filter(Boolean))].sort() as string[]}
+          contacts={projects.find((p) => p.id === projectFilter)?.contacts ?? []}
+          onClose={() => setQuickOpen(false)}
+          onSaved={() => { void load(); }}
+          labels={{
+            stepPhoto: t('punch.qcStepPhoto'),
+            stepData: t('punch.qcStepData'),
+            takePhoto: t('punch.qcTakePhoto'),
+            changePhoto: t('punch.qcChangePhoto'),
+            markPhoto: t('punch.qcMarkPhoto'),
+            area: t('punch.qcArea'),
+            areaPlaceholder: t('punch.qcAreaPlaceholder'),
+            location: t('punch.qcLocation'),
+            locationPlaceholder: t('punch.qcLocationPlaceholder'),
+            trade: t('punch.qcTrade'),
+            title: t('punch.qcTitle'),
+            titlePlaceholder: t('punch.qcTitlePlaceholder'),
+            priority: t('punch.qcPriority'),
+            assignNow: t('punch.qcAssignNow'),
+            save: t('punch.qcSave'),
+            saveAnother: t('punch.qcSaveAnother'),
+            saved: (n: number) => t('punch.qcSaved', { n }),
+            photoError: t('punch.qcPhotoError'),
+            undo: t('punch.qcUndo'),
+            clear: t('punch.qcClear'),
+            cancel: t('punch.qcCancel'),
+            done: t('punch.qcDone'),
+          }}
+        />
       )}
     </div>
   );
