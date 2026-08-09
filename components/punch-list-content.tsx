@@ -7,11 +7,12 @@ import { useI18n } from '@/hooks/use-i18n';
 import {
   ListChecks, Plus, Send, CheckCircle2, Trash2, Loader2, Camera,
   Clock, CircleDot, Eye, Pencil, X, Download, AlertTriangle, RotateCcw, Ban,
-  PenLine, Zap, UserPlus, MapPin,
+  PenLine, Zap, UserPlus, MapPin, Mic,
 } from 'lucide-react';
 import { PunchSignoff } from '@/components/punch-signoff';
 import { QuickCaptureDialog } from '@/components/punch-quick-capture';
 import { PunchPlanBoard } from '@/components/punch-plan-board';
+import { PunchWalkMode } from '@/components/punch-walk-mode';
 
 type ProjectContact = { name: string; email: string; company: string | null; role: string };
 type ProjectOption = {
@@ -58,7 +59,7 @@ const emptyForm = {
 };
 
 export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [items, setItems] = useState<PunchItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [projectFilter, setProjectFilter] = useState('');
@@ -74,6 +75,7 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
   const [responsibleSel, setResponsibleSel] = useState<string>('');
   const [tab, setTab] = useState<'items' | 'plan' | 'signoff'>('items');
   const [quickOpen, setQuickOpen] = useState(false);
+  const [walkOpen, setWalkOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkContact, setBulkContact] = useState('');
@@ -454,6 +456,11 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
               <Download className="w-4 h-4" /> {t('punch.reportPdf')}
             </a>
           )}
+          <button onClick={() => projectFilter && setWalkOpen(true)}
+            title={!projectFilter ? t('punch.tabSignoffHint') : ''}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors ${!projectFilter ? 'opacity-40 cursor-not-allowed' : ''}`}>
+            <Mic className="w-4 h-4" /> {t('punch.walkMode')}
+          </button>
           <button onClick={() => projectFilter && setQuickOpen(true)}
             title={!projectFilter ? t('punch.tabSignoffHint') : ''}
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#C9A96E] text-[#0F1B33] text-sm font-bold hover:bg-[#B8955A] transition-colors ${!projectFilter ? 'opacity-40 cursor-not-allowed' : ''}`}>
@@ -959,6 +966,36 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
         </div>
       )}
 
+      {walkOpen && projectFilter && (
+        <PunchWalkMode
+          projectId={projectFilter}
+          initialAreas={areas}
+          trades={[...new Set(scoped.map((it) => it.trade).filter(Boolean))].sort() as string[]}
+          contacts={projects.find((p) => p.id === projectFilter)?.contacts ?? []}
+          locale={locale}
+          onClose={() => { setWalkOpen(false); void load(); }}
+          onChanged={() => { /* load al cerrar para no re-render a mitad de dictado */ }}
+          labels={{
+            tapMic: t('punch.walkTapMic'),
+            listening: t('punch.walkListening'),
+            heard: t('punch.walkHeard'),
+            nextArea: t('punch.walkNextArea'),
+            finishArea: t('punch.walkDone'),
+            itemSaved: t('punch.walkItemSaved'),
+            areaOf: (c: number, tot: number) => t('punch.walkAreaOf', { current: c, total: tot }),
+            itemsInArea: (n: number) => t('punch.walkItemsInArea', { count: n }),
+            noAreas: t('punch.walkNoAreas'),
+            voiceError: t('punch.walkVoiceError'),
+            voiceUnsupported: t('punch.walkVoiceUnsupported'),
+            selectArea: t('punch.walkSelectArea'),
+            done: t('punch.walkDone'),
+            totalCaptured: (n: number) => t('punch.walkTotalCaptured', { count: n }),
+            backToList: t('punch.walkBackToList'),
+            saveError: t('punch.saveError'),
+            saveBtn: t('common.save'),
+          }}
+        />
+      )}
       {quickOpen && projectFilter && (
         <QuickCaptureDialog
           projectId={projectFilter}
