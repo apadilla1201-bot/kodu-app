@@ -25,7 +25,7 @@ export async function GET(request: Request) {
         sheetNumber: true,
         title: true,
         discipline: true,
-        revisions: { where: { isCurrent: true }, select: { label: true }, take: 1 },
+        revisions: { where: { isCurrent: true }, select: { label: true, fileUrl: true, fileIsPublic: true }, take: 1 },
       },
       orderBy: { sheetNumber: 'asc' },
     });
@@ -37,6 +37,8 @@ export async function GET(request: Request) {
         title: s.title,
         discipline: s.discipline,
         currentRevision: s.revisions[0]?.label ?? null,
+        fileUrl: s.revisions[0]?.fileUrl ?? null,
+        fileIsPublic: s.revisions[0]?.fileIsPublic ?? true,
         display: `${s.sheetNumber} — ${s.title}${s.revisions[0]?.label ? ` (${s.revisions[0].label})` : ''}`,
       }))
     );

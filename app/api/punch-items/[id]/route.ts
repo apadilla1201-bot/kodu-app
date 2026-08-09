@@ -41,6 +41,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (body.area !== undefined) data.area = body.area ? String(body.area) : null;
     if (body.correctiveAction !== undefined) data.correctiveAction = body.correctiveAction ? String(body.correctiveAction) : null;
     if (body.identifiedBy !== undefined) data.identifiedBy = body.identifiedBy ? String(body.identifiedBy) : null;
+    if (body.planSheetId !== undefined) data.planSheetId = body.planSheetId ? String(body.planSheetId) : null;
+    if (body.pinX !== undefined) data.pinX = typeof body.pinX === 'number' ? body.pinX : null;
+    if (body.pinY !== undefined) data.pinY = typeof body.pinY === 'number' ? body.pinY : null;
     if (body.backCharge !== undefined) data.backCharge = body.backCharge === null || body.backCharge === '' ? null : Number(body.backCharge) || 0;
     if (body.assignedToName !== undefined) data.assignedToName = body.assignedToName ? String(body.assignedToName) : null;
     if (body.assignedToEmail !== undefined) data.assignedToEmail = body.assignedToEmail ? String(body.assignedToEmail).trim().toLowerCase() : null;

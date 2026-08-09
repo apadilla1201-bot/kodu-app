@@ -7,10 +7,11 @@ import { useI18n } from '@/hooks/use-i18n';
 import {
   ListChecks, Plus, Send, CheckCircle2, Trash2, Loader2, Camera,
   Clock, CircleDot, Eye, Pencil, X, Download, AlertTriangle, RotateCcw, Ban,
-  PenLine, Zap, UserPlus,
+  PenLine, Zap, UserPlus, MapPin,
 } from 'lucide-react';
 import { PunchSignoff } from '@/components/punch-signoff';
 import { QuickCaptureDialog } from '@/components/punch-quick-capture';
+import { PunchPlanBoard } from '@/components/punch-plan-board';
 
 type ProjectContact = { name: string; email: string; company: string | null; role: string };
 type ProjectOption = {
@@ -41,6 +42,9 @@ type PunchItem = {
   completionPhotoUrl: string | null;
   externalToken: string | null;
   notes: string | null;
+  planSheetId: string | null;
+  pinX: number | null;
+  pinY: number | null;
   project: { id: string; projectNumber: string; projectName: string };
 };
 
@@ -68,7 +72,7 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [responsibleSel, setResponsibleSel] = useState<string>('');
-  const [tab, setTab] = useState<'items' | 'signoff'>('items');
+  const [tab, setTab] = useState<'items' | 'plan' | 'signoff'>('items');
   const [quickOpen, setQuickOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -468,6 +472,11 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
           className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'items' ? 'border-[#C9A96E] text-[#0F1B33]' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
           <ListChecks className="w-4 h-4" /> {t('punch.tabItems')}
         </button>
+        <button onClick={() => projectFilter && setTab('plan')}
+          title={!projectFilter ? t('punch.tabSignoffHint') : ''}
+          className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'plan' ? 'border-[#C9A96E] text-[#0F1B33]' : 'border-transparent text-muted-foreground hover:text-foreground'} ${!projectFilter ? 'opacity-40 cursor-not-allowed' : ''}`}>
+          <MapPin className="w-4 h-4" /> {t('punch.tabPlan')}
+        </button>
         <button onClick={() => projectFilter && setTab('signoff')}
           title={!projectFilter ? t('punch.tabSignoffHint') : ''}
           className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'signoff' ? 'border-[#C9A96E] text-[#0F1B33]' : 'border-transparent text-muted-foreground hover:text-foreground'} ${!projectFilter ? 'opacity-40 cursor-not-allowed' : ''}`}>
@@ -477,6 +486,38 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
 
       {tab === 'signoff' && projectFilter ? (
         <PunchSignoff projectId={projectFilter} />
+      ) : tab === 'plan' && projectFilter ? (
+        <PunchPlanBoard
+          projectId={projectFilter}
+          items={scoped}
+          onChanged={() => { void load(); }}
+          onOpenList={(itemId) => {
+            setTab('items');
+            setSelected(new Set([itemId]));
+          }}
+          labels={{
+            pickSheet: t('punch.pinPickSheet'),
+            noPlans: t('punch.pinNoPlans'),
+            noPlansDesc: t('punch.pinNoPlansDesc'),
+            noFile: t('punch.pinNoFile'),
+            loadError: t('punch.pinLoadError'),
+            addPin: t('punch.pinAdd'),
+            addPinHint: t('punch.pinAddHint'),
+            cancelAdd: t('punch.pinCancelAdd'),
+            pinTitle: t('punch.pinNewTitle'),
+            pinTitlePlaceholder: t('punch.pinTitlePlaceholder'),
+            pinPriority: t('punch.colPriority'),
+            pinSave: t('punch.pinSave'),
+            pinCancel: t('common.cancel'),
+            pinSaved: t('punch.pinSaved'),
+            pinError: t('punch.saveError'),
+            openItems: t('punch.pinOpenItems'),
+            legendOpen: t('punch.statusOpen'),
+            legendReady: t('punch.statusReadyforReview'),
+            legendDone: t('punch.statusCompleted'),
+            backToList: t('punch.pinBackToList'),
+          }}
+        />
       ) : (
       <>
       {/* Dashboard estilo Excel PDG */}
@@ -641,7 +682,10 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
                     </td>
                     <td className="px-4 py-3 font-bold text-[#0F1B33]">PL-{String(it.itemNumber).padStart(3, '0')}</td>
                     <td className="px-4 py-3 max-w-[300px]">
-                      <p className="font-medium truncate" title={it.title}>{it.title}</p>
+                      <p className="font-medium truncate flex items-center gap-1.5" title={it.title}>
+                        {it.planSheetId && <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                        {it.title}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {[it.location, it.trade].filter(Boolean).join(' · ')}
                         {it.backCharge ? ` · 💰 $${Number(it.backCharge).toLocaleString('en-US')}` : ''}

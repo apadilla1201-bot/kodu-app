@@ -74,6 +74,7 @@ export async function POST(request: Request) {
     const {
       projectId, title, description, location, trade, area, correctiveAction,
       identifiedBy, assignedToName, assignedToEmail, priority, dueDate, notes,
+      planSheetId, pinX, pinY,
     } = body ?? {};
 
     if (!projectId || !title?.trim()) {
@@ -111,6 +112,9 @@ export async function POST(request: Request) {
         priority: prio,
         dueDate: autoDue,
         notes: notes ? String(notes) : null,
+        planSheetId: planSheetId ? String(planSheetId) : null,
+        pinX: typeof pinX === 'number' ? pinX : null,
+        pinY: typeof pinY === 'number' ? pinY : null,
         externalToken: randomBytes(24).toString('hex'),
         createdByName: (session.user as any)?.name ?? null,
         createdByEmail: (session.user as any)?.email ?? null,

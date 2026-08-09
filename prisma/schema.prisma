@@ -763,6 +763,8 @@ model PunchItem {
   description         String?   @db.Text
   location            String?
   planSheetId         String?                        // vínculo Plan Room (plano de referencia)
+  pinX                Float?                         // pin en el plano: X relativo (0-1)
+  pinY                Float?                         // pin en el plano: Y relativo (0-1)
   trade               String?
   assignedToName      String?
   assignedToEmail     String?
