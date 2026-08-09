@@ -8,6 +8,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useI18n } from '@/hooks/use-i18n';
 import { navForRole, ROLE_LABELS } from '@/lib/permissions';
 import { GlobalSearch } from '@/components/global-search';
+import { AssistantWidget } from '@/components/assistant-widget';
 import { NotificationBell } from '@/components/notification-bell';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { PlanBadge } from '@/components/plan-badge';
@@ -307,6 +308,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
         <GlobalSearch />
+        <AssistantWidget />
       </div>
     </div>
   );

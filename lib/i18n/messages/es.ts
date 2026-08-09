@@ -1256,4 +1256,17 @@ export const esMessages: Messages = {
   planPicker: {
     none: '— Sin plano vinculado —',
   },
+  assistant: {
+    title: 'Asistente koduPM',
+    subtitle: 'Pregunta cómo funciona cualquier cosa',
+    welcome: 'Hola. Puedo guiarte por cualquier módulo — RFIs, submittals, aplicaciones de pago, punch list, closeout y más. ¿Qué necesitas hacer?',
+    placeholder: 'Escribe tu pregunta…',
+    send: 'Enviar',
+    close: 'Cerrar',
+    thinking: 'Pensando…',
+    errorGeneric: 'No pude responder ahora. Inténtalo de nuevo en un momento.',
+    sug1: '¿Cómo apruebo una orden de cambio?',
+    sug2: '¿Cómo uso el Modo caminata en mi celular?',
+    sug3: '¿Cómo solicito documentos de cierre?',
+  },
 };

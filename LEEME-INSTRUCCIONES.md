@@ -1,67 +1,44 @@
-LEEME — SUBIDA A GITHUB (v9b: TODO + PLAN ROOM + FIX titileo)
-=====================================================
+LEEME — SUBIDA A GITHUB (v17: ASISTENTE koduPM — chat de ayuda)
+================================================================
 
 Este paquete reemplaza a TODOS los anteriores. NO subas ningún ZIP viejo.
 
-CONTENIDO:
-1. PLAN ROOM (NUEVO) — registro de planos con control de revisiones:
-   - Menú nuevo "Plan Room" (entre Cierre de Proyecto y Budgets).
-   - Planos agrupados por disciplina (auto por la letra: A=Architectural,
-     S=Structural, M/E/P…), búsqueda, filtro "solo con archivo vigente".
-   - SUBIDA MÚLTIPLE: seleccionas varios PDF, el número y título se detectan
-     del nombre del archivo ("A-101 - First Floor Plan.pdf") y los editas
-     antes de subir. Si el plano ya existe → se añade como REVISIÓN nueva.
-   - ETIQUETAS al momento de anexar: Original, Permit, Rev A, Rev B, Rev C…
-     (con sugerencias; puedes escribir la que quieras).
-   - Historial por plano: todas las revisiones, cuál es la vigente,
-     "marcar vigente" cualquiera anterior, ver/descargar cada PDF.
-   - PAQUETES (sets): Contract Drawings, Permit Set, Addendum 2… con tipo
-     y fecha de emisión.
-   - DRAWING LOG en PDF (horizontal): número, título, disciplina, paquete,
-     # de revisiones, revisión vigente y fecha.
-   - PERMISOS: solo Admin/Owner/PM suben y editan; superintendente consulta.
-   ⚠️ REQUIERE MIGRACIÓN (PASO 2) — sin ella el Plan Room avisa y no rompe nada.
-2. FIX SEGURIDAD / COR (middleware.ts): enlaces públicos de aprobación
-   funcionan sin sesión (solo ese documento); el resto exige login.
-   ⚠️ Sube TAMBIÉN el archivo suelto middleware.ts (raíz del repo).
-3. LIEN WAIVERS — completo.
-4. PUNCH LIST — áreas, A/B/C, DISPUTED, firma por área (AIA G704).
-5. CLOSEOUT — 22 entregables, solicitud por correo, reporte PDF.
-6. SUBMITTALS — reporte MERGE (portada koduPM + anexos) + botón Email.
+NUEVO EN v17 — ASISTENTE koduPM (chat de ayuda dentro de la app):
+- Botón flotante abajo a la derecha (en todas las pantallas con menú).
+- Abre un panel de chat que responde CÓMO USAR la herramienta:
+  RFIs, submittals, CORs, pay apps, budgets, punch list, closeout,
+  plan room, reportes… Responde con pasos exactos.
+- BILINGÜE: si le escribes en español responde en español;
+  si le escribes en inglés responde en inglés.
+- En celular el chat ocupa toda la pantalla; en computadora es una ventana.
+- NO requiere migración ni configuración nueva: usa la misma clave de IA
+  (ANTHROPIC_API_KEY) que ya tienes en Vercel.
 
-PASO 1 — SUBIR
---------------
-1. github.com/apadilla1201-bot/kodu-app → Add file → Upload files.
-2. Arrastra las 4 CARPETAS (app, components, lib, prisma) Y el archivo
-   suelto middleware.ts.
-3. Commit. Espera el check VERDE de Vercel.
-   (Si el deploy falla, producción NO se actualiza — avísame el error.)
+Archivos nuevos en esta versión:
+- app/api/assistant/route.ts ............ cerebro del chat (servidor)
+- components/assistant-widget.tsx ....... botón y ventana del chat
+Archivos actualizados:
+- components/dashboard-shell.tsx ........ monta el asistente en el menú
+- lib/i18n/messages/en.ts / es.ts ....... textos del chat (EN/ES)
 
-PASO 2 — EJECUTAR LA URL DE MIGRACIÓN (logueado en koduPM)
-----------------------------------------------------------
-  https://app.kodupm.com/api/internal/plans-migrate?key=kodupm-migrar-2026
-  Debe responder {"ok":true,...}
-  (Las tablas de Punch/Closeout/Waivers ya existen — no necesitas las otras URL.)
+CÓMO SUBIR (mismo procedimiento de siempre):
+1. Descomprime el ZIP.
+2. En GitHub (repo kodu-app): Add file → Upload files.
+3. Arrastra TODAS las carpetas y archivos del paquete
+   (app, components, lib, prisma, middleware.ts, package.json).
+4. Commit. Vercel despliega solo en 1-2 minutos.
 
-PASO 3 — BORRAR EL TEMPORAL
----------------------------
-En GitHub borra la carpeta app/api/internal/plans-migrate/ y commit.
+CÓMO PROBAR:
+1. Entra a app.kodupm.com con tu usuario.
+2. Abajo a la derecha verás un botón redondo navy con ícono de chat.
+3. Tócalo y pregunta por ejemplo: "¿Cómo apruebo una orden de cambio?"
+   o en inglés: "How do I use Walk Mode on my phone?"
+4. Debe responder con pasos concretos en el mismo idioma.
 
-PASO 4 — VERIFICAR
-------------------
-- Menú "Plan Room": sube 2-3 PDF de planos de prueba en Arena Madness,
-  verifica que detecta número/título, añade una "Rev A" a uno de ellos,
-  y descarga el Drawing Log en PDF.
-- Prueba en incógnito: un enlace de COR sigue abriendo solo ese COR.
-
-FIX v9b (06-ago, tarde): corregido el titileo (parpadeo) del Plan Room — era un
-bucle de recarga por una función inestable en el useEffect. También se aplicó
-la misma corrección preventiva al módulo Closeout. Si ya subiste la v9,
-sube ESTA versión encima (mismo procedimiento, mismas URL de migración).
-
-NOTA SOBRE REFERENCIAS EN RFI/COR/SUBMITTAL
--------------------------------------------
-El vínculo directo (selector de plano dentro de esos formularios) queda
-listo en una siguiente entrega controlada: requiere tocar las APIs de cada
-módulo. Mientras tanto, el campo de texto "Drawing Reference" sigue
-funcionando igual — escribe el número del plano (ej. A-101) como hasta hoy.
+LO QUE YA TRAE ACUMULADO (v10–v16):
+- Páginas públicas y correos bilingües EN/ES con logo de cada empresa.
+- Plan Room: carga de planos en 3 pasos con progreso real y reintento.
+- Punch List: captura rápida con foto y marcado, acciones masivas,
+  columna de días, pines sobre el plano, MODO CAMINATA por voz (celular).
+- Menú agrupado por fases con contadores de pendientes.
+- Lien Waivers, Closeout, Buyout, Pay Apps, reportes PDF.
