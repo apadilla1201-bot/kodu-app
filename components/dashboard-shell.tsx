@@ -26,7 +26,6 @@ import {
   Settings,
   Menu,
   LogOut,
-  ChevronRight,
   User,
   FileSpreadsheet,
   Languages,
@@ -41,6 +40,19 @@ import {
   DraftingCompass,
 } from 'lucide-react';
 
+type BadgeMap = Record<string, number>;
+
+// Badges de pendientes por ruta (vienen de /api/nav-badges)
+const BADGE_BY_HREF: Record<string, keyof BadgeMap> = {
+  '/dashboard/rfis': 'rfis',
+  '/dashboard/submittals': 'submittals',
+  '/dashboard/pay-apps': 'payApps',
+  '/dashboard/lien-waivers': 'waivers',
+  '/dashboard/punch-list': 'punch',
+  '/dashboard/closeout': 'closeout',
+  '/dashboard/approvals': 'cors',
+};
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
@@ -48,6 +60,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // Logo de la compañía: subido por el admin en Settings; null = wordmark
   // koduPM (NUNCA PDG fijo — PDG solo aparece si ES la compañía del usuario).
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [badges, setBadges] = useState<BadgeMap>({});
 
   useEffect(() => {
     (async () => {
@@ -62,36 +75,91 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
+
+  // Contadores de pendientes (al entrar y al cambiar de página)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/nav-badges', { credentials: 'include' });
+        if (res.ok && alive) setBadges(await res.json());
+      } catch {
+        // sin badges no pasa nada
+      }
+    })();
+    return () => { alive = false; };
+  }, [pathname]);
+
   const { t, locale, setLocale } = useI18n();
 
   // PASO 3: menú filtrado por rol (Super no ve Pay Apps ni Budgets; owner/sub ven solo lo suyo)
   const userRole = (session?.user as any)?.role ?? 'viewer';
   const allowed = navForRole(userRole);
 
-  const allNavItems = [
-    { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
-    { href: '/dashboard/projects', label: t('nav.projects'), icon: FolderKanban },
-    { href: '/dashboard/rfis', label: t('nav.rfiLog'), icon: FileQuestion },
-    { href: '/dashboard/submittals', label: t('nav.submittals'), icon: FileStack },
-    { href: '/dashboard/buyout', label: t('nav.buyout'), icon: ClipboardList },
-    { href: '/dashboard/pay-apps', label: 'Pay Applications', icon: Wallet },
-    { href: '/dashboard/lien-waivers', label: t('nav.lienWaivers'), icon: FileSignature },
-    { href: '/dashboard/budgets', label: 'Budgets', icon: Receipt },
-    { href: '/dashboard/photos', label: t('nav.sitePhotos'), icon: Camera },
-    { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
-    { href: '/dashboard/punch-list', label: t('nav.punchList'), icon: ListChecks },
-    { href: '/dashboard/closeout', label: t('nav.closeout'), icon: ClipboardCheck },
-    { href: '/dashboard/plans', label: t('nav.plans'), icon: DraftingCompass },
-    { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
-    { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
-    { href: '/dashboard/approvals', label: t('nav.approvals'), icon: Inbox },
-    { href: '/dashboard/import', label: t('nav.importExcel'), icon: FileSpreadsheet },
-    { href: '/dashboard/team', label: 'Team', icon: UserPlus },
-    { href: '/dashboard/help', label: t('nav.help'), icon: BookOpen },
-    { href: '/dashboard/settings', label: t('nav.settings'), icon: Settings },
+  // Menú agrupado por fase del proyecto (estructura familiar para quien viene de Procore)
+  const navGroups: { key: string | null; label: string | null; items: { href: string; label: string; icon: any }[] }[] = [
+    {
+      key: null,
+      label: null,
+      items: [
+        { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+      ],
+    },
+    {
+      key: 'project',
+      label: t('nav.groupProject'),
+      items: [
+        { href: '/dashboard/projects', label: t('nav.projects'), icon: FolderKanban },
+        { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
+        { href: '/dashboard/plans', label: t('nav.plans'), icon: DraftingCompass },
+        { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
+        { href: '/dashboard/photos', label: t('nav.sitePhotos'), icon: Camera },
+      ],
+    },
+    {
+      key: 'controls',
+      label: t('nav.groupControls'),
+      items: [
+        { href: '/dashboard/rfis', label: t('nav.rfiLog'), icon: FileQuestion },
+        { href: '/dashboard/submittals', label: t('nav.submittals'), icon: FileStack },
+        { href: '/dashboard/buyout', label: t('nav.buyout'), icon: ClipboardList },
+      ],
+    },
+    {
+      key: 'cost',
+      label: t('nav.groupCost'),
+      items: [
+        { href: '/dashboard/budgets', label: 'Budgets', icon: Receipt },
+        { href: '/dashboard/pay-apps', label: 'Pay Applications', icon: Wallet },
+        { href: '/dashboard/lien-waivers', label: t('nav.lienWaivers'), icon: FileSignature },
+      ],
+    },
+    {
+      key: 'field',
+      label: t('nav.groupField'),
+      items: [
+        { href: '/dashboard/punch-list', label: t('nav.punchList'), icon: ListChecks },
+        { href: '/dashboard/closeout', label: t('nav.closeout'), icon: ClipboardCheck },
+      ],
+    },
+    {
+      key: 'admin',
+      label: t('nav.groupAdmin'),
+      items: [
+        { href: '/dashboard/analytics', label: t('nav.analytics'), icon: BarChart3 },
+        { href: '/dashboard/approvals', label: t('nav.approvals'), icon: Inbox },
+        { href: '/dashboard/import', label: t('nav.importExcel'), icon: FileSpreadsheet },
+        { href: '/dashboard/team', label: 'Team', icon: UserPlus },
+        { href: '/dashboard/help', label: t('nav.help'), icon: BookOpen },
+        { href: '/dashboard/settings', label: t('nav.settings'), icon: Settings },
+      ],
+    },
   ];
 
-  const navItems = allNavItems.filter((item) => allowed.includes(item.href));
+  // Aplicar el filtro de rol a cada grupo y descartar grupos vacíos
+  const visibleGroups = navGroups
+    .map((g) => ({ ...g, items: g.items.filter((item) => allowed.includes(item.href)) }))
+    .filter((g) => g.items.length > 0);
 
   const onLocaleChange = async (value: string) => {
     await setLocale(value as AppLocale);
@@ -112,7 +180,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         }`}
       >
         <div className="flex flex-col h-full">
-          <div className="p-5 border-b border-white/10">
+          <div className="px-5 py-5 border-b border-white/10">
             <div className="relative w-[180px] h-[60px] mx-auto flex items-center justify-center">
               {companyLogo ? (
                 <Image src={companyLogo} alt="Company logo" fill className="object-contain" unoptimized={companyLogo.startsWith('http')} />
@@ -126,27 +194,47 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <nav className="flex-1 px-3 py-4 space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith?.(item.href));
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-[#C9A96E]/20 text-[#C9A96E]'
-                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
-                  }`}
-                >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  <span>{item.label}</span>
-                  {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
-                </Link>
-              );
-            })}
+          <nav className="flex-1 px-3 py-3 overflow-y-auto">
+            {visibleGroups.map((group, gi) => (
+              <div key={group.key ?? 'root'} className={gi > 0 ? 'mt-5' : ''}>
+                {group.label && (
+                  <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40 select-none">
+                    {group.label}
+                  </p>
+                )}
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith?.(item.href));
+                    const badgeKey = BADGE_BY_HREF[item.href];
+                    const badge = badgeKey ? badges[badgeKey] ?? 0 : 0;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`relative flex items-center gap-3 px-3 py-2 rounded-md text-[13.5px] font-medium transition-colors ${
+                          isActive
+                            ? 'bg-white/10 text-white'
+                            : 'text-white/60 hover:bg-white/5 hover:text-white'
+                        }`}
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-full bg-[#C9A96E]" />
+                        )}
+                        <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-[#C9A96E]' : ''}`} />
+                        <span className="flex-1 truncate">{item.label}</span>
+                        {badge > 0 && (
+                          <span className="text-[11px] font-semibold leading-none px-1.5 py-1 rounded bg-white/10 text-white/75 tabular-nums">
+                            {badge > 99 ? '99+' : badge}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
 
           <div className="p-4 border-t border-white/10">

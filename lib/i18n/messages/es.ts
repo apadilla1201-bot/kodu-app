@@ -47,6 +47,11 @@ export const esMessages: Messages = {
     punchList: 'Punch List',
     closeout: 'Cierre de Proyecto',
     plans: 'Plan Room',
+    groupProject: 'Proyecto',
+    groupControls: 'Controles',
+    groupCost: 'Costo y pago',
+    groupField: 'Campo y cierre',
+    groupAdmin: 'Administración',
   },
   settings: {
     title: 'Mi perfil',

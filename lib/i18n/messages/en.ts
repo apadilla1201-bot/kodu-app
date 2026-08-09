@@ -45,6 +45,11 @@ export const enMessages = {
     punchList: 'Punch List',
     closeout: 'Closeout',
     plans: 'Plan Room',
+    groupProject: 'Project',
+    groupControls: 'Controls',
+    groupCost: 'Cost & Payment',
+    groupField: 'Field & Closeout',
+    groupAdmin: 'Administration',
   },
   settings: {
     title: 'My Profile',
