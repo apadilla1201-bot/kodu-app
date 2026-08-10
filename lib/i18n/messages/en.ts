@@ -1176,6 +1176,7 @@ export const enMessages = {
     walkVoiceError: "Didn't catch that — try again",
     walkVoiceUnsupported: 'Voice not available in this browser',
     walkTypeInstead: 'No voice here — just type the item above and tap Save.',
+    walkTranslating: 'Translating to English…',
     walkSelectArea: 'Choose the area',
     walkDone: 'Walk finished',
     walkTotalCaptured: '{count} items captured',

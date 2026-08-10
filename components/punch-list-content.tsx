@@ -994,6 +994,7 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
             saveError: t('punch.saveError'),
             saveBtn: t('common.save'),
             typeInstead: t('punch.walkTypeInstead'),
+            translating: t('punch.walkTranslating'),
           }}
         />
       )}

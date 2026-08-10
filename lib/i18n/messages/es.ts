@@ -1178,6 +1178,7 @@ export const esMessages: Messages = {
     walkVoiceError: 'No te escuché — intenta de nuevo',
     walkVoiceUnsupported: 'Voz no disponible en este navegador',
     walkTypeInstead: 'Sin voz aquí — escribe el ítem arriba y toca Guardar.',
+    walkTranslating: 'Traduciendo a inglés…',
     walkSelectArea: 'Elige el área',
     walkDone: 'Caminata terminada',
     walkTotalCaptured: '{count} ítems capturados',

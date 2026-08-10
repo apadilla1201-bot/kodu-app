@@ -18,10 +18,17 @@ export function PhotoMarkupEditor({ file, onDone, onCancel, labels }: {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
+  // Fuente de verdad para el canvas: un ref. El state `strokes` solo
+  // alimenta la UI (botones undo/clear). Antes, redraw() leía el state
+  // dentro de closures viejos → al soltar el dedo borraba lo dibujado
+  // y "Done" exportaba la foto sin marcas.
+  const strokesRef = useRef<Stroke[]>([]);
   const drawing = useRef<Stroke | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    strokesRef.current = [];
+    setStrokes([]);
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -47,7 +54,7 @@ export function PhotoMarkupEditor({ file, onDone, onCancel, labels }: {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    for (const st of [...strokes, ...(extra ? [extra] : [])]) {
+    for (const st of [...strokesRef.current, ...(extra ? [extra] : [])]) {
       if (st.points.length < 2) continue;
       ctx.strokeStyle = st.color;
       ctx.lineWidth = st.width;
@@ -81,38 +88,17 @@ export function PhotoMarkupEditor({ file, onDone, onCancel, labels }: {
   const onUp = () => {
     if (!drawing.current) return;
     if (drawing.current.points.length > 1) {
-      setStrokes((st) => {
-        const next = [...st, drawing.current!];
-        setTimeout(() => redraw(), 0);
-        return next;
-      });
+      strokesRef.current = [...strokesRef.current, drawing.current];
+      setStrokes(strokesRef.current);
     }
     drawing.current = null;
     redraw();
   };
 
   const undo = () => {
-    setStrokes((st) => {
-      const next = st.slice(0, -1);
-      setTimeout(() => {
-        const canvas = canvasRef.current;
-        const img = imgRef.current;
-        if (!canvas || !img) return;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        for (const s2 of next) {
-          if (s2.points.length < 2) continue;
-          ctx.strokeStyle = s2.color;
-          ctx.lineWidth = s2.width;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(s2.points[0].x, s2.points[0].y);
-          for (const p of s2.points.slice(1)) ctx.lineTo(p.x, p.y);
-          ctx.stroke();
-        }
-      }, 0);
-      return next;
-    });
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    setStrokes(strokesRef.current);
+    redraw();
   };
 
   const exportFile = () => {
@@ -134,7 +120,7 @@ export function PhotoMarkupEditor({ file, onDone, onCancel, labels }: {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-semibold disabled:opacity-40">
               <Undo2 className="w-3.5 h-3.5" /> {labels.undo}
             </button>
-            <button onClick={() => { setStrokes([]); setTimeout(() => redraw(), 0); }} disabled={strokes.length === 0}
+            <button onClick={() => { strokesRef.current = []; setStrokes([]); redraw(); }} disabled={strokes.length === 0}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 text-white text-xs font-semibold disabled:opacity-40">
               <Trash2 className="w-3.5 h-3.5" /> {labels.clear}
             </button>

@@ -11,7 +11,7 @@ export type WalkLabels = {
   itemsInArea: (n: number) => string; noAreas: string; voiceError: string;
   voiceUnsupported: string; selectArea: string; done: string;
   totalCaptured: (n: number) => string; backToList: string; saveError: string;
-  saveBtn: string; typeInstead: string;
+  saveBtn: string; typeInstead: string; translating: string;
 };
 
 const PRIORITIES = ['A', 'B', 'C'] as const;
@@ -75,6 +75,7 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
   const [trade, setTrade] = useState('');
   const [priority, setPriority] = useState<'A' | 'B' | 'C'>('B');
   const [saving, setSaving] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [areaCount, setAreaCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
@@ -165,13 +166,33 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
     setSaving(true);
     stopListening();
     try {
+      // Regla de producto: se puede dictar/escribir en español, pero el ítem
+      // (y el reporte) SIEMPRE se guarda en inglés.
+      let title = heard.trim();
+      if (locale === 'es') {
+        setTranslating(true);
+        try {
+          const tr = await fetch('/api/punch-items/translate', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: title }),
+          });
+          const trData = await tr.json().catch(() => ({}));
+          if (tr.ok && typeof trData?.en === 'string' && trData.en.trim()) {
+            title = trData.en.trim();
+          }
+          // Si la traducción falla, guardamos el texto original — nunca se pierde el ítem
+        } catch { /* noop — guardar original */ }
+        setTranslating(false);
+      }
       const res = await fetch('/api/punch-items', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          title: heard.trim(),
+          title,
           area: currentArea || null,
           trade: trade || null,
           priority,
@@ -255,6 +276,11 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
           placeholder="…"
         />
         {voiceMsg && <p className="text-red-400 text-sm mt-2 font-medium">{voiceMsg}</p>}
+        {translating && (
+          <p className="text-[#C9A96E] text-sm mt-2 font-medium inline-flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" /> {labels.translating}
+          </p>
+        )}
         {!speechSupported() && (
           <p className="text-[#C9A96E] text-xs mt-2 font-medium">{labels.typeInstead}</p>
         )}
