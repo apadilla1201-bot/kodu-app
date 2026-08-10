@@ -168,6 +168,12 @@ export const esMessages: Messages = {
     emptyTitle: 'Bandeja vacía',
     emptyHint: 'Nada está esperando una decisión ahora mismo. Buen trabajo.',
   },
+  gate: {
+    title: 'Selecciona un proyecto',
+    subtitle: 'Elige el proyecto en el que vas a trabajar. Solo verás sus documentos.',
+    empty: 'Aún no hay proyectos — crea uno primero.',
+    change: 'Cambiar proyecto',
+  },
   budgets: {
     title: 'Presupuestos',
     subtitle: 'Todos los presupuestos de proyectos, de toda tu compañía.',

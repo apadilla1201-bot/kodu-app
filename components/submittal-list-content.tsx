@@ -41,14 +41,16 @@ function fmtDate(d: string | null) {
 export function SubmittalListContent({
   submittals,
   projects,
+  initialProjectNumber,
 }: {
   submittals: SubmittalItem[];
   projects: ProjectInfo[];
+  initialProjectNumber?: string;
 }) {
   const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [projectFilter, setProjectFilter] = useState('All');
+  const [projectFilter, setProjectFilter] = useState(initialProjectNumber ?? 'All');
 
   const filtered = useMemo(() => {
     return (submittals ?? []).filter((s) => {

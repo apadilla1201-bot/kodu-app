@@ -166,6 +166,12 @@ export const enMessages = {
     emptyTitle: 'Inbox zero',
     emptyHint: 'Nothing is waiting for a decision right now. Nice work.',
   },
+  gate: {
+    title: 'Select a project',
+    subtitle: 'Choose the project you want to work on. You will only see its documents.',
+    empty: 'No projects yet — create one first.',
+    change: 'Change project',
+  },
   budgets: {
     title: 'Budgets',
     subtitle: 'All project budgets, across your company.',

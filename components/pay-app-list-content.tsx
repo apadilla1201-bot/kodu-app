@@ -28,9 +28,9 @@ const statusColors: Record<string, string> = {
   Approved: 'bg-[#2E7D32]/10 text-[#2E7D32]',
 };
 
-export function PayAppListContent({ projects }: { projects: any[] }) {
+export function PayAppListContent({ projects, initialProjectId }: { projects: any[]; initialProjectId?: string }) {
   const [search, setSearch] = useState('');
-  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [selectedProject, setSelectedProject] = useState<string>(initialProjectId ?? 'all');
 
   const filtered = projects.filter(p => {
     if (selectedProject !== 'all' && p.id !== selectedProject) return false;

@@ -20,7 +20,7 @@ const money = (n: number) =>
 
 // Lista de Budgets (cross-project). La API GET /api/budgets ya existía —
 // faltaba esta página (el menú apuntaba a una ruta sin página = 404).
-export function BudgetsContent() {
+export function BudgetsContent({ projectId }: { projectId?: string }) {
   const { t } = useI18n();
   const router = useRouter();
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -32,7 +32,8 @@ export function BudgetsContent() {
       const res = await fetch('/api/budgets', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setBudgets(Array.isArray(data) ? data : []);
+        const list: Budget[] = Array.isArray(data) ? data : [];
+        setBudgets(projectId ? list.filter((b: any) => b?.project?.id === projectId || (b as any)?.projectId === projectId) : list);
       }
     } catch {
       // silencioso

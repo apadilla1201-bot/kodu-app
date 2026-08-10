@@ -28,10 +28,10 @@ const statusStyles: Record<string, string> = {
   Rejected: 'bg-red-50 text-[#92400E]',
 };
 
-export function AllCorsContent({ projects }: { projects: ProjectWithCors[] }) {
+export function AllCorsContent({ projects, initialProjectId }: { projects: ProjectWithCors[]; initialProjectId?: string }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [projectFilter, setProjectFilter] = useState('All');
+  const [projectFilter, setProjectFilter] = useState(initialProjectId ?? 'All');
   const [sortField, setSortField] = useState<'corNumber' | 'date' | 'totalAmount'>('date');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 

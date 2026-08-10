@@ -58,11 +58,11 @@ const emptyForm = {
   backCharge: '',
 };
 
-export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
+export function PunchListContent({ projects, initialProjectId }: { projects: ProjectOption[]; initialProjectId?: string }) {
   const { t, locale } = useI18n();
   const [items, setItems] = useState<PunchItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projectFilter, setProjectFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState(initialProjectId ?? '');
   const [statusFilter, setStatusFilter] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);

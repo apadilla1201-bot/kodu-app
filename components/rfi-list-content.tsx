@@ -64,10 +64,10 @@ function daysOpen(dateSubmitted: string): number {
   return Math.floor((Date.now() - new Date(dateSubmitted).getTime()) / 86400000);
 }
 
-export function RFIListContent({ rfis, projects }: { rfis: RFIItem[]; projects: ProjectInfo[] }) {
+export function RFIListContent({ rfis, projects, initialProjectNumber }: { rfis: RFIItem[]; projects: ProjectInfo[]; initialProjectNumber?: string }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [projectFilter, setProjectFilter] = useState('All');
+  const [projectFilter, setProjectFilter] = useState(initialProjectNumber ?? 'All');
   const [sortField, setSortField] = useState<SortField>('dateSubmitted');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 

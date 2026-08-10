@@ -30,9 +30,9 @@ const STATUSES = ['Pending', 'Requested', 'Received', 'Verified'];
 
 const emptyForm = { category: '', deliverable: '', responsible: '', notes: '' };
 
-export function CloseoutContent({ projects }: { projects: ProjectOption[] }) {
+export function CloseoutContent({ projects, initialProjectId }: { projects: ProjectOption[]; initialProjectId?: string }) {
   const { t } = useI18n();
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
+  const [projectId, setProjectId] = useState(initialProjectId ?? projects[0]?.id ?? '');
   const [items, setItems] = useState<CloseoutItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);

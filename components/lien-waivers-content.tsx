@@ -45,11 +45,11 @@ const emptyForm = {
   waiverType: 'conditional_progress', amount: '', throughDate: '', notes: '',
 };
 
-export function LienWaiversContent({ projects }: { projects: ProjectOption[] }) {
+export function LienWaiversContent({ projects, initialProjectId }: { projects: ProjectOption[]; initialProjectId?: string }) {
   const { t } = useI18n();
   const [waivers, setWaivers] = useState<Waiver[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projectFilter, setProjectFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState(initialProjectId ?? '');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<any>(emptyForm);

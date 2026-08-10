@@ -38,9 +38,9 @@ function parseFileName(fileName: string): { sheetNumber: string; title: string }
 const fmtD = (d: string | null) =>
   d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
-export function PlanRoomContent({ projects }: { projects: ProjectOpt[] }) {
+export function PlanRoomContent({ projects, initialProjectId }: { projects: ProjectOpt[]; initialProjectId?: string }) {
   const { t } = useI18n();
-  const [projectId, setProjectId] = useState(projects[0]?.id ?? '');
+  const [projectId, setProjectId] = useState(initialProjectId ?? projects[0]?.id ?? '');
   const [sets, setSets] = useState<PlanSet[]>([]);
   const [sheets, setSheets] = useState<PlanSheet[]>([]);
   const [canUpload, setCanUpload] = useState(false);

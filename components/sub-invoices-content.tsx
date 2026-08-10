@@ -41,11 +41,11 @@ const emptyForm = {
   grossAmount: '', retainagePercent: '5', netAmount: '', costCode: '', notes: '',
 };
 
-export function SubInvoicesContent({ projects, costCodes }: { projects: ProjectOption[]; costCodes: CostCode[] }) {
+export function SubInvoicesContent({ projects, costCodes, initialProjectId }: { projects: ProjectOption[]; costCodes: CostCode[]; initialProjectId?: string }) {
   const { t } = useI18n();
   const [invoices, setInvoices] = useState<SubInvoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projectFilter, setProjectFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState(initialProjectId ?? '');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState<SubInvoice | null>(null);
   const [form, setForm] = useState<any>(emptyForm);
