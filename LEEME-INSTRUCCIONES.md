@@ -1,9 +1,48 @@
-LEEME — SUBIDA A GITHUB (v17: ASISTENTE koduPM — chat de ayuda)
-================================================================
+LEEME — SUBIDA A GITHUB (v18: DISEÑO PROFESIONAL + NUEVO NOMBRE)
+==================================================================
 
 Este paquete reemplaza a TODOS los anteriores. NO subas ningún ZIP viejo.
 
-NUEVO EN v17 — ASISTENTE koduPM (chat de ayuda dentro de la app):
+NUEVO EN v18 — REPASO DE DISEÑO PROFESIONAL:
+1. TIPOGRAFÍA NUEVA: los títulos de toda la app pasan de una fuente
+   "redonda" (típica de demos) a Libre Franklin — sobria, estilo
+   software B2B serio. El cambio se nota en todo el producto.
+2. LOGIN PROFESIONAL:
+   - Fondo navy sólido (sin gradiente decorativo).
+   - Las 3 tarjetas ya NO usan emojis: ahora son iconos dorados
+     profesionales (Projects / CORs / Reports).
+3. NUEVO NOMBRE DEL PRODUCTO (login):
+   - Antes: "Change Order Management" (ya quedaba corto).
+   - Ahora: "Project Controls for Construction Teams"
+     ES: "Control de Proyectos para Equipos de Construcción".
+   - Subtítulo nuevo que menciona RFIs, Submittals, CORs, Pay Apps,
+     Punch List y Closeout.
+4. LIMPIEZA: se quitó un script viejo (Abacus) que ya no se usa
+   y hacía más lenta la carga del login.
+
+Archivos actualizados en esta versión:
+- app/layout.tsx ........... fuente nueva + limpieza
+- app/login/page.tsx ....... login profesional
+- lib/i18n/messages/en.ts .. nuevo nombre (inglés)
+- lib/i18n/messages/es.ts .. nuevo nombre (español)
+
+CÓMO SUBIR (mismo procedimiento de siempre):
+1. Descomprime el ZIP.
+2. En GitHub (repo kodu-app): Add file → Upload files.
+3. Arrastra TODAS las carpetas y archivos del paquete
+   (app, components, lib, prisma, middleware.ts, package.json).
+4. Commit. Vercel despliega solo en 1-2 minutos.
+
+CÓMO PROBAR:
+1. Cierra sesión en app.kodupm.com (o abre una ventana incógnito).
+2. La pantalla de login debe decir "Project Controls for Construction
+   Teams" con iconos dorados en vez de emojis, fondo navy plano.
+3. Entra: los títulos de toda la app se ven con la nueva tipografía.
+
+-------------------------------------------------------------------
+LO QUE YA TRAE ACUMULADO (v17):
+
+v17 — ASISTENTE koduPM (chat de ayuda dentro de la app):
 - Botón flotante abajo a la derecha (en todas las pantallas con menú).
 - Abre un panel de chat que responde CÓMO USAR la herramienta:
   RFIs, submittals, CORs, pay apps, budgets, punch list, closeout,

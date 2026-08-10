@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Building2, Mail, Lock, Eye, EyeOff, ArrowRight, FolderKanban, FileText, FileBarChart2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useI18n } from '@/hooks/use-i18n';
@@ -91,9 +91,8 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#0F1B33] relative items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0F1B33] via-[#1B2A4A] to-[#0F1B33]" />
-        <div className="relative z-10 text-center px-12">
+      <div className="hidden lg:flex lg:w-1/2 bg-[#0F1B33] items-center justify-center">
+        <div className="text-center px-12">
           <div className="relative w-[280px] h-[130px] mx-auto mb-8 flex items-center justify-center">
             {companyLogo ? (
               <Image src={companyLogo} alt="Company logo" fill className="object-contain" unoptimized={companyLogo.startsWith('http')} />
@@ -112,10 +111,10 @@ function LoginForm() {
             {t('auth.heroSubtitle')}
           </p>
           <div className="mt-12 grid grid-cols-3 gap-6 max-w-sm mx-auto">
-            {[{ label: 'Projects', icon: '📋' }, { label: 'CORs', icon: '📄' }, { label: 'PDFs', icon: '📑' }].map((item: any) => (
-              <div key={item?.label} className="bg-white/5 rounded-lg p-4 text-center">
-                <span className="text-2xl block mb-1">{item?.icon}</span>
-                <span className="text-xs text-gray-400">{item?.label}</span>
+            {[{ label: 'Projects', Icon: FolderKanban }, { label: 'CORs', Icon: FileText }, { label: 'Reports', Icon: FileBarChart2 }].map((item) => (
+              <div key={item.label} className="bg-white/5 rounded-lg p-4 text-center">
+                <item.Icon className="w-6 h-6 mx-auto mb-2 text-[#C9A96E]" />
+                <span className="text-xs text-gray-400">{item.label}</span>
               </div>
             ))}
           </div>
