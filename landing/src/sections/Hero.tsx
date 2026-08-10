@@ -10,9 +10,8 @@ const demoCors = [
 export default function Hero({ lang }: { lang: Lang }) {
   const t = copy[lang].hero
   return (
-    <section className="bg-[#0F1B33] text-white pt-32 pb-20 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0F1B33] via-[#1B2A4A] to-[#0F1B33] opacity-90" />
-      <div className="max-w-6xl mx-auto px-5 relative grid lg:grid-cols-2 gap-14 items-center">
+    <section className="bg-[#0F1B33] text-white pt-32 pb-20">
+      <div className="max-w-6xl mx-auto px-5 grid lg:grid-cols-2 gap-14 items-center">
         <div>
           <span className="inline-block text-xs font-semibold tracking-wide text-[#C9A96E] border border-[#C9A96E]/40 rounded-full px-3 py-1 mb-6">
             {t.badge}
@@ -34,7 +33,7 @@ export default function Hero({ lang }: { lang: Lang }) {
         </div>
 
         {/* Dashboard mock */}
-        <div className="bg-[#FEFBF5] rounded-2xl shadow-2xl p-6 text-[#0F1B33] rotate-1 hover:rotate-0 transition-transform duration-300">
+        <div className="bg-[#FEFBF5] rounded-2xl shadow-xl p-6 text-[#0F1B33]">
           <div className="grid grid-cols-3 gap-3 mb-5">
             {[
               { icon: FolderKanban, l: t.card.projects, v: '2' },

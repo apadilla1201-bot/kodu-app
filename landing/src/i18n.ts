@@ -4,7 +4,7 @@ export const copy = {
   en: {
     nav: { modules: 'Modules', how: 'How it works', faq: 'FAQ', signin: 'Sign in', cta: 'Start free' },
     hero: {
-      badge: 'For PMs, GCs & Owner\u2019s Reps',
+      badge: 'Project Controls for Construction Teams',
       h1a: 'Run your project controls',
       h1b: 'in one system — not in Excel.',
       sub: 'Kodu PM tracks Change Orders, RFIs, Submittals, Buyout, Daily Logs and Pay Applications for construction teams. Import your CO LOG from Excel and be up and running in minutes.',
@@ -80,7 +80,7 @@ export const copy = {
   es: {
     nav: { modules: 'Módulos', how: 'Cómo funciona', faq: 'Preguntas', signin: 'Iniciar sesión', cta: 'Empieza gratis' },
     hero: {
-      badge: 'Para PMs, GCs y Owner\u2019s Reps',
+      badge: 'Control de Proyectos para Equipos de Construcci\u00f3n',
       h1a: 'Maneja tus project controls',
       h1b: 'en un solo sistema — no en Excel.',
       sub: 'Kodu PM controla Change Orders, RFIs, Submittals, Buyout, Daily Logs y Pay Applications para equipos de construcción. Importa tu CO LOG de Excel y empieza en minutos.',

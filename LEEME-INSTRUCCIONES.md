@@ -1,9 +1,23 @@
-LEEME — SUBIDA A GITHUB (v18: DISEÑO PROFESIONAL + NUEVO NOMBRE)
-==================================================================
+LEEME — SUBIDA A GITHUB (v18b: DISEÑO PROFESIONAL + NUEVO NOMBRE + LANDING)
+============================================================================
 
 Este paquete reemplaza a TODOS los anteriores. NO subas ningún ZIP viejo.
 
-NUEVO EN v18 — REPASO DE DISEÑO PROFESIONAL:
+⚠️ NOTA IMPORTANTE: este paquete ahora incluye TAMBIÉN la carpeta
+"landing" (la página pública www.kodupm.com). Arrástrala junto con
+las demás carpetas (app, components, lib, landing, prisma,
+middleware.ts, package.json).
+
+NUEVO EN v18b — LANDING (www.kodupm.com) ALINEADA:
+1. Hero sin gradiente decorativo — navy sólido.
+2. El panel de ejemplo ya no está rotado/juguetón — derecho, serio.
+3. La insignia del hero ahora dice el nuevo posicionamiento:
+   "Project Controls for Construction Teams" /
+   "Control de Proyectos para Equipos de Construcción".
+4. Tipografía de la landing alineada con la app: Libre Franklin
+   (títulos) + DM Sans (cuerpo).
+
+NUEVO EN v18 — REPASO DE DISEÑO PROFESIONAL (APP):
 1. TIPOGRAFÍA NUEVA: los títulos de toda la app pasan de una fuente
    "redonda" (típica de demos) a Libre Franklin — sobria, estilo
    software B2B serio. El cambio se nota en todo el producto.
