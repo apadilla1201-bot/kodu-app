@@ -1267,7 +1267,19 @@ export const enMessages = {
     sug2: 'How do I use Walk Mode on my phone?',
     sug3: 'How do I request closeout documents?',
   },
-} as const;
+ assistant: {
+    title: 'koduPM Assistant',
+    subtitle: 'Ask how anything works',
+    welcome: 'Hi. I can walk you through any module — RFIs, submittals, pay applications, punch list, closeout and more. What do you need to do?',
+    placeholder: 'Type your question…',
+    send: 'Send',
+    close: 'Close',
+    thinking: 'Thinking…',
+    errorGeneric: 'I could not answer right now. Please try again in a moment.',
+    sug1: 'How do I approve a change order?',
+    sug2: 'How do I use Walk Mode on my phone?',
+    sug3: 'How do I request closeout documents?',
+  ,} as const;
 
 export type MessageTree = {
   [key: string]: string | MessageTree;
