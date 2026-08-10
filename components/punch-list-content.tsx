@@ -993,6 +993,7 @@ export function PunchListContent({ projects }: { projects: ProjectOption[] }) {
             backToList: t('punch.walkBackToList'),
             saveError: t('punch.saveError'),
             saveBtn: t('common.save'),
+            typeInstead: t('punch.walkTypeInstead'),
           }}
         />
       )}

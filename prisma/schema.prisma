@@ -167,6 +167,7 @@ model Project {
   sitePhotos      SitePhoto[]
   dailyLogs       DailyLog[]
   lienWaivers     LienWaiver[]
+  subInvoices     SubInvoice[]
   punchItems      PunchItem[]
   punchSignoffs   PunchAreaSignoff[]
   closeoutItems   CloseoutItem[]
@@ -740,6 +741,44 @@ model LienWaiver {
 
   @@index([projectId])
   @@index([payApplicationId])
+}
+
+// ============================================================
+// SUB INVOICES — facturas/pay apps que los subs envían al GC
+// ------------------------------------------------------------
+// Flujo PDG: el sub manda su invoice/pay app en PDF → el PM lo sube,
+// asigna el COST CODE de la lista del proyecto y el NETO aprobado
+// (retainage automático, editable) → koduPM ESTAMPA en el PDF la línea
+// roja "Project N, Cost code: X, Net Payment: $Y" → se envía a
+// contabilidad por correo. Reemplaza la edición manual del PDF.
+// ============================================================
+model SubInvoice {
+  id               String    @id @default(cuid())
+  projectId        String
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subcontractor    String                                  // nombre del sub (texto libre o del directorio)
+  invoiceNumber    String?                                 // # de invoice/pay app del sub
+  description      String?                                 // concepto del trabajo
+  grossAmount      Float     @default(0)                   // monto bruto del invoice
+  retainagePercent Float     @default(0.05)                // % retención (default 5%)
+  netAmount        Float     @default(0)                   // neto aprobado por el PM (calculado, editable)
+  costCode         String?                                 // código de la lista del proyecto (ej "32 39 13")
+  costCodeLabel    String?                                 // descripción del cost code
+  fileUrl          String?                                 // PDF ORIGINAL del sub
+  fileName         String?
+  stampedFileUrl   String?                                 // PDF SELLADO con la línea roja
+  stampedFileName  String?
+  status           String    @default("Pending")           // Pending | Stamped | Sent
+  sentToEmail      String?                                 // correo de contabilidad al que se envió
+  sentAt           DateTime?
+  notes            String?   @db.Text
+  createdByName    String?
+  createdByEmail   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([status])
 }
 
 // ============================================================

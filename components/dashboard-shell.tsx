@@ -39,6 +39,7 @@ import {
   ListChecks,
   ClipboardCheck,
   DraftingCompass,
+  Stamp,
 } from 'lucide-react';
 
 type BadgeMap = Record<string, number>;
@@ -49,6 +50,7 @@ const BADGE_BY_HREF: Record<string, keyof BadgeMap> = {
   '/dashboard/submittals': 'submittals',
   '/dashboard/pay-apps': 'payApps',
   '/dashboard/lien-waivers': 'waivers',
+  '/dashboard/sub-invoices': 'subInvoices',
   '/dashboard/punch-list': 'punch',
   '/dashboard/closeout': 'closeout',
   '/dashboard/approvals': 'cors',
@@ -133,6 +135,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         { href: '/dashboard/budgets', label: 'Budgets', icon: Receipt },
         { href: '/dashboard/pay-apps', label: 'Pay Applications', icon: Wallet },
         { href: '/dashboard/lien-waivers', label: t('nav.lienWaivers'), icon: FileSignature },
+        { href: '/dashboard/sub-invoices', label: t('nav.subInvoices'), icon: Stamp },
       ],
     },
     {

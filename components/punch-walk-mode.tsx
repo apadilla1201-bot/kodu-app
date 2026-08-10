@@ -11,7 +11,7 @@ export type WalkLabels = {
   itemsInArea: (n: number) => string; noAreas: string; voiceError: string;
   voiceUnsupported: string; selectArea: string; done: string;
   totalCaptured: (n: number) => string; backToList: string; saveError: string;
-  saveBtn: string;
+  saveBtn: string; typeInstead: string;
 };
 
 const PRIORITIES = ['A', 'B', 'C'] as const;
@@ -22,7 +22,7 @@ const PRIO_STYLE: Record<string, string> = {
 };
 
 // Web Speech API (gratis, EN/ES, Chrome/Android + Safari iOS)
-function getRecognizer(lang: string, onResult: (text: string, final: boolean) => void, onEnd: () => void, onError: () => void): any {
+function getRecognizer(lang: string, onResult: (text: string, final: boolean) => void, onEnd: () => void, onError: (err?: any) => void): any {
   const w = window as any;
   const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
   if (!SR) return null;
@@ -41,8 +41,14 @@ function getRecognizer(lang: string, onResult: (text: string, final: boolean) =>
     onResult(final || interim, Boolean(final));
   };
   rec.onend = onEnd;
-  rec.onerror = onError;
+  rec.onerror = (e: any) => onError(e);
   return rec;
+}
+
+// ¿El navegador soporta dictado por voz?
+function speechSupported(): boolean {
+  const w = window as any;
+  return Boolean(w.SpeechRecognition || w.webkitSpeechRecognition);
 }
 
 /**
@@ -81,14 +87,39 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
   const currentArea = customArea.trim() || area;
   const totalAreas = Math.max(areaQueue.length, areaIdx + 1);
 
+  const startTimeoutRef = useRef<any>(null);
+
   const stopListening = () => {
+    if (startTimeoutRef.current) { clearTimeout(startTimeoutRef.current); startTimeoutRef.current = null; }
     try { recRef.current?.stop(); } catch { /* noop */ }
     setListening(false);
   };
 
-  const toggleMic = () => {
+  const toggleMic = async () => {
     if (listening) { stopListening(); return; }
     setVoiceMsg('');
+
+    if (!speechSupported()) {
+      setVoiceMsg(labels.voiceUnsupported);
+      heardRef.current?.focus();
+      return;
+    }
+
+    // 1) Pedir permiso del micrófono PRIMERO. En iPhone/Safari (y a veces
+    //    Android), arrancar SpeechRecognition sin permiso concedido deja el
+    //    recognizer colgado SIN lanzar error → la pantalla "se frisa".
+    //    getUserMedia fuerza el diálogo de permiso y confirma que hay mic.
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop()); // soltar el mic; SpeechRecognition lo retoma
+      }
+    } catch {
+      setVoiceMsg(labels.voiceError);
+      heardRef.current?.focus();
+      return;
+    }
+
     const rec = getRecognizer(
       voiceLang,
       (text, isFinal) => {
@@ -100,14 +131,34 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
     );
     if (!rec) {
       setVoiceMsg(labels.voiceUnsupported);
+      heardRef.current?.focus();
       return;
     }
     recRef.current = rec;
     setListening(true);
-    try { rec.start(); } catch { setListening(false); }
+
+    // 2) Timeout de seguridad: si en 8s el recognizer no arrancó (onstart no
+    //    existe en todos, así que usamos onresult/onend), no dejamos la UI
+    //    colgada — avisamos y soltamos.
+    if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+    startTimeoutRef.current = setTimeout(() => {
+      setListening((cur) => {
+        if (cur && !heardRef.current?.value) {
+          try { rec.abort(); } catch { /* noop */ }
+          setVoiceMsg(labels.voiceError);
+          return false;
+        }
+        return cur;
+      });
+    }, 8000);
+
+    try { rec.start(); } catch { setListening(false); setVoiceMsg(labels.voiceError); }
   };
 
-  useEffect(() => () => { try { recRef.current?.abort(); } catch { /* noop */ } }, []);
+  useEffect(() => () => {
+    if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+    try { recRef.current?.abort(); } catch { /* noop */ }
+  }, []);
 
   const save = async () => {
     if (!heard.trim()) { heardRef.current?.focus(); return; }
@@ -204,6 +255,9 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
           placeholder="…"
         />
         {voiceMsg && <p className="text-red-400 text-sm mt-2 font-medium">{voiceMsg}</p>}
+        {!speechSupported() && (
+          <p className="text-[#C9A96E] text-xs mt-2 font-medium">{labels.typeInstead}</p>
+        )}
 
         {/* Oficio + prioridad */}
         <div className="mt-4 grid grid-cols-2 gap-3">
