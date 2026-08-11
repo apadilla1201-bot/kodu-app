@@ -40,6 +40,7 @@ import {
   ClipboardCheck,
   DraftingCompass,
   Stamp,
+  FileText,
 } from 'lucide-react';
 
 type BadgeMap = Record<string, number>;
@@ -64,6 +65,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // koduPM (NUNCA PDG fijo — PDG solo aparece si ES la compañía del usuario).
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [badges, setBadges] = useState<BadgeMap>({});
+  const [projectNames, setProjectNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     (async () => {
@@ -85,7 +87,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const res = await fetch('/api/nav-badges', { credentials: 'include' });
-        if (res.ok && alive) setBadges(await res.json());
+        if (res.ok && alive) {
+          const data = await res.json();
+          setBadges(data);
+          if (data?.projectNames) setProjectNames(data.projectNames);
+        }
       } catch {
         // sin badges no pasa nada
       }
@@ -98,6 +104,32 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // PASO 3: menú filtrado por rol (Super no ve Pay Apps ni Budgets; owner/sub ven solo lo suyo)
   const userRole = (session?.user as any)?.role ?? 'viewer';
   const allowed = navForRole(userRole);
+
+  // v22: ¿estamos DENTRO de un proyecto? La URL /dashboard/projects/<id>/… lo indica.
+  const projectMatch = pathname?.match?.(/^\/dashboard\/projects\/([^/]+)/);
+  const activeProjectId = projectMatch?.[1] && !['new'].includes(projectMatch[1]) ? projectMatch[1] : null;
+  const activeProjectName = activeProjectId ? (projectNames[activeProjectId] ?? '') : '';
+
+  // Módulos disponibles DENTRO del proyecto (href plano + query del proyecto)
+  const pm = activeProjectId ? `?projectId=${activeProjectId}` : '';
+  const projectModules: { href: string; label: string; icon: any }[] = activeProjectId
+    ? [
+        { href: `/dashboard/projects/${activeProjectId}`, label: t('nav.overview'), icon: LayoutDashboard },
+        { href: `/dashboard/rfis${pm}`, label: t('nav.rfiLog'), icon: FileQuestion },
+        { href: `/dashboard/submittals${pm}`, label: t('nav.submittals'), icon: FileStack },
+        { href: `/dashboard/cors${pm}`, label: 'Change Orders', icon: FileText },
+        { href: `/dashboard/buyout${pm}`, label: t('nav.buyout'), icon: ClipboardList },
+        { href: `/dashboard/pay-apps${pm}`, label: 'Pay Applications', icon: Wallet },
+        { href: `/dashboard/lien-waivers${pm}`, label: t('nav.lienWaivers'), icon: FileSignature },
+        { href: `/dashboard/sub-invoices${pm}`, label: t('nav.subInvoices'), icon: Stamp },
+        { href: `/dashboard/budgets${pm}`, label: 'Budgets', icon: Receipt },
+        { href: `/dashboard/punch-list${pm}`, label: t('nav.punchList'), icon: ListChecks },
+        { href: `/dashboard/closeout${pm}`, label: t('nav.closeout'), icon: ClipboardCheck },
+        { href: `/dashboard/plans${pm}`, label: t('nav.plans'), icon: DraftingCompass },
+        { href: `/dashboard/photos${pm}`, label: t('nav.sitePhotos'), icon: Camera },
+        { href: `/dashboard/daily-logs${pm}`, label: t('nav.dailyLogs'), icon: NotebookPen },
+      ].filter((item) => allowed.includes(item.href.split('?')[0]))
+    : [];
 
   // Menú agrupado por fase del proyecto (estructura familiar para quien viene de Procore)
   const navGroups: { key: string | null; label: string | null; items: { href: string; label: string; icon: any }[] }[] = [
@@ -160,10 +192,40 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     },
   ];
 
-  // Aplicar el filtro de rol a cada grupo y descartar grupos vacíos
+  // Aplicar el filtro de rol a cada grupo y descartar grupos vacíos.
+  // v22: los módulos con lista por proyecto salen de la vista de empresa —
+  // ahora se entra a ellos DESDE el proyecto (menú contextual abajo).
+  const HIDE_AT_COMPANY_LEVEL = new Set([
+    '/dashboard/rfis', '/dashboard/submittals', '/dashboard/cors', '/dashboard/buyout',
+    '/dashboard/pay-apps', '/dashboard/lien-waivers', '/dashboard/sub-invoices',
+    '/dashboard/budgets', '/dashboard/punch-list', '/dashboard/closeout',
+    '/dashboard/plans', '/dashboard/photos', '/dashboard/daily-logs',
+    '/dashboard/analytics', '/dashboard/import',
+  ]);
   const visibleGroups = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((item) => allowed.includes(item.href)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((item) => allowed.includes(item.href) && !HIDE_AT_COMPANY_LEVEL.has(item.href)),
+    }))
     .filter((g) => g.items.length > 0);
+
+  // Menú contextual del proyecto activo (v22): home → Projects → módulos del proyecto
+  const projectNavGroups = activeProjectId
+    ? [
+        {
+          key: 'back',
+          label: null,
+          items: [{ href: '/dashboard', label: t('nav.allProjects'), icon: FolderKanban }],
+        },
+        {
+          key: 'projectModules',
+          label: activeProjectName ? `#${activeProjectName}` : t('nav.thisProject'),
+          items: projectModules,
+        },
+      ]
+    : [];
+
+  const groupsToRender = activeProjectId ? projectNavGroups : visibleGroups;
 
   const onLocaleChange = async (value: string) => {
     await setLocale(value as AppLocale);
@@ -199,7 +261,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex-1 px-3 py-3 overflow-y-auto">
-            {visibleGroups.map((group, gi) => (
+            {groupsToRender.map((group, gi) => (
               <div key={group.key ?? 'root'} className={gi > 0 ? 'mt-5' : ''}>
                 {group.label && (
                   <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40 select-none">
