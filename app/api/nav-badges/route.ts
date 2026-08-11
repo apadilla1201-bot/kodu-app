@@ -29,7 +29,17 @@ export async function GET() {
       safe(() => prisma.subInvoice.count({ where: { project: { companyId }, status: { not: 'Sent' } } })),
     ]);
 
-    return NextResponse.json({ rfis, submittals, cors, payApps, waivers, punch, closeout, subInvoices });
+    // v22: nombres de proyecto para el menú contextual (dentro de un proyecto)
+    let projectNames: Record<string, string> = {};
+    try {
+      const projs = await prisma.project.findMany({
+        where: { companyId },
+        select: { id: true, projectNumber: true, projectName: true },
+      });
+      projectNames = Object.fromEntries(projs.map((pr) => [pr.id, `${pr.projectNumber} — ${pr.projectName}`]));
+    } catch { /* sin nombres no pasa nada */ }
+
+    return NextResponse.json({ rfis, submittals, cors, payApps, waivers, punch, closeout, subInvoices, projectNames });
   } catch {
     return NextResponse.json({});
   }

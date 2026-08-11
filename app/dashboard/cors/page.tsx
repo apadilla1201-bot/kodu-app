@@ -5,14 +5,16 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { AllCorsContent } from '@/components/all-cors-content';
+import { requireProjectAccess } from '@/lib/require-project';
 
-export default async function CorsPage() {
+export default async function CorsPage({ searchParams }: { searchParams: { projectId?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
+  const { projectId } = await requireProjectAccess(searchParams);
   const companyId = (session.user as any)?.companyId ?? '';
 
-  const projects = await prisma.project.findMany({
-    where: { companyId },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, companyId },
     include: {
       changeOrders: {
         orderBy: { sequence: 'asc' },
@@ -23,14 +25,14 @@ export default async function CorsPage() {
         },
       },
     },
-    orderBy: { createdAt: 'desc' },
   });
+  if (!project) redirect('/dashboard');
 
-  const data = (projects ?? []).map((p: any) => ({
-    id: p?.id ?? '',
-    projectNumber: p?.projectNumber ?? '',
-    projectName: p?.projectName ?? '',
-    changeOrders: (p?.changeOrders ?? []).map((co: any) => ({
+  const data = [{
+    id: project.id,
+    projectNumber: project.projectNumber ?? '',
+    projectName: project.projectName ?? '',
+    changeOrders: (project.changeOrders ?? []).map((co: any) => ({
       id: co?.id ?? '',
       corNumber: co?.corNumber ?? '',
       date: co?.date ? new Date(co.date).toISOString() : '',
@@ -39,7 +41,7 @@ export default async function CorsPage() {
       status: co?.status ?? 'Pending',
       totalAmount: co?.totalAmount ?? 0,
     })),
-  }));
+  }];
 
-  return <AllCorsContent projects={data} />;
+  return <AllCorsContent projects={data} initialProjectId={project.id} />;
 }

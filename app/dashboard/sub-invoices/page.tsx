@@ -7,25 +7,23 @@ import { redirect } from 'next/navigation';
 import { isFullAccess } from '@/lib/permissions';
 import { SubInvoicesContent } from '@/components/sub-invoices-content';
 import { COST_CODES } from '@/lib/cost-codes';
+import { requireProjectAccess } from '@/lib/require-project';
 
-export default async function SubInvoicesPage() {
+export default async function SubInvoicesPage({ searchParams }: { searchParams: { projectId?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
   const role = (session.user as any)?.role ?? 'viewer';
   if (!isFullAccess(role)) redirect('/dashboard');
+  const { projectId } = await requireProjectAccess(searchParams);
   const companyId = (session.user as any)?.companyId ?? '';
 
-  const projects = await prisma.project.findMany({
-    where: { companyId },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, companyId },
     select: { id: true, projectNumber: true, projectName: true },
-    orderBy: { createdAt: 'desc' },
   });
+  if (!project) redirect('/dashboard');
 
-  const serialized = projects.map((p) => ({
-    id: p.id,
-    projectNumber: p.projectNumber,
-    projectName: p.projectName,
-  }));
+  const serialized = [{ id: project.id, projectNumber: project.projectNumber, projectName: project.projectName }];
 
-  return <SubInvoicesContent projects={serialized} costCodes={COST_CODES} />;
+  return <SubInvoicesContent projects={serialized} costCodes={COST_CODES} initialProjectId={project.id} />;
 }

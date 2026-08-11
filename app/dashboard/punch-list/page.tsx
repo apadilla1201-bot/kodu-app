@@ -6,17 +6,18 @@ import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { isFullAccess } from '@/lib/permissions';
 import { PunchListContent } from '@/components/punch-list-content';
+import { requireProjectAccess } from '@/lib/require-project';
 
-export default async function PunchListPage() {
+export default async function PunchListPage({ searchParams }: { searchParams: { projectId?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
   const role = (session.user as any)?.role ?? 'viewer';
-  // Gestión completa + superintendente (su trabajo diario de campo)
   if (!isFullAccess(role) && role !== 'superintendent') redirect('/dashboard');
+  const { projectId } = await requireProjectAccess(searchParams);
   const companyId = (session.user as any)?.companyId ?? '';
 
-  const projects = await prisma.project.findMany({
-    where: { companyId },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, companyId },
     select: {
       id: true,
       projectNumber: true,
@@ -27,15 +28,15 @@ export default async function PunchListPage() {
         orderBy: { name: 'asc' },
       },
     },
-    orderBy: { createdAt: 'desc' },
   });
+  if (!project) redirect('/dashboard');
 
-  const serialized = projects.map((p) => ({
-    id: p.id,
-    projectNumber: p.projectNumber,
-    projectName: p.projectName,
-    contacts: p.contacts,
-  }));
+  const serialized = [{
+    id: project.id,
+    projectNumber: project.projectNumber,
+    projectName: project.projectName,
+    contacts: project.contacts,
+  }];
 
-  return <PunchListContent projects={serialized} />;
+  return <PunchListContent projects={serialized} initialProjectId={project.id} />;
 }

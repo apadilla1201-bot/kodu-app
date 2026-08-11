@@ -5,14 +5,16 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { PayAppListContent } from '@/components/pay-app-list-content';
+import { requireProjectAccess } from '@/lib/require-project';
 
-export default async function PayAppsPage() {
+export default async function PayAppsPage({ searchParams }: { searchParams: { projectId?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
+  const { projectId } = await requireProjectAccess(searchParams);
   const companyId = (session.user as any)?.companyId ?? '';
 
-  const projects = await prisma.project.findMany({
-    where: { companyId },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, companyId },
     include: {
       payApplications: {
         orderBy: { applicationNumber: 'desc' },
@@ -27,21 +29,21 @@ export default async function PayAppsPage() {
         },
       },
     },
-    orderBy: { createdAt: 'desc' },
   });
+  if (!project) redirect('/dashboard');
 
-  const serialized = projects.map(p => ({
-    ...p,
-    startDate: p.startDate?.toISOString() ?? null,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-    payApplications: p.payApplications.map(pa => ({
+  const serialized = [{
+    ...project,
+    startDate: project.startDate?.toISOString() ?? null,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
+    payApplications: project.payApplications.map(pa => ({
       ...pa,
       applicationDate: pa.applicationDate.toISOString(),
       periodFrom: pa.periodFrom.toISOString(),
       periodTo: pa.periodTo.toISOString(),
     })),
-  }));
+  }];
 
-  return <PayAppListContent projects={serialized} />;
+  return <PayAppListContent projects={serialized} initialProjectId={project.id} />;
 }

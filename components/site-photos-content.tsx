@@ -103,7 +103,7 @@ export function SitePhotosContent({
 
   const uploadFiles = async (files: FileList | File[]) => {
     if (!projectId) {
-      toast({ title: 'Selecciona un proyecto', variant: 'destructive' });
+      toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
       return;
     }
     const area = pendingArea.trim();
@@ -159,7 +159,7 @@ export function SitePhotosContent({
       } else if (skipped > 0) {
         const msg = t('sitePhotos.invalidFormat');
         setUploadError(msg);
-        toast({ title: 'Formato no soportado', description: msg, variant: 'destructive' });
+        toast({ title: t('sitePhotos.unsupportedFormat'), description: msg, variant: 'destructive' });
       }
     } catch (e: any) {
       const msg = e?.message ?? t('sitePhotos.uploadError');
@@ -201,11 +201,11 @@ export function SitePhotosContent({
         }),
       });
       if (!res.ok) throw new Error('Failed');
-      toast({ title: 'Foto actualizada' });
+      toast({ title: t('sitePhotos.photoUpdated') });
       setSelected(null);
       await load();
     } catch {
-      toast({ title: 'Error al guardar', variant: 'destructive' });
+      toast({ title: t('sitePhotos.saveError'), variant: 'destructive' });
     }
   };
 
@@ -217,7 +217,7 @@ export function SitePhotosContent({
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed');
-      toast({ title: 'Foto eliminada' });
+      toast({ title: t('sitePhotos.photoDeleted') });
       if (selected?.id === photo.id) setSelected(null);
       await load();
     } catch {
@@ -255,7 +255,7 @@ export function SitePhotosContent({
       <div className="bg-card border rounded-xl p-4 shadow-sm space-y-4 lg:sticky lg:top-4 lg:z-10">
         <div>
           <p className="text-sm font-medium">
-            {selectedProject ? `#${selectedProject.projectNumber} — ${selectedProject.projectName}` : 'Select project'}
+            {selectedProject ? `#${selectedProject.projectNumber} — ${selectedProject.projectName}` : t('sitePhotos.selectProject')}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             Completa la identificación antes de tomar o elegir la foto
@@ -291,7 +291,7 @@ export function SitePhotosContent({
           <input
             value={pendingArea}
             onChange={(e) => setPendingArea(e.target.value)}
-            placeholder="Ej. Level 2 · Grid B4 · East wing"
+            placeholder={t('sitePhotos.phLocation')}
             className="w-full px-3 py-2 border rounded-lg bg-background text-sm"
           />
           <div className="flex flex-wrap gap-1.5">
@@ -318,7 +318,7 @@ export function SitePhotosContent({
           <input
             value={pendingTrade}
             onChange={(e) => setPendingTrade(e.target.value)}
-            placeholder="Ej. Concrete, Electrical, Steel"
+            placeholder={t('sitePhotos.phTrades')}
             className="w-full px-3 py-2 border rounded-lg bg-background text-sm"
           />
           <div className="flex flex-wrap gap-1.5">
@@ -346,7 +346,7 @@ export function SitePhotosContent({
             value={pendingCaption}
             onChange={(e) => setPendingCaption(e.target.value)}
             rows={2}
-            placeholder="Ej. Slab pour completed, rebar inspection, delivery of steel beams…"
+            placeholder={t('sitePhotos.phDescription')}
             className="w-full px-3 py-2 border rounded-lg bg-background text-sm resize-none"
           />
           <p className="text-[11px] text-muted-foreground">* Ubicación o descripción — al menos uno requerido</p>
@@ -377,7 +377,7 @@ export function SitePhotosContent({
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A96E] hover:bg-[#B8944F] text-white rounded-lg font-semibold text-sm disabled:opacity-50"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-            {uploading ? 'Subiendo…' : 'Tomar foto'}
+            {uploading ? t('sitePhotos.uploading') : t('sitePhotos.takePhoto')}
           </button>
           <button
             type="button"
@@ -430,7 +430,7 @@ export function SitePhotosContent({
         <div className="text-center py-16 bg-card border rounded-xl">
           <ImageIcon className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
           <p className="font-medium">{t('sitePhotos.noPhotosYet')}</p>
-          <p className="text-sm text-muted-foreground mt-1">Sube la primera foto del sitio con el botón de arriba</p>
+          <p className="text-sm text-muted-foreground mt-1">{t('sitePhotos.firstPhotoHint')}</p>
         </div>
       ) : (
         <div className="space-y-8">
@@ -485,7 +485,7 @@ export function SitePhotosContent({
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4">
           <div className="bg-card w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl shadow-xl">
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="font-semibold">Detalle de foto</h3>
+              <h3 className="font-semibold">{t('sitePhotos.photoDetail')}</h3>
               <button type="button" onClick={() => setSelected(null)} className="p-1 rounded hover:bg-muted">
                 <X className="w-5 h-5" />
               </button>
@@ -498,7 +498,7 @@ export function SitePhotosContent({
                 {selected.uploadedBy ? ` · ${selected.uploadedBy}` : ''}
               </p>
               <div>
-                <label className="text-xs font-medium">Tipo</label>
+                <label className="text-xs font-medium">{t('sitePhotos.typeLabel')}</label>
                 <select
                   value={editTag}
                   onChange={(e) => setEditTag(e.target.value as PhotoTagId)}
@@ -517,7 +517,7 @@ export function SitePhotosContent({
                   <input
                     value={editArea}
                     onChange={(e) => setEditArea(e.target.value)}
-                    placeholder="Level 2 / Grid B"
+                    placeholder={t('sitePhotos.phLocationShort')}
                     className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
                   />
                 </div>
@@ -526,13 +526,13 @@ export function SitePhotosContent({
                   <input
                     value={editTrade}
                     onChange={(e) => setEditTrade(e.target.value)}
-                    placeholder="Concrete"
+                    placeholder={t('sitePhotos.phTradesShort')}
                     className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium">Descripción</label>
+                <label className="text-xs font-medium">{t('sitePhotos.descLabel')}</label>
                 <textarea
                   value={editCaption}
                   onChange={(e) => setEditCaption(e.target.value)}

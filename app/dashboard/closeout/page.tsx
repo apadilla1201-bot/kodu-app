@@ -6,19 +6,21 @@ import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { isFullAccess } from '@/lib/permissions';
 import { CloseoutContent } from '@/components/closeout-content';
+import { requireProjectAccess } from '@/lib/require-project';
 
-export default async function CloseoutPage() {
+export default async function CloseoutPage({ searchParams }: { searchParams: { projectId?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect('/login');
   const role = (session.user as any)?.role ?? 'viewer';
   if (!isFullAccess(role) && role !== 'superintendent') redirect('/dashboard');
+  const { projectId } = await requireProjectAccess(searchParams);
   const companyId = (session.user as any)?.companyId ?? '';
 
-  const projects = await prisma.project.findMany({
-    where: { companyId },
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, companyId },
     select: { id: true, projectNumber: true, projectName: true },
-    orderBy: { createdAt: 'desc' },
   });
+  if (!project) redirect('/dashboard');
 
-  return <CloseoutContent projects={projects} />;
+  return <CloseoutContent projects={[project]} initialProjectId={project.id} />;
 }

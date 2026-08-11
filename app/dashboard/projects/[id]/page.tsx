@@ -5,11 +5,17 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { redirect, notFound } from 'next/navigation';
 import { ProjectDetailContent } from '@/components/project-detail-content';
+import { canAccessProject } from '@/lib/project-access';
 
 export default async function ProjectDetailPage({ params, searchParams }: { params: { id: string }; searchParams: { tab?: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
   const companyId = (session?.user as any)?.companyId ?? '';
+  const userId = (session?.user as any)?.id ?? '';
+  const role = (session?.user as any)?.role ?? 'viewer';
+
+  // Acceso por proyecto: sin clave/membresía → de vuelta a la lista (v22)
+  if (!(await canAccessProject(userId, params?.id ?? '', role))) redirect('/dashboard');
 
   const project = await prisma.project.findFirst({
     where: { id: params?.id ?? '', companyId },

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { canInvite, ROLE_LABELS } from '@/lib/permissions';
+import { canInvite, isFullAccess, ROLE_LABELS } from '@/lib/permissions';
 
 type Project = { id: string; projectName: string; projectNumber: string };
 type TeamUser = { id: string; name: string | null; email: string; role: string; createdAt: string };
@@ -22,6 +22,7 @@ export default function TeamPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [roleBusy, setRoleBusy] = useState('');
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [form, setForm] = useState({ email: '', name: '', role: 'subcontractor', projectId: '' });
 
@@ -48,6 +49,28 @@ export default function TeamPage() {
   }, []);
 
   const needsProject = form.role === 'owner' || form.role === 'subcontractor';
+  const canChangeRoles = isFullAccess(userRole);
+  const myId = (session?.user as any)?.id ?? '';
+
+  const changeRole = async (userId: string, newRole: string) => {
+    setRoleBusy(userId);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/team/role', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Error al cambiar el rol');
+      setMessage({ ok: true, text: 'Rol actualizado.' });
+      load();
+    } catch (err: any) {
+      setMessage({ ok: false, text: err?.message ?? 'Error' });
+    } finally {
+      setRoleBusy('');
+    }
+  };
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,9 +230,22 @@ export default function TeamPage() {
                 <p className="text-sm font-medium truncate">{u.name ?? '—'}</p>
                 <p className="text-xs text-muted-foreground truncate">{u.email}</p>
               </div>
-              <span className="text-xs px-2 py-1 rounded-full bg-[#0F1B33] text-[#C9A96E]">
-                {ROLE_LABELS[u.role] ?? u.role}
-              </span>
+              {canChangeRoles && u.id !== myId ? (
+                <select
+                  value={u.role}
+                  disabled={roleBusy === u.id}
+                  onChange={(e) => changeRole(u.id, e.target.value)}
+                  className="text-xs px-2 py-1.5 rounded-lg border border-border bg-background font-medium disabled:opacity-50"
+                >
+                  {INVITABLE_ROLES.map((r) => (
+                    <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-xs px-2 py-1 rounded-full bg-[#0F1B33] text-[#C9A96E]">
+                  {ROLE_LABELS[u.role] ?? u.role}
+                </span>
+              )}
             </div>
           ))}
         </div>

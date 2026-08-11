@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Save, Building2, Hash, MapPin, DollarSign, Calendar, User } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Hash, MapPin, DollarSign, Calendar, User, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -20,6 +20,7 @@ export default function EditProjectPage() {
     location: '',
     contractAmount: '',
     startDate: '',
+    accessKey: '',
   });
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function EditProjectPage() {
           location: p?.location ?? '',
           contractAmount: p?.contractAmount != null ? String(p.contractAmount) : '',
           startDate: p?.startDate ? new Date(p.startDate).toISOString().split('T')[0] : '',
+          accessKey: p?.accessKey ?? '',
         });
       } catch (err: any) {
         toast.error(err?.message ?? 'Failed to load project');
@@ -89,6 +91,7 @@ export default function EditProjectPage() {
     { key: 'location', label: 'Location', icon: MapPin, placeholder: '1089 NW 20th ST, Miami FL 33127' },
     { key: 'contractAmount', label: 'Contract Amount', icon: DollarSign, placeholder: '0.00', type: 'number' },
     { key: 'startDate', label: 'Start Date', icon: Calendar, type: 'date' },
+    { key: 'accessKey', label: 'Project Access Key', icon: KeyRound, placeholder: 'e.g. ARENA-2026' },
   ];
 
   if (fetching) {

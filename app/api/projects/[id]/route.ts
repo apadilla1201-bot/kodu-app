@@ -54,7 +54,7 @@ export async function PATCH(
     if (!existing) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     const body = await request.json();
-    const { projectNumber, projectName, client, location, contractAmount, startDate } = body ?? {};
+    const { projectNumber, projectName, client, location, contractAmount, startDate, accessKey } = body ?? {};
 
     if (!projectNumber || !projectName || !client) {
       return NextResponse.json({ error: 'Project number, name, and client are required' }, { status: 400 });
@@ -69,6 +69,7 @@ export async function PATCH(
         location: location ? String(location) : null,
         contractAmount: parseFloat(String(contractAmount ?? '0')) || 0,
         startDate: startDate ? new Date(startDate) : null,
+        ...(accessKey !== undefined ? { accessKey: accessKey ? String(accessKey).trim() || null : null } : {}),
       },
     });
     return NextResponse.json(project);
