@@ -57,6 +57,7 @@ model User {
   sessions      Session[]
   projects      Project[]
   memberships   ProjectMember[]
+  projectAccess ProjectAccess[]
   invitesSent   UserInvite[]      @relation("InviteCreator")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -173,6 +174,8 @@ model Project {
   closeoutItems   CloseoutItem[]
   planSets        PlanSet[]
   planSheets      PlanSheet[]
+  accessKey       String?                            // clave de entrada al proyecto (la define admin/pm)
+  projectAccess   ProjectAccess[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -947,3 +950,25 @@ model PlanRevision {
   @@index([planSheetId])
 }
 
+
+// ============================================================
+// ACCESO POR PROYECTO CON CLAVE (v22)
+// Regla del cliente: entrar al software muestra SOLO los proyectos;
+// cada proyecto requiere su clave de entrada para desbloquearse.
+// - admin / owner / pm  → ven y entran a TODO (gestión)
+// - superintendent / viewer / etc. → solo proyectos desbloqueados:
+//   a) membresía directa (ProjectMember), o
+//   b) clave correcta ingresada una vez → queda guardada aquí
+// ============================================================
+model ProjectAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
+}
