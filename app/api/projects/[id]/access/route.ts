@@ -38,10 +38,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
       return NextResponse.json({ ok: true, already: true });
     }
 
-    // Proyecto sin clave configurada → abierto para miembros de la empresa
+    // Proyecto sin clave configurada → SOLO gestión entra (ya filtrado arriba).
+    // Superintendent/viewer necesitan que el admin ponga una clave o los invite.
     if (!project.accessKey) {
-      await grantProjectAccess(userId, project.id);
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ error: 'This project has no access key configured', needsKey: false, noKey: true }, { status: 403 });
     }
 
     const body = await request.json().catch(() => ({}));

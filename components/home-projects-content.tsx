@@ -53,7 +53,7 @@ export function HomeProjectsContent({ projects, canCreate }: { projects: HomePro
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(t('home.wrongKey'));
+        setError(data?.noKey ? t('home.noKeyConfigured') : t('home.wrongKey'));
         return;
       }
       setUnlocking(null);

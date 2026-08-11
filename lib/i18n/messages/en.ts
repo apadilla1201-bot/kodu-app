@@ -179,6 +179,7 @@ export const enMessages = {
     keyPlaceholder: 'Project access key',
     unlock: 'Unlock',
     wrongKey: 'Wrong key. Check with your project administrator.',
+    noKeyConfigured: 'This project has no access key yet. Ask your administrator to set one.',
   },
   gate: {
     title: 'Select a project',

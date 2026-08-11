@@ -40,8 +40,8 @@ export default async function DashboardPage() {
     client: p.client ?? '',
     location: p.location ?? null,
     hasKey: Boolean(p.accessKey),
-    // Bloqueado para este usuario si el proyecto tiene clave y él no lo ha desbloqueado
-    locked: full ? false : Boolean(p.accessKey) && !(allowedIds ?? []).includes(p.id),
+    // Bloqueado para no-gestión salvo que lo haya desbloqueado (clave o membresía)
+    locked: full ? false : !(allowedIds ?? []).includes(p.id),
   }));
 
   return <HomeProjectsContent projects={serialized} canCreate={canWrite(role)} />;

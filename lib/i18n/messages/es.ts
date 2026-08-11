@@ -181,6 +181,7 @@ export const esMessages: Messages = {
     keyPlaceholder: 'Clave de acceso del proyecto',
     unlock: 'Desbloquear',
     wrongKey: 'Clave incorrecta. Verifica con el administrador del proyecto.',
+    noKeyConfigured: 'Este proyecto aún no tiene clave. Pide al administrador que la configure.',
   },
   gate: {
     title: 'Selecciona un proyecto',

@@ -77,7 +77,7 @@ const NAV_BY_ROLE: Record<string, string[]> = {
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
     '/dashboard/buyout', '/dashboard/pay-apps', '/dashboard/lien-waivers', '/dashboard/sub-invoices', '/dashboard/punch-list', '/dashboard/closeout', '/dashboard/plans', '/dashboard/budgets', '/dashboard/photos',
     '/dashboard/daily-logs', '/dashboard/directory',
-    '/dashboard/settings', '/dashboard/team', '/dashboard/approvals',
+    '/dashboard/settings', '/dashboard/team',
     '/dashboard/help',
   ],
   superintendent: [
