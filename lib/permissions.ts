@@ -76,13 +76,12 @@ const NAV_BY_ROLE: Record<string, string[]> = {
   full: [
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
     '/dashboard/buyout', '/dashboard/pay-apps', '/dashboard/lien-waivers', '/dashboard/sub-invoices', '/dashboard/punch-list', '/dashboard/closeout', '/dashboard/plans', '/dashboard/budgets', '/dashboard/photos',
-    '/dashboard/daily-logs', '/dashboard/directory',
     '/dashboard/settings', '/dashboard/team',
     '/dashboard/help',
   ],
   superintendent: [
     '/dashboard', '/dashboard/projects', '/dashboard/rfis', '/dashboard/submittals',
-    '/dashboard/buyout', '/dashboard/photos', '/dashboard/daily-logs', '/dashboard/directory',
+    '/dashboard/buyout', '/dashboard/photos',
     '/dashboard/settings', '/dashboard/help', '/dashboard/punch-list', '/dashboard/closeout', '/dashboard/plans',
     // SIN /dashboard/pay-apps ni /dashboard/budgets (punch-list SÍ: es su trabajo de campo)
   ],

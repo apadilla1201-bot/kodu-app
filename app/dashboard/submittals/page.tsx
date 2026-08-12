@@ -24,6 +24,9 @@ export default async function SubmittalsPage({ searchParams }: { searchParams: {
     requiredDate: s.requiredDate?.toISOString?.() ?? null,
     submittedDate: s.submittedDate?.toISOString?.() ?? null,
     reviewedDate: s.reviewedDate?.toISOString?.() ?? null,
+    responseDate: s.responseDate?.toISOString?.() ?? null,
+    createdAt: s.createdAt?.toISOString?.() ?? new Date().toISOString(),
+    updatedAt: s.updatedAt?.toISOString?.() ?? new Date().toISOString(),
     projectName: project.projectName,
     projectNumber: project.projectNumber,
   }));

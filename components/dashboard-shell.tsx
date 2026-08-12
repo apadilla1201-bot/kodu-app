@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useI18n } from '@/hooks/use-i18n';
 import { navForRole, ROLE_LABELS } from '@/lib/permissions';
@@ -60,6 +60,7 @@ const BADGE_BY_HREF: Record<string, keyof BadgeMap> = {
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data: session } = useSession() || {};
   // Logo de la compañía: subido por el admin en Settings; null = wordmark
   // koduPM (NUNCA PDG fijo — PDG solo aparece si ES la compañía del usuario).
@@ -105,9 +106,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const userRole = (session?.user as any)?.role ?? 'viewer';
   const allowed = navForRole(userRole);
 
-  // v22: ¿estamos DENTRO de un proyecto? La URL /dashboard/projects/<id>/… lo indica.
+  // v22: ¿estamos DENTRO de un proyecto? Lo indica el path /dashboard/projects/<id>/…
+  // o la query ?projectId=<id> en las páginas de módulo (rfis, submittals, etc.)
   const projectMatch = pathname?.match?.(/^\/dashboard\/projects\/([^/]+)/);
-  const activeProjectId = projectMatch?.[1] && !['new'].includes(projectMatch[1]) ? projectMatch[1] : null;
+  const pathProjectId = projectMatch?.[1] && !['new', 'edit'].includes(projectMatch[1]) ? projectMatch[1] : null;
+  const queryProjectId = searchParams?.get?.('projectId') ?? null;
+  const activeProjectId = pathProjectId ?? queryProjectId;
   const activeProjectName = activeProjectId ? (projectNames[activeProjectId] ?? '') : '';
 
   // Módulos disponibles DENTRO del proyecto (href plano + query del proyecto)
@@ -127,7 +131,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         { href: `/dashboard/closeout${pm}`, label: t('nav.closeout'), icon: ClipboardCheck },
         { href: `/dashboard/plans${pm}`, label: t('nav.plans'), icon: DraftingCompass },
         { href: `/dashboard/photos${pm}`, label: t('nav.sitePhotos'), icon: Camera },
-        { href: `/dashboard/daily-logs${pm}`, label: t('nav.dailyLogs'), icon: NotebookPen },
       ].filter((item) => allowed.includes(item.href.split('?')[0]))
     : [];
 
@@ -145,9 +148,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       label: t('nav.groupProject'),
       items: [
         { href: '/dashboard/projects', label: t('nav.projects'), icon: FolderKanban },
-        { href: '/dashboard/directory', label: t('nav.directory'), icon: Users },
         { href: '/dashboard/plans', label: t('nav.plans'), icon: DraftingCompass },
-        { href: '/dashboard/daily-logs', label: t('nav.dailyLogs'), icon: NotebookPen },
         { href: '/dashboard/photos', label: t('nav.sitePhotos'), icon: Camera },
       ],
     },
