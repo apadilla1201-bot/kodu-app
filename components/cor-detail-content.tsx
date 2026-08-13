@@ -10,7 +10,7 @@ import { uploadFileToStorage, downloadStorageFile } from '@/lib/upload-client';
 import {
   ArrowLeft, Download, FileText, CheckCircle2, Clock, XCircle,
   Loader2, Hash, Calendar, Building2, User, DollarSign,
-  Pencil, Save, X, Plus, Trash2, Upload, File, RefreshCw,
+  Pencil, Save, X, Plus, Trash2, Upload, File, RefreshCw, ExternalLink,
 } from 'lucide-react';
 
 interface CORDetail {
@@ -68,6 +68,8 @@ function fmt(n: number): string {
 
 export function CORDetailContent({ cor }: { cor: CORDetail }) {
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
+  const [generatedPdfName, setGeneratedPdfName] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -355,18 +357,21 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         throw new Error(errData?.error || 'PDF generation failed');
       }
       const blob = await res.blob();
-      // Safari-compatible: convert blob to data URL for reliable download
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const a = document.createElement('a');
-        a.href = reader.result as string;
-        a.download = `COR_${(cor?.corNumber ?? 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => document.body.removeChild(a), 2000);
-      };
-      reader.readAsDataURL(blob);
+      const fileName = `COR_${(cor?.corNumber ?? 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+      const url = URL.createObjectURL(blob);
+      if (generatedPdfUrl) URL.revokeObjectURL(generatedPdfUrl);
+      setGeneratedPdfUrl(url);
+      setGeneratedPdfName(fileName);
+      // Open the PDF in a new tab so the user SEES the result,
+      // and also trigger the download to the Downloads folder.
+      window.open(url, '_blank', 'noopener');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 2000);
       toast.success(t('cor.pdfGenerated'));
     } catch (err: any) {
       console.error('PDF generation error:', err);
@@ -427,14 +432,14 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               {editing ? (
                 <>
                   <div className="flex items-center gap-1"><span className="text-[10px] font-medium text-muted-foreground">Fecha:</span><input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} className={inputClass + ' w-40'} /></div>
-                  <div className="flex items-center gap-1"><span className="text-[10px] font-medium text-muted-foreground">Aprobado:</span><input type="date" value={editApprovalDate} onChange={(e) => setEditApprovalDate(e.target.value)} className={inputClass + ' w-40'} /></div>
-                  <input type="text" value={editSub} onChange={(e) => setEditSub(e.target.value)} placeholder="Subcontratista" className={inputClass + ' w-48'} />
+                  <div className="flex items-center gap-1"><span className="text-[10px] font-medium text-muted-foreground">{t('cor.approvedLabel')}</span><input type="date" value={editApprovalDate} onChange={(e) => setEditApprovalDate(e.target.value)} className={inputClass + ' w-40'} /></div>
+                  <input type="text" value={editSub} onChange={(e) => setEditSub(e.target.value)} placeholder={t('cor.subcontractorPlaceholder')} className={inputClass + ' w-48'} />
                   <input type="text" value={editCsi} onChange={(e) => setEditCsi(e.target.value)} placeholder={t('cor.csiPlaceholder')} className={inputClass + ' w-32'} />
                 </>
               ) : (
                 <>
                   <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {cor?.date ? new Date(cor.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</span>
-                  {cor?.approvalDate && <span className="flex items-center gap-1 text-[#2E7D32]"><CheckCircle2 className="w-3 h-3" /> Aprobado: {new Date(cor.approvalDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>}
+                  {cor?.approvalDate && <span className="flex items-center gap-1 text-[#2E7D32]"><CheckCircle2 className="w-3 h-3" /> {t('cor.approvedLabel')} {new Date(cor.approvalDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>}
                   {cor?.subcontractor && <span className="flex items-center gap-1"><User className="w-3 h-3" /> {cor?.subcontractor}</span>}
                   {cor?.csiCode && <span className="flex items-center gap-1"><Hash className="w-3 h-3" /> {cor.csiCode}</span>}
                 </>
@@ -473,6 +478,24 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               </>
             )}
           </div>
+          {generatedPdfUrl && (
+            <div className="mt-3 flex flex-wrap items-center gap-3 bg-[#2E7D32]/5 border border-[#2E7D32]/25 rounded-lg px-4 py-3">
+              <CheckCircle2 className="w-5 h-5 text-[#2E7D32] flex-shrink-0" />
+              <div className="flex-1 min-w-[180px]">
+                <p className="text-sm font-medium text-[#2E7D32]">{t('cor.pdfReady')}</p>
+                <p className="text-xs text-muted-foreground">{generatedPdfName} — {t('cor.pdfReadyHint')}</p>
+              </div>
+              <a href={generatedPdfUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg bg-[#0F1B33] hover:bg-[#1a2a4a] text-white text-xs font-medium flex items-center gap-1.5 transition-colors">
+                <ExternalLink className="w-3.5 h-3.5" /> {t('cor.openPdf')}
+              </a>
+              <a href={generatedPdfUrl} download={generatedPdfName} className="px-3 py-2 rounded-lg bg-[#C9A96E] hover:bg-[#B8975D] text-white text-xs font-medium flex items-center gap-1.5 transition-colors">
+                <Download className="w-3.5 h-3.5" /> {t('cor.downloadAgain')}
+              </a>
+              <button onClick={() => { if (generatedPdfUrl) URL.revokeObjectURL(generatedPdfUrl); setGeneratedPdfUrl(null); }} className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Dismiss">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -486,8 +509,8 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               <div className="flex items-center gap-3 bg-[#C9A96E]/10 border border-[#C9A96E]/30 rounded-lg px-4 py-3 animate-pulse">
                 <Loader2 className="w-5 h-5 text-[#C9A96E] animate-spin flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-[#C9A96E]">Procesando PDF...</p>
-                  <p className="text-xs text-muted-foreground">Extrayendo datos, line items y montos del nuevo PDF para recalcular el COR</p>
+                  <p className="text-sm font-medium text-[#C9A96E]">{t('cor.processingPdf')}</p>
+                  <p className="text-xs text-muted-foreground">{t('cor.processingPdfHint')}</p>
                 </div>
               </div>
             )}
@@ -509,7 +532,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
                 <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-blue-700">PDF actual adjunto</p>
+                  <p className="text-sm font-medium text-blue-700">{t('cor.currentPdfAttached')}</p>
                   <p className="text-xs text-muted-foreground">{t('cor.pdfAutoDeleteNote')}</p>
                 </div>
                 <button onClick={removePdf} className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors flex items-center gap-1">
@@ -534,7 +557,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
               <div className="flex items-center gap-3 bg-[#C9A96E]/5 border border-[#C9A96E]/20 rounded-lg px-4 py-3">
                 <Upload className="w-5 h-5 text-[#C9A96E] flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#C9A96E]">Nuevo PDF: {newPdfFile.name}</p>
+                  <p className="text-sm font-medium text-[#C9A96E]">{t('cor.newPdfLabel')} {newPdfFile.name}</p>
                   <p className="text-xs text-muted-foreground">{(newPdfFile.size / 1024 / 1024).toFixed(1)} MB {pdfExtracted ? t('cor.dataExtractedNote') : ''}</p>
                 </div>
                 <button onClick={() => { setNewPdfFile(null); setPdfExtracted(false); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
@@ -562,10 +585,10 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 bg-[#2E7D32]/5 border border-[#2E7D32]/20 rounded-lg px-4 py-3 flex-1">
                 <FileText className="w-5 h-5 text-[#2E7D32]" />
-                <span className="text-sm font-medium text-[#2E7D32]">PDF del subcontratista adjunto</span>
+                <span className="text-sm font-medium text-[#2E7D32]">{t('cor.subPdfAttached')}</span>
               </div>
               <button onClick={handleViewSubPdf} className="px-4 py-2.5 rounded-lg bg-[#0F1B33] hover:bg-[#1a2a4a] text-white text-sm font-medium flex items-center gap-2 transition-colors">
-                <Download className="w-4 h-4" /> Descargar
+                <Download className="w-4 h-4" /> {t('cor.download')}
               </button>
             </div>
           ) : (
@@ -579,11 +602,11 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold flex items-center gap-2">
             <FileText className="w-4 h-4 text-[#C9A96E]" /> Line Items
-            {editing && pdfExtracted && <span className="text-xs bg-[#2E7D32]/10 text-[#2E7D32] px-2 py-0.5 rounded-full">Actualizados del nuevo PDF</span>}
+            {editing && pdfExtracted && <span className="text-xs bg-[#2E7D32]/10 text-[#2E7D32] px-2 py-0.5 rounded-full">{t('cor.updatedFromNewPdf')}</span>}
           </h2>
           {editing && (
             <button onClick={addLineItem} className="text-xs text-[#C9A96E] hover:underline flex items-center gap-1 font-medium">
-              <Plus className="w-3.5 h-3.5" /> Agregar Line Item
+              <Plus className="w-3.5 h-3.5" /> {t('cor.addLineItem')}
             </button>
           )}
         </div>
@@ -653,7 +676,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-[#0F1B33] text-white rounded-lg p-6">
         <h2 className="text-sm font-semibold mb-4 text-[#C9A96E] flex items-center gap-2">
           <DollarSign className="w-4 h-4" /> Cost Summary
-          {editing && pdfExtracted && <span className="text-xs bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">Recalculado del nuevo PDF</span>}
+          {editing && pdfExtracted && <span className="text-xs bg-[#2E7D32] text-white px-2 py-0.5 rounded-full">{t('cor.recalculatedFromNewPdf')}</span>}
           {editing && !pdfExtracted && <span className="text-xs text-white/60">{editLineItems.length > 0 ? t('cor.autoCalculated') : t('cor.directEdit')}</span>}
         </h2>
         <div className="space-y-2 max-w-md">
@@ -786,7 +809,7 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
             Editando COR {cor?.corNumber} — <span className="font-semibold text-[#C9A96E]">{fmt(editTotal)}</span>
             {newPdfFile && <span className="ml-2 text-[#2E7D32]">📄 {newPdfFile.name}</span>}
             {pdfExtracted && <span className="ml-1 text-[#2E7D32] text-xs">{t('cor.dataExtractedShort')}</span>}
-            {pdfRemoved && !newPdfFile && <span className="ml-2 text-red-400">👷 PDF eliminado</span>}
+            {pdfRemoved && !newPdfFile && <span className="ml-2 text-red-400">{t('cor.pdfRemovedShort')}</span>}
           </p>
           <div className="flex gap-2">
             <button onClick={cancelEdit} className="px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted text-sm font-medium">{t('common.cancel')}</button>

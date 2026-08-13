@@ -485,8 +485,8 @@ ${corRequestHtml}
         return NextResponse.json(
           {
             error:
-              'No se pudo anexar el PDF del subcontratista. ' +
-              'Vuelve a subir la cotización del sub en el COR y guarda antes de generar el PDF.',
+              'Could not attach the subcontractor PDF. ' +
+              'Re-upload the subcontractor quote in the COR and save before generating the PDF.',
             details: mergeErr?.message ?? 'download failed',
           },
           { status: 500 }
