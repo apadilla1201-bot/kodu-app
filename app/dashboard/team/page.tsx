@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { canInvite, isFullAccess, ROLE_LABELS } from '@/lib/permissions';
+import { useI18n } from '@/hooks/use-i18n';
 
 type Project = { id: string; projectName: string; projectNumber: string };
 type TeamUser = { id: string; name: string | null; email: string; role: string; createdAt: string };
@@ -12,8 +13,10 @@ type Invite = { id: string; email: string; name: string | null; role: string; cr
 const INVITABLE_ROLES = ['admin', 'pm', 'superintendent', 'owner', 'subcontractor', 'viewer'];
 
 export default function TeamPage() {
-  const { data: session } = useSession() || {};
-  const userRole = (session?.user as any)?.role ?? 'viewer';
+  const { data: session, status: sessionStatus } = useSession() || {};
+  const { t } = useI18n();
+  const sessionRole = (session?.user as any)?.role ?? '';
+  const userRole = sessionRole || 'viewer';
   const allowedToInvite = canInvite(userRole);
 
   const [users, setUsers] = useState<TeamUser[]>([]);
@@ -49,7 +52,9 @@ export default function TeamPage() {
   }, []);
 
   const needsProject = form.role === 'owner' || form.role === 'subcontractor';
-  const canChangeRoles = isFullAccess(userRole);
+  const sessionReady = sessionStatus !== 'loading';
+  const canChangeRoles = sessionReady && isFullAccess(userRole);
+  const roleMissing = sessionReady && !sessionRole;
   const myId = (session?.user as any)?.id ?? '';
 
   const changeRole = async (userId: string, newRole: string) => {
@@ -62,8 +67,8 @@ export default function TeamPage() {
         body: JSON.stringify({ userId, role: newRole }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Error al cambiar el rol');
-      setMessage({ ok: true, text: 'Rol actualizado.' });
+      if (!res.ok) throw new Error(data?.error || t('team.roleUpdateError'));
+      setMessage({ ok: true, text: t('team.roleUpdated') });
       load();
     } catch (err: any) {
       setMessage({ ok: false, text: err?.message ?? 'Error' });
@@ -75,7 +80,7 @@ export default function TeamPage() {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (needsProject && !form.projectId) {
-      setMessage({ ok: false, text: 'Owner y Subcontractor requieren un proyecto asignado.' });
+      setMessage({ ok: false, text: t('team.requiresProject') });
       return;
     }
     setSending(true);
@@ -92,12 +97,12 @@ export default function TeamPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || 'Error al invitar');
+      if (!res.ok) throw new Error(data?.error || t('team.inviteError'));
       setMessage({
         ok: true,
         text: data?.invited
-          ? `Invitación enviada a ${form.email} — recibirá un correo para crear su clave.`
-          : `${form.email} añadido al equipo (ya tenía cuenta).`,
+          ? t('team.inviteSent').replace('{email}', form.email)
+          : t('team.memberAdded').replace('{email}', form.email),
       });
       setForm({ email: '', name: '', role: 'subcontractor', projectId: '' });
       load();
@@ -109,26 +114,25 @@ export default function TeamPage() {
   };
 
   if (loading) {
-    return <div className="p-8 text-muted-foreground">Loading team…</div>;
+    return <div className="p-8 text-muted-foreground">{t('team.loading')}</div>;
   }
 
   return (
     <div className="max-w-4xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">Team</h1>
+        <h1 className="text-2xl font-bold">{t('team.title')}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Invita a los integrantes del proyecto con su rol. Cada quien recibe un correo para crear su clave
-          y entra con los permisos de su rol — como en Procore.
+          {t('team.subtitle')}
         </p>
       </div>
 
       {/* Formulario de invitación */}
       <div className="border rounded-xl p-5 bg-card">
-        <h2 className="font-semibold mb-3">Invitar a un integrante</h2>
+        <h2 className="font-semibold mb-3">{t('team.inviteTitle')}</h2>
         {allowedToInvite ? (
           <form onSubmit={handleInvite} className="grid sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium">Correo *</label>
+              <label className="text-sm font-medium">{t('team.email')}</label>
               <input
                 type="email"
                 value={form.email}
@@ -138,7 +142,7 @@ export default function TeamPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Nombre</label>
+              <label className="text-sm font-medium">{t('team.name')}</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -146,7 +150,7 @@ export default function TeamPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Rol *</label>
+              <label className="text-sm font-medium">{t('team.role')}</label>
               <select
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
@@ -157,15 +161,15 @@ export default function TeamPage() {
                 ))}
               </select>
               <p className="text-xs text-muted-foreground mt-1">
-                {form.role === 'superintendent' && 'Todo menos Pay Applications y Budgets.'}
-                {form.role === 'owner' && 'Solo su proyecto, solo lectura (RFI, COR, fotos).'}
-                {form.role === 'subcontractor' && 'Solo lo asignado a él.'}
-                {(form.role === 'admin' || form.role === 'pm') && 'Acceso total.'}
+                {form.role === 'superintendent' && t('team.hintSuperintendent')}
+                {form.role === 'owner' && t('team.hintOwner')}
+                {form.role === 'subcontractor' && t('team.hintSubcontractor')}
+                {(form.role === 'admin' || form.role === 'pm') && t('team.hintFull')}
               </p>
             </div>
             <div>
               <label className="text-sm font-medium">
-                Proyecto {needsProject ? '*' : '(opcional)'}
+                {t('team.project')} {needsProject ? '*' : t('team.optional')}
               </label>
               <select
                 value={form.projectId}
@@ -173,7 +177,7 @@ export default function TeamPage() {
                 className="w-full mt-1 px-3 py-2 border rounded-lg bg-background"
                 required={needsProject}
               >
-                <option value="">— Selecciona —</option>
+                <option value="">{t('team.selectPlaceholder')}</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.projectNumber} · {p.projectName}</option>
                 ))}
@@ -190,13 +194,13 @@ export default function TeamPage() {
                 disabled={sending}
                 className="px-5 py-2.5 bg-[#0F1B33] text-[#C9A96E] rounded-lg font-semibold disabled:opacity-50"
               >
-                {sending ? 'Enviando…' : 'Enviar invitación'}
+                {sending ? t('team.sending') : t('team.sendInvite')}
               </button>
             </div>
           </form>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Solo el <strong>Administrador</strong> o el <strong>PM</strong> pueden invitar miembros.
+            {t('team.onlyAdminPm')}
           </p>
         )}
       </div>
@@ -204,7 +208,7 @@ export default function TeamPage() {
       {/* Invitaciones pendientes */}
       {invites.length > 0 && (
         <div className="border rounded-xl p-5 bg-card">
-          <h2 className="font-semibold mb-3">Invitaciones pendientes ({invites.length})</h2>
+          <h2 className="font-semibold mb-3">{t('team.pendingInvites')} ({invites.length})</h2>
           <div className="space-y-2">
             {invites.map((inv) => (
               <div key={inv.id} className="flex items-center gap-3 text-sm border border-amber-200 bg-amber-50 rounded-lg px-4 py-2.5">
@@ -219,7 +223,12 @@ export default function TeamPage() {
 
       {/* Miembros */}
       <div className="border rounded-xl p-5 bg-card">
-        <h2 className="font-semibold mb-3">Miembros del equipo ({users.length})</h2>
+        <h2 className="font-semibold mb-3">{t('team.members')} ({users.length})</h2>
+        {roleMissing && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+            {t('team.sessionRoleMissing')}
+          </p>
+        )}
         <div className="divide-y">
           {users.map((u) => (
             <div key={u.id} className="flex items-center gap-3 py-3">
@@ -254,13 +263,13 @@ export default function TeamPage() {
       {/* Membresías por proyecto */}
       {members.length > 0 && (
         <div className="border rounded-xl p-5 bg-card">
-          <h2 className="font-semibold mb-3">Accesos por proyecto</h2>
+          <h2 className="font-semibold mb-3">{t('team.projectAccess')}</h2>
           <div className="space-y-2 text-sm">
             {members.map((m) => (
               <div key={m.id} className="flex items-center gap-3 border rounded-lg px-4 py-2.5">
                 <span className="flex-1">{m.user.name ?? m.user.email}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full border">{ROLE_LABELS[m.role] ?? m.role}</span>
-                <span className="text-xs text-muted-foreground">{m.project ? m.project.projectName : 'Toda la empresa'}</span>
+                <span className="text-xs text-muted-foreground">{m.project ? m.project.projectName : t('team.wholeCompany')}</span>
               </div>
             ))}
           </div>

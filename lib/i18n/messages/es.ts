@@ -127,6 +127,10 @@ export const esMessages: Messages = {
     hintFull: 'Acceso total.',
     manageFromSettings: 'Gestionar equipo y roles',
     manageFromSettingsHint: 'Invita miembros, asigna roles y acceso por proyecto.',
+    roleUpdated: 'Rol actualizado.',
+    roleUpdateError: 'No se pudo cambiar el rol',
+    inviteError: 'No se pudo enviar la invitación',
+    sessionRoleMissing: 'Tu sesión no muestra un rol, por eso el cambio de roles está deshabilitado. Cierra sesión y vuelve a entrar para refrescar tus permisos.',
   },
   search: {
     trigger: 'Buscar…',

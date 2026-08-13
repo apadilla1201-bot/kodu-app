@@ -125,6 +125,10 @@ export const enMessages = {
     hintFull: 'Full access.',
     manageFromSettings: 'Manage team & roles',
     manageFromSettingsHint: 'Invite members, assign roles and project access.',
+    roleUpdated: 'Role updated.',
+    roleUpdateError: 'Could not change the role',
+    inviteError: 'Could not send the invitation',
+    sessionRoleMissing: 'Your session does not show a role, so role editing is disabled. Sign out and sign back in to refresh your permissions.',
   },
   search: {
     trigger: 'Search…',
