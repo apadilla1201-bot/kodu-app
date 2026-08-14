@@ -131,6 +131,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         { href: `/dashboard/closeout${pm}`, label: t('nav.closeout'), icon: ClipboardCheck },
         { href: `/dashboard/plans${pm}`, label: t('nav.plans'), icon: DraftingCompass },
         { href: `/dashboard/photos${pm}`, label: t('nav.sitePhotos'), icon: Camera },
+        { href: `/dashboard/daily-logs${pm}`, label: t('nav.dailyLogs'), icon: NotebookPen },
       ].filter((item) => allowed.includes(item.href.split('?')[0]))
     : [];
 
