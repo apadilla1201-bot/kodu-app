@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useI18n } from '@/hooks/use-i18n';
-import { Search, Plus, FileStack, ChevronRight } from 'lucide-react';
+import { Search, Plus, FileStack, ChevronRight, Printer } from 'lucide-react';
 
 interface SubmittalItem {
   id: string;
@@ -100,13 +100,30 @@ export function SubmittalListContent({
             {t('submittals.subtitle')}
           </p>
         </div>
-        <Link
-          href="/dashboard/submittals/new"
-          className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8944F] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors shadow-md"
-        >
-          <Plus className="w-4 h-4" />
-          {t('submittals.newSubmittal')}
-        </Link>
+        <div className="flex items-center gap-2">
+          {(() => {
+            const pid = projects.find((p) => p.projectNumber === projectFilter)?.id ?? '';
+            return (
+              <a
+                href={pid ? `/api/submittals/pdf?projectId=${pid}` : '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Print Submittal Log (PDF)"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted ${!pid ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <Printer className="w-4 h-4" />
+                Print Log
+              </a>
+            );
+          })()}
+          <Link
+            href="/dashboard/submittals/new"
+            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8944F] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            {t('submittals.newSubmittal')}
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

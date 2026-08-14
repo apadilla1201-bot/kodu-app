@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Search, FileText, Plus, CheckCircle2, Clock, XCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, FileText, Plus, CheckCircle2, Clock, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Printer } from 'lucide-react';
 
 interface COR {
   id: string;
@@ -85,6 +85,16 @@ export function AllCorsContent({ projects, initialProjectId }: { projects: Proje
           <h1 className="text-2xl font-display font-bold tracking-tight">All Change Orders</h1>
           <p className="text-sm text-muted-foreground mt-1">View and manage CORs across all projects</p>
         </div>
+        <a
+          href={projectFilter !== 'All' ? `/api/cors/pdf?projectId=${projectFilter}` : '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Print Change Order Log (PDF)"
+          className={`inline-flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted ${projectFilter === 'All' ? 'opacity-50 pointer-events-none' : ''}`}
+        >
+          <Printer className="w-4 h-4" />
+          Print Log
+        </a>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">

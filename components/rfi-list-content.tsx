@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Search, Plus, FileQuestion, Clock, CheckCircle2, AlertTriangle,
-  MessageSquare, Filter, ChevronRight,
+  MessageSquare, Filter, ChevronRight, Printer,
 } from 'lucide-react';
 
 interface RFIItem {
@@ -131,13 +131,30 @@ export function RFIListContent({ rfis, projects, initialProjectNumber }: { rfis:
           <h1 className="text-2xl font-bold text-foreground">Requests for Information</h1>
           <p className="text-muted-foreground mt-1">Track and manage all project RFIs</p>
         </div>
-        <Link
-          href="/dashboard/rfis/new"
-          className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8944F] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors shadow-md"
-        >
-          <Plus className="w-4 h-4" />
-          New RFI
-        </Link>
+        <div className="flex items-center gap-2">
+          {(() => {
+            const pid = projects.find((p) => p.projectNumber === projectFilter)?.id ?? '';
+            return (
+              <a
+                href={pid ? `/api/rfis/pdf?projectId=${pid}` : '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Print RFI Log (PDF)"
+                className={`inline-flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium hover:bg-muted ${!pid ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                <Printer className="w-4 h-4" />
+                Print Log
+              </a>
+            );
+          })()}
+          <Link
+            href="/dashboard/rfis/new"
+            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8944F] text-white px-5 py-2.5 rounded-lg font-semibold transition-colors shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            New RFI
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
