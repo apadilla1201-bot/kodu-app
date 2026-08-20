@@ -10,7 +10,7 @@ import {
   ArrowLeft, Plus, Search, FileText, CheckCircle2, Clock, XCircle,
   DollarSign, Download, Building2, MapPin, Hash,
   FileQuestion, Receipt, LayoutDashboard, AlertTriangle, MessageSquare,
-  Calendar, ChevronRight, Wallet, CalendarDays, BarChart3, Upload, ArrowUpDown, Trash2, Loader2, FileBarChart, FileStack,
+  Calendar, ChevronRight, Wallet, CalendarDays, BarChart3, Upload, ArrowUpDown, Trash2, Loader2, FileBarChart, FileStack, Printer,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -646,6 +646,14 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
             <button onClick={handleExportExcel} className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted flex items-center gap-1.5">
               <Download className="w-4 h-4" /> Export
             </button>
+            <a
+              href={`/api/cors/pdf?projectId=${project.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted"
+            >
+              <Printer className="w-4 h-4" /> Print Log
+            </a>
             <Link href={`/dashboard/cors/new?projectId=${project.id}`}
               className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
               <Plus className="w-4 h-4" /> New COR
