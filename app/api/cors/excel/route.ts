@@ -6,12 +6,13 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { getSessionLocale } from '@/lib/i18n/server';
+import * as XLSX from 'xlsx';
 
 const dayDiff = (from: Date, to: Date): number =>
   Math.floor((to.getTime() - from.getTime()) / 86400000);
 
-const fmtMoney = (v: number | null | undefined): string =>
-  (v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtMoney = (v: number | null | undefined): number =>
+  v ?? 0;
 
 const fmtDateShort = (d: Date | string | null | undefined): string => {
   if (!d) return '';
@@ -54,86 +55,63 @@ export async function GET(request: Request) {
     const approvedItems = items.filter((i: any) => APPROVED.includes(i.status));
     const rejectedItems = items.filter((i: any) => i.status === 'Rejected');
 
-    const ExcelJS = await import('exceljs');
-    const workbook = new ExcelJS.Workbook();
-
-    // Helper to create a sheet
-    const createSheet = (name: string, data: any[], subtitle: string) => {
-      const sheet = workbook.addWorksheet(name);
-      // Title
-      sheet.mergeCells('A1:I1');
-      sheet.getCell('A1').value = `CHANGE ORDER LOG — ${subtitle}`;
-      sheet.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF0F1B33' } };
-      sheet.getCell('A1').alignment = { horizontal: 'center' };
-
-      // Project info
-      sheet.mergeCells('A2:I2');
-      sheet.getCell('A2').value = `${project.projectNumber ?? ''} — ${project.projectName ?? ''}${project.client ? ` · ${project.client}` : ''}`;
-      sheet.getCell('A2').font = { size: 10, color: { argb: 'FF666666' } };
-      sheet.getCell('A2').alignment = { horizontal: 'center' };
-
-      // Headers
-      const headers = ['COR #', 'DATE', 'DESCRIPTION', 'SUBCONTRACTOR', 'AMOUNT', 'STATUS', 'APPROVED', 'DAYS PENDING', 'DECIDED BY'];
-      sheet.addRow(headers);
-      const headerRow = sheet.getRow(4);
-      headerRow.eachCell((cell: any) => {
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F1B33' } };
-        cell.alignment = { horizontal: 'center' };
-      });
-
-      // Data rows
+    // Helper to build sheet data
+    const buildSheet = (data: any[], title: string) => {
+      const rows: any[] = [
+        [`CHANGE ORDER LOG — ${title}`],
+        [`${project.projectNumber ?? ''} — ${project.projectName ?? ''}${project.client ? ` · ${project.client}` : ''}`],
+        [],
+        ['COR #', 'DATE', 'DESCRIPTION', 'SUBCONTRACTOR', 'AMOUNT', 'STATUS', 'APPROVED', 'DAYS PENDING', 'DECIDED BY'],
+      ];
       data.forEach((i: any) => {
         const days = i.approvalDate
           ? dayDiff(new Date(i.date), new Date(i.approvalDate))
           : dayDiff(new Date(i.date), now);
-        sheet.addRow([
+        rows.push([
           i.corNumber || '',
           fmtDateShort(i.date),
           i.description || '',
           i.subcontractor || '',
-          i.totalAmount || 0,
+          fmtMoney(i.totalAmount),
           i.status || '',
           fmtDateShort(i.approvalDate),
           days >= 0 ? days : '',
           i.decidedBy || '',
         ]);
       });
-
+      const ws = XLSX.utils.aoa_to_sheet(rows);
       // Column widths
-      sheet.columns = [
-        { width: 12 }, { width: 12 }, { width: 50 }, { width: 20 },
-        { width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 18 },
+      ws['!cols'] = [
+        { wch: 12 }, { wch: 12 }, { wch: 60 }, { wch: 24 },
+        { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 18 },
       ];
-
-      // Format amount column as currency
-      sheet.getColumn(5).numFmt = '$#,##0.00';
+      return ws;
     };
 
-    // Create sheets
-    createSheet('Resumen', items, 'RESUMEN');
-    createSheet('Pending', pendingItems, 'PENDING');
-    createSheet('Approved', approvedItems, 'APPROVED');
-    createSheet('Rejected', rejectedItems, 'REJECTED');
-    createSheet('Todos', items, 'TODOS');
+    const wb = XLSX.utils.book_new();
 
-    // Fill Resumen sheet with summary data
-    const resumen = workbook.getWorksheet('Resumen');
-    resumen.getRow(6).values = ['STATUS', '# CORs', 'AMOUNT', '% OF TOTAL'];
-    resumen.getRow(6).eachCell((cell: any) => {
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F1B33' } };
-    });
-    const totalAll = totalsAll.all;
-    resumen.getRow(7).values = ['Pending', pendingItems.length, totalsAll.pending, totalAll > 0 ? (totalsAll.pending / totalAll) : 0];
-    resumen.getRow(8).values = ['Approved', approvedItems.length, totalsAll.approved, totalAll > 0 ? (totalsAll.approved / totalAll) : 0];
-    resumen.getRow(9).values = ['Rejected', rejectedItems.length, totalsAll.all - totalsAll.pending - totalsAll.approved, totalAll > 0 ? ((totalsAll.all - totalsAll.pending - totalsAll.approved) / totalAll) : 0];
-    resumen.getRow(10).values = ['TOTAL', items.length, totalAll, 1];
-    resumen.getRow(10).eachCell((cell: any) => { cell.font = { bold: true }; });
-    resumen.getColumn(3).numFmt = '$#,##0.00';
-    resumen.getColumn(4).numFmt = '0.0%';
+    // Sheet: Resumen
+    const resumenRows = [
+      ['CHANGE ORDER LOG — RESUMEN'],
+      [`${project.projectNumber ?? ''} — ${project.projectName ?? ''}`],
+      [],
+      ['STATUS', '# CORs', 'AMOUNT', '% OF TOTAL'],
+      ['Pending', pendingItems.length, totalsAll.pending, totalsAll.all > 0 ? totalsAll.pending / totalsAll.all : 0],
+      ['Approved', approvedItems.length, totalsAll.approved, totalsAll.all > 0 ? totalsAll.approved / totalsAll.all : 0],
+      ['Rejected', rejectedItems.length, totalsAll.all - totalsAll.pending - totalsAll.approved, totalsAll.all > 0 ? (totalsAll.all - totalsAll.pending - totalsAll.approved) / totalsAll.all : 0],
+      ['TOTAL', items.length, totalsAll.all, 1],
+    ];
+    const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
+    wsResumen['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
 
-    const buffer = await workbook.xlsx.writeBuffer();
+    // Other sheets
+    XLSX.utils.book_append_sheet(wb, buildSheet(pendingItems, 'PENDING'), 'Pending');
+    XLSX.utils.book_append_sheet(wb, buildSheet(approvedItems, 'APPROVED'), 'Approved');
+    XLSX.utils.book_append_sheet(wb, buildSheet(rejectedItems, 'REJECTED'), 'Rejected');
+    XLSX.utils.book_append_sheet(wb, buildSheet(items, 'TODOS'), 'Todos');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
     const fname = `Change_Order_Log_${project.projectNumber ?? 'project'}_by_Status.xlsx`.replace(/[^a-zA-Z0-9_.-]/g, '_');
     return new NextResponse(new Uint8Array(buffer as ArrayBuffer), {
