@@ -654,6 +654,38 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
             >
               <Printer className="w-4 h-4" /> Print Log
             </a>
+            <a
+              href={`/api/cors/pdf?projectId=${project.id}&status=Approved`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted text-green-700"
+            >
+              <Printer className="w-4 h-4" /> Approved
+            </a>
+            <a
+              href={`/api/cors/pdf?projectId=${project.id}&status=Pending`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted text-amber-700"
+            >
+              <Printer className="w-4 h-4" /> Pending
+            </a>
+            <a
+              href={`/api/cors/pdf?projectId=${project.id}&status=Rejected`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted text-red-700"
+            >
+              <Printer className="w-4 h-4" /> Rejected
+            </a>
+            <a
+              href={`/api/cors/excel?projectId=${project.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-muted text-[#0F1B33]"
+            >
+              <FileBarChart className="w-4 h-4" /> Excel
+            </a>
             <Link href={`/dashboard/cors/new?projectId=${project.id}`}
               className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
               <Plus className="w-4 h-4" /> New COR
