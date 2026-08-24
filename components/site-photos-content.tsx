@@ -104,12 +104,14 @@ export function SitePhotosContent({
   }, [selected]);
 
   const uploadFiles = async (files: FileList | File[]) => {
+    console.log('[UPLOAD] start', { projectId, fileCount: Array.from(files).length });
     if (!projectId) {
       toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
       return;
     }
     const area = pendingArea.trim();
     const caption = pendingCaption.trim();
+    console.log('[UPLOAD] validation', { area, caption, hasId: !!(area || caption) });
     if (!area && !caption) {
       toast({
         title: t('sitePhotos.missingId'),
@@ -128,6 +130,7 @@ export function SitePhotosContent({
     try {
       for (let i = 0; i < list.length; i++) {
         const raw = list[i];
+        console.log('[UPLOAD] file', i, { name: raw.name, type: raw.type, size: raw.size });
         if (!isImageFile(raw)) {
           skipped++;
           continue;
@@ -140,8 +143,9 @@ export function SitePhotosContent({
         let file: File;
         try {
           file = await prepareImageForUpload(raw);
+          console.log('[UPLOAD] prepared', file.name, file.size);
         } catch (prepErr: any) {
-          console.warn('prepareImageForUpload failed, uploading raw:', prepErr);
+          console.warn('[UPLOAD] prepare failed, using raw:', prepErr);
           file = raw;
         }
         setUploadStatus(
@@ -149,27 +153,33 @@ export function SitePhotosContent({
             ? `Subiendo foto ${i + 1} de ${list.length}…`
             : 'Subiendo foto…',
         );
-        await uploadSitePhoto(projectId, file, {
+        console.log('[UPLOAD] calling API…');
+        const result = await uploadSitePhoto(projectId, file, {
           caption: caption || null,
           area: area || null,
           trade: pendingTrade.trim() || null,
           tag: pendingTag,
         });
+        console.log('[UPLOAD] API result', result);
         ok++;
       }
+      console.log('[UPLOAD] loop done', { ok, skipped });
       if (ok > 0) {
         setUploadStatus(null);
         toast({ title: ok === 1 ? t('sitePhotos.photoUploaded') : t('sitePhotos.photosUploaded', { count: ok }) });
         setPendingCaption('');
         setPendingArea('');
         setPendingTrade('');
+        console.log('[UPLOAD] refreshing list…');
         await load();
+        console.log('[UPLOAD] refresh done');
       } else if (skipped > 0) {
         const msg = t('sitePhotos.invalidFormat');
         setUploadError(msg);
         toast({ title: t('sitePhotos.unsupportedFormat'), description: msg, variant: 'destructive' });
       }
     } catch (e: any) {
+      console.error('[UPLOAD] ERROR:', e);
       const msg = e?.message ?? t('sitePhotos.uploadError');
       setUploadError(msg);
       setUploadStatus(null);
