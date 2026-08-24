@@ -110,7 +110,24 @@ export function SitePhotosContent({
     }
   }, [selected]);
 
-  const uploadFiles = async (files: FileList | File[]) => {
+  const uploadFiles = async (files: FileList | File[]): Promise<boolean> => {
+    addDebug(`[UPLOAD] start projectId=${projectId} fileCount=${Array.from(files).length}`);
+    if (!projectId) {
+      toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
+      return false;
+    }
+    const area = pendingArea.trim();
+    const caption = pendingCaption.trim();
+    addDebug(`[UPLOAD] validation area="${area}" caption="${caption}" hasId=${!!(area || caption)}`);
+    if (!area && !caption) {
+      toast({
+        title: t('sitePhotos.missingId'),
+        description: t('sitePhotos.missingIdDesc'),
+        variant: 'destructive',
+      });
+      addDebug('[UPLOAD] ABORTED: falta ubicación o descripción');
+      return false;
+    }
     addDebug(`[UPLOAD] start projectId=${projectId} fileCount=${Array.from(files).length}`);
     if (!projectId) {
       toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
@@ -128,6 +145,10 @@ export function SitePhotosContent({
       return;
     }
     const list = Array.from(files);
+    if (!list.length) {
+      addDebug('[UPLOAD] abort: no files');
+      return false;
+    }
     if (!list.length) {
       addDebug('[UPLOAD] abort: no files');
       return;
@@ -189,6 +210,22 @@ export function SitePhotosContent({
         addDebug('[UPLOAD] refreshing list…');
         await load();
         addDebug('[UPLOAD] refresh done');
+        return true;
+      } else if (skipped > 0) {
+        const msg = t('sitePhotos.invalidFormat');
+        setUploadError(msg);
+        toast({ title: t('sitePhotos.unsupportedFormat'), description: msg, variant: 'destructive' });
+        return false;
+      }
+      return false;
+    } catch (e: any) {
+      addDebug(`[UPLOAD] ERROR: ${e?.message || e}`);
+      const msg = e?.message ?? t('sitePhotos.uploadError');
+      setUploadError(msg);
+      setUploadStatus(null);
+      toast({ title: msg, variant: 'destructive' });
+      return false;
+    } finally {
       } else if (skipped > 0) {
         const msg = t('sitePhotos.invalidFormat');
         setUploadError(msg);
@@ -228,6 +265,10 @@ export function SitePhotosContent({
   };
 
   const executeUpload = async () => {
+    if (!pendingFiles.length) return;
+    const success = await uploadFiles(pendingFiles);
+    if (success) clearPending();
+  };
     if (!pendingFiles.length) return;
     await uploadFiles(pendingFiles);
     clearPending();
