@@ -68,15 +68,6 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
   onChanged: () => void;
 }) {
   const { t } = useI18n();
-  projectId: string;
-  initialAreas: string[];
-  trades: string[];
-  contacts: ProjectContact[];
-  locale: string;
-  labels: WalkLabels;
-  onClose: () => void;
-  onChanged: () => void;
-}) {
   const [areaQueue, setAreaQueue] = useState<string[]>(initialAreas.length > 0 ? initialAreas : []);
   const [areaIdx, setAreaIdx] = useState(0);
   const [area, setArea] = useState(initialAreas[0] ?? '');
