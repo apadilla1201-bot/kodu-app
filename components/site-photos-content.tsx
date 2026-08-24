@@ -71,6 +71,8 @@ export function SitePhotosContent({
   const [pendingCaption, setPendingCaption] = useState('');
   const [pendingArea, setPendingArea] = useState('');
   const [pendingTrade, setPendingTrade] = useState('');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
 
   const selectedProject = projects.find((p) => p.id === projectId);
 
@@ -182,14 +184,33 @@ export function SitePhotosContent({
   const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
-    void uploadFiles(files);
+    const list = Array.from(files).filter(isImageFile);
+    if (!list.length) {
+      toast({ title: 'No se encontraron imágenes válidas', variant: 'destructive' });
+      return;
+    }
+    setPendingFiles(list);
+    const previews = list.map((f) => URL.createObjectURL(f));
+    setPendingPreviews(previews);
+    if (e.target) e.target.value = '';
+  };
+
+  const clearPending = () => {
+    pendingPreviews.forEach((url) => URL.revokeObjectURL(url));
+    setPendingFiles([]);
+    setPendingPreviews([]);
+  };
+
+  const executeUpload = async () => {
+    if (!pendingFiles.length) return;
+    await uploadFiles(pendingFiles);
+    clearPending();
   };
 
   const openFilePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
     const input = ref.current;
     if (!input) return;
     input.value = '';
-    // iOS Safari requires the input to be in the DOM (not display:none) for programmatic click to work.
     input.click();
   };
 
@@ -396,6 +417,51 @@ export function SitePhotosContent({
             <Upload className="w-4 h-4" /> Galería
           </button>
         </div>
+
+        {/* Preview of selected files — shows BEFORE upload so user can confirm */}
+        {pendingFiles.length > 0 && (
+          <div className="space-y-3 border-t pt-3">
+            <p className="text-sm font-medium text-muted-foreground">
+              {pendingFiles.length} foto{pendingFiles.length > 1 ? 's' : ''} seleccionada{pendingFiles.length > 1 ? 's' : ''}:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {pendingPreviews.map((url, i) => (
+                <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[9px] text-center py-0.5 truncate px-1">
+                    {pendingFiles[i]?.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={executeUpload}
+                className="flex-1 bg-[#C9A96E] hover:bg-[#B8944F] text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                {uploading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Subiendo…
+                  </span>
+                ) : (
+                  `Subir ${pendingFiles.length} foto${pendingFiles.length > 1 ? 's' : ''}`
+                )}
+              </button>
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={clearPending}
+                className="px-4 py-2 border rounded-lg text-sm hover:bg-muted disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
         {uploadStatus && (
           <p className="flex items-center gap-2 text-sm text-[#C9A96E] font-medium">
             <Loader2 className="w-4 h-4 animate-spin shrink-0" />
