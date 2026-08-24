@@ -511,7 +511,6 @@ export const enMessages = {
     compareError: 'Comparison failed',
     cpmImportSuccess: 'CPM imported successfully',
     revisionNameRequired: 'Enter revision name',
-    revisionNameRequired: 'Enter revision name',
     revisionCreated: 'Revision {name} created',
     uploadHint: 'Upload your interactive Excel with CPM and Look-Ahead sheets. Previous versions are kept automatically.',
     cloneHint: 'Or create a new revision by cloning the active one ({revision}):',
