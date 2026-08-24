@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Check, ChevronRight, Camera, X, Loader2, Flag } from 'lucide-react';
+import { useI18n } from '@/hooks/use-i18n';
 
 type ProjectContact = { name: string; email: string; company: string | null; role: string };
 
@@ -57,6 +58,16 @@ function speechSupported(): boolean {
  * → revisa → prioridad → guardar → siguiente ítem. "Siguiente área" avanza la ruta.
  */
 export function PunchWalkMode({ projectId, initialAreas, trades, contacts, locale, labels, onClose, onChanged }: {
+  projectId: string;
+  initialAreas: string[];
+  trades: string[];
+  contacts: ProjectContact[];
+  locale: string;
+  labels: WalkLabels;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const { t } = useI18n();
   projectId: string;
   initialAreas: string[];
   trades: string[];
@@ -291,7 +302,7 @@ export function PunchWalkMode({ projectId, initialAreas, trades, contacts, local
             list="walk-trades"
             value={trade}
             onChange={(e) => setTrade(e.target.value)}
-            placeholder="Trade / Oficio"
+            placeholder={t(`punch.tradePlaceholder`)}
             className="bg-white/5 border-2 border-white/10 rounded-2xl px-4 py-3.5 text-white text-base focus:outline-none focus:border-[#C9A96E] placeholder:text-white/30"
           />
           <datalist id="walk-trades">{trades.map((tr) => <option key={tr} value={tr} />)}</datalist>

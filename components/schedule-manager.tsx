@@ -346,7 +346,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
         throw new Error(err.error || 'Import failed');
       }
       const data = await res.json();
-      toast.success(data.message || 'CPM importado exitosamente');
+      toast.success(data.message || t('schedules.cpmImportSuccess'));
       // Reload page to refresh schedule list
       window.location.reload();
     } catch (err: any) {

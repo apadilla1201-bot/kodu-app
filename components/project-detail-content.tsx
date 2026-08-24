@@ -969,7 +969,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                   disabled={reordering}
                   className="border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
                 >
-                  <ArrowUpDown className="w-4 h-4" /> {reordering ? 'Procesando...' : 'Reordenar por Fecha'}
+                  <ArrowUpDown className="w-4 h-4" /> {reordering ? t('common.processing') : t('project.reorderByDate')}
                 </button>
               )}
               {payApps.length > 0 && (
