@@ -135,7 +135,13 @@ export function SitePhotosContent({
             ? `Preparando foto ${i + 1} de ${list.length}…`
             : 'Preparando foto…',
         );
-        const file = await prepareImageForUpload(raw);
+        let file: File;
+        try {
+          file = await prepareImageForUpload(raw);
+        } catch (prepErr: any) {
+          console.warn('prepareImageForUpload failed, uploading raw:', prepErr);
+          file = raw;
+        }
         setUploadStatus(
           list.length > 1
             ? `Subiendo foto ${i + 1} de ${list.length}…`
@@ -183,6 +189,7 @@ export function SitePhotosContent({
     const input = ref.current;
     if (!input) return;
     input.value = '';
+    // iOS Safari requires the input to be in the DOM (not display:none) for programmatic click to work.
     input.click();
   };
 
@@ -353,21 +360,22 @@ export function SitePhotosContent({
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
+          {/* Use sr-only instead of hidden so iOS Safari allows programmatic input.click() */}
           <input
             ref={cameraInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
+            accept="image/*"
             multiple
             capture="environment"
-            className="hidden"
+            className="sr-only"
             onChange={handleFilePick}
           />
           <input
             ref={galleryInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
+            accept="image/*"
             multiple
-            className="hidden"
+            className="sr-only"
             onChange={handleFilePick}
           />
           <button
