@@ -125,33 +125,13 @@ export function SitePhotosContent({
         description: t('sitePhotos.missingIdDesc'),
         variant: 'destructive',
       });
-      addDebug('[UPLOAD] ABORTED: falta ubicación o descripción');
+      addDebug('[UPLOAD] ABORTED: missing area or description');
       return false;
-    }
-    addDebug(`[UPLOAD] start projectId=${projectId} fileCount=${Array.from(files).length}`);
-    if (!projectId) {
-      toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
-      return;
-    }
-    const area = pendingArea.trim();
-    const caption = pendingCaption.trim();
-    addDebug(`[UPLOAD] validation area="${area}" caption="${caption}" hasId=${!!(area || caption)}`);
-    if (!area && !caption) {
-      toast({
-        title: t('sitePhotos.missingId'),
-        description: t('sitePhotos.missingIdDesc'),
-        variant: 'destructive',
-      });
-      return;
     }
     const list = Array.from(files);
     if (!list.length) {
       addDebug('[UPLOAD] abort: no files');
       return false;
-    }
-    if (!list.length) {
-      addDebug('[UPLOAD] abort: no files');
-      return;
     }
 
     setUploading(true);
@@ -169,8 +149,8 @@ export function SitePhotosContent({
         }
         setUploadStatus(
           list.length > 1
-            ? `Preparando foto ${i + 1} de ${list.length}…`
-            : 'Preparando foto…',
+            ? `Preparing photo ${i + 1} of ${list.length}…`
+            : 'Preparing photo…',
         );
         let file: File;
         try {
@@ -182,8 +162,8 @@ export function SitePhotosContent({
         }
         setUploadStatus(
           list.length > 1
-            ? `Subiendo foto ${i + 1} de ${list.length}…`
-            : 'Subiendo foto…',
+            ? `Uploading photo ${i + 1} of ${list.length}…`
+            : 'Uploading photo…',
         );
         addDebug('[UPLOAD] calling API…');
         const result = await uploadSitePhoto(
@@ -226,18 +206,6 @@ export function SitePhotosContent({
       toast({ title: msg, variant: 'destructive' });
       return false;
     } finally {
-      } else if (skipped > 0) {
-        const msg = t('sitePhotos.invalidFormat');
-        setUploadError(msg);
-        toast({ title: t('sitePhotos.unsupportedFormat'), description: msg, variant: 'destructive' });
-      }
-    } catch (e: any) {
-      addDebug(`[UPLOAD] ERROR: ${e?.message || e}`);
-      const msg = e?.message ?? t('sitePhotos.uploadError');
-      setUploadError(msg);
-      setUploadStatus(null);
-      toast({ title: msg, variant: 'destructive' });
-    } finally {
       setUploading(false);
       if (cameraInputRef.current) cameraInputRef.current.value = '';
       if (galleryInputRef.current) galleryInputRef.current.value = '';
@@ -249,7 +217,7 @@ export function SitePhotosContent({
     if (!files?.length) return;
     const list = Array.from(files).filter(isImageFile);
     if (!list.length) {
-      toast({ title: 'No se encontraron imágenes válidas', variant: 'destructive' });
+      toast({ title: t('sitePhotos.invalidFormat'), variant: 'destructive' });
       return;
     }
     setPendingFiles(list);
@@ -268,10 +236,6 @@ export function SitePhotosContent({
     if (!pendingFiles.length) return;
     const success = await uploadFiles(pendingFiles);
     if (success) clearPending();
-  };
-    if (!pendingFiles.length) return;
-    await uploadFiles(pendingFiles);
-    clearPending();
   };
 
   const openFilePicker = (ref: React.RefObject<HTMLInputElement | null>) => {
@@ -322,6 +286,12 @@ export function SitePhotosContent({
 
   const groups = groupPhotosByDate(photos);
 
+  const selectedLabel = (count: number) =>
+    count === 1 ? t('sitePhotos.photoSelected') : t('sitePhotos.photosSelected', { count });
+
+  const uploadLabel = (count: number) =>
+    count === 1 ? t('sitePhotos.uploadOne') : t('sitePhotos.uploadN', { count });
+
   return (
     <div className="space-y-6 pb-24 lg:pb-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -353,11 +323,11 @@ export function SitePhotosContent({
             {selectedProject ? `#${selectedProject.projectNumber} — ${selectedProject.projectName}` : t('sitePhotos.selectProject')}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Completa la identificación antes de tomar o elegir la foto
+            {t('sitePhotos.identificationHint')}
           </p>
         </div>
 
-        {/* Qué es */}
+        {/* What is it */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t('sitePhotos.whatIsIt')}
@@ -372,13 +342,13 @@ export function SitePhotosContent({
                   pendingTag === t.id ? t.color + ' ring-2 ring-[#C9A96E]' : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {t.labelEs}
+                {photoTagLabel(t.id, locale)}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Dónde */}
+        {/* Where */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
             <MapPin className="w-3 h-3" /> {t('sitePhotos.whereArea')}
@@ -405,7 +375,7 @@ export function SitePhotosContent({
           </div>
         </div>
 
-        {/* Oficio */}
+        {/* Trade */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t('sitePhotos.tradeLabel')}
@@ -432,7 +402,7 @@ export function SitePhotosContent({
           </div>
         </div>
 
-        {/* Descripción */}
+        {/* Description */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t('sitePhotos.whatShowsDesc')}
@@ -444,7 +414,7 @@ export function SitePhotosContent({
             placeholder={t('sitePhotos.phDescription')}
             className="w-full px-3 py-2 border rounded-lg bg-background text-sm resize-none"
           />
-          <p className="text-[11px] text-muted-foreground">* Ubicación o descripción — al menos uno requerido</p>
+          <p className="text-[11px] text-muted-foreground">{t('sitePhotos.requiredHint')}</p>
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
@@ -481,15 +451,15 @@ export function SitePhotosContent({
             onClick={() => openFilePicker(galleryInputRef)}
             className="inline-flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium hover:bg-muted disabled:opacity-50"
           >
-            <Upload className="w-4 h-4" /> Galería
+            <Upload className="w-4 h-4" /> {t('sitePhotos.gallery')}
           </button>
           <button
             type="button"
             onClick={() => setShowDebug((s) => !s)}
             className="inline-flex items-center gap-1.5 px-3 py-2.5 border rounded-lg text-xs font-medium hover:bg-muted"
-            title="Mostrar/ocultar diagnóstico"
+            title={showDebug ? t('sitePhotos.hide') : t('sitePhotos.debug')}
           >
-            <Bug className="w-3.5 h-3.5" /> {showDebug ? 'Ocultar' : 'Diagnóstico'}
+            <Bug className="w-3.5 h-3.5" /> {showDebug ? t('sitePhotos.hide') : t('sitePhotos.debug')}
           </button>
         </div>
 
@@ -497,17 +467,17 @@ export function SitePhotosContent({
         {showDebug && (
           <div className="border rounded-lg bg-slate-900 text-slate-100 text-[11px] p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-[#C9A96E]">Panel de diagnóstico</span>
+              <span className="font-semibold text-[#C9A96E]">{t('sitePhotos.debugPanel')}</span>
               <button
                 type="button"
                 onClick={() => setDebugLog([])}
                 className="text-[10px] underline opacity-70 hover:opacity-100"
               >
-                Limpiar
+                {t('common.clear')}
               </button>
             </div>
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono leading-relaxed">
-              {debugLog.length === 0 ? 'Esperando acción…' : debugLog.join('\n')}
+              {debugLog.length === 0 ? t('sitePhotos.waitingAction') : debugLog.join('\n')}
             </pre>
           </div>
         )}
@@ -516,7 +486,7 @@ export function SitePhotosContent({
         {pendingFiles.length > 0 && (
           <div className="space-y-3 border-t pt-3">
             <p className="text-sm font-medium text-muted-foreground">
-              {pendingFiles.length} foto{pendingFiles.length > 1 ? 's' : ''} seleccionada{pendingFiles.length > 1 ? 's' : ''}:
+              {pendingFiles.length} {selectedLabel(pendingFiles.length)}:
             </p>
             <div className="flex flex-wrap gap-2">
               {pendingPreviews.map((url, i) => (
@@ -538,10 +508,10 @@ export function SitePhotosContent({
               >
                 {uploading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Subiendo…
+                    <Loader2 className="w-4 h-4 animate-spin" /> {t('sitePhotos.uploading')}
                   </span>
                 ) : (
-                  `Subir ${pendingFiles.length} foto${pendingFiles.length > 1 ? 's' : ''}`
+                  uploadLabel(pendingFiles.length)
                 )}
               </button>
               <button
@@ -550,7 +520,7 @@ export function SitePhotosContent({
                 onClick={clearPending}
                 className="px-4 py-2 border rounded-lg text-sm hover:bg-muted disabled:opacity-50"
               >
-                Cancelar
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -576,7 +546,7 @@ export function SitePhotosContent({
           onClick={() => setTagFilter('all')}
           className={`px-3 py-1 rounded-full text-xs font-medium ${tagFilter === 'all' ? 'bg-[#0F1B33] text-[#C9A96E]' : 'bg-muted'}`}
         >
-          All ({photos.length})
+          {t('common.all')} ({photos.length})
         </button>
         {PHOTO_TAGS.map((t) => (
           <button
@@ -585,7 +555,7 @@ export function SitePhotosContent({
             onClick={() => setTagFilter(t.id)}
             className={`px-3 py-1 rounded-full text-xs font-medium ${tagFilter === t.id ? t.color + ' ring-1 ring-[#C9A96E]' : 'bg-muted text-muted-foreground'}`}
           >
-            {t.labelEs}
+            {photoTagLabel(t.id, locale)}
           </button>
         ))}
       </div>
@@ -673,14 +643,14 @@ export function SitePhotosContent({
                   className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
                 >
                   {PHOTO_TAGS.map((t) => (
-                    <option key={t.id} value={t.id}>{t.labelEs}</option>
+                    <option key={t.id} value={t.id}>{photoTagLabel(t.id, locale)}</option>
                   ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium flex items-center gap-1">
-                    <MapPin className="w-3 h-3" /> Ubicación
+                    <MapPin className="w-3 h-3" /> {t('sitePhotos.area')}
                   </label>
                   <input
                     value={editArea}
@@ -715,7 +685,7 @@ export function SitePhotosContent({
                   onClick={savePhoto}
                   className="flex-1 py-2.5 bg-[#0F1B33] text-[#C9A96E] rounded-lg font-semibold text-sm"
                 >
-                  Guardar
+                  {t('common.save')}
                 </button>
                 <button
                   type="button"
