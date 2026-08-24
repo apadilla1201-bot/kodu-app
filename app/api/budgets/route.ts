@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     data: {
       projectId,
       version: version || '1.0',
-      budgetDate: budgetDate ? new Date(budgetDate) : new Date(),
+      budgetDate: (budgetDate && !isNaN(new Date(budgetDate).getTime())) ? new Date(budgetDate) : new Date(),
       totalACSF: totalACSF || null,
       sfRate: sfRate || null,
       constructionSubtotal: constructionSubtotal || 0,

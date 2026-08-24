@@ -11,6 +11,33 @@ function num(v: any): number {
 }
 function str(v: any): string { return v == null ? '' : String(v).trim(); }
 
+/** Parse Excel date value → ISO string or empty */
+function parseExcelDate(v: any): string {
+  if (v == null || v === '') return '';
+  // xlsx sometimes returns a native Date object
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.toISOString();
+  // Excel serial number (days since 1900-01-00)
+  if (typeof v === 'number') {
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    const d = new Date(epoch.getTime() + v * 86400000);
+    return isNaN(d.getTime()) ? '' : d.toISOString();
+  }
+  const s = String(v).trim();
+  // Strip common prefixes
+  const cleaned = s.replace(/^date[:\s]*/i, '').trim();
+  const d = new Date(cleaned);
+  if (!isNaN(d.getTime())) return d.toISOString();
+  // Try MM/DD/YYYY explicitly
+  const mdy = cleaned.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+  if (mdy) {
+    const [, m, day, y] = mdy;
+    const year = y.length === 2 ? 2000 + parseInt(y) : parseInt(y);
+    const tryD = new Date(year, parseInt(m) - 1, parseInt(day));
+    if (!isNaN(tryD.getTime())) return tryD.toISOString();
+  }
+  return '';
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -35,7 +62,7 @@ export async function POST(req: NextRequest) {
       result.summary.company = str(rows[1]?.[0] || '');
       result.summary.owner = str(rows[2]?.[0] || '');
       const dateRow = rows.find(r => /date/i.test(str(r[0])));
-      if (dateRow) result.summary.budgetDate = str(dateRow[1]);
+      if (dateRow) result.summary.budgetDate = parseExcelDate(dateRow[1]);
       const sfRow = rows.find(r => /total.*ac.*sf/i.test(str(r[3] || r[0])));
       if (sfRow) result.summary.totalACSF = num(sfRow[4] || sfRow[1]);
       const sfRateRow = rows.find(r => /sf rate/i.test(str(r[3] || r[0])));

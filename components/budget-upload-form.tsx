@@ -49,7 +49,7 @@ export function BudgetUploadForm({ projects, initialProjectId }: { projects: Pro
       const body = {
         projectId: selectedProject.id,
         version,
-        budgetDate: parsedData.summary?.budgetDate ? new Date(parsedData.summary.budgetDate).toISOString() : new Date().toISOString(),
+        budgetDate: parsedData.summary?.budgetDate || new Date().toISOString(),
         totalACSF: parsedData.summary?.totalACSF || null,
         sfRate: parsedData.summary?.sfRate || null,
         constructionSubtotal: parsedData.summary?.constructionSubtotal || 0,
