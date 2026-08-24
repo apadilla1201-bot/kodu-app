@@ -338,7 +338,6 @@ export const enMessages = {
     continue: 'Continue',
     pboLogTitle: 'Owner Paid-by-Owner Log',
     importExcel: 'Import from Excel',
-    importExcel: 'Import from Excel',
     importExcelDesc: 'G702/G703 workbook — auto line items',
     importPdf: 'Import from PDF',
     importPdfDesc: 'Separate G702 and G703 PDFs — AI extraction',
