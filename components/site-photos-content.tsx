@@ -104,6 +104,92 @@ export function SitePhotosContent({
   }, [selected]);
 
   const uploadFiles = async (files: FileList | File[]) => {
+    console.log('[DEBUG] uploadFiles started', { projectId, fileCount: Array.from(files).length });
+    if (!projectId) {
+      toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
+      return;
+    }
+    const area = pendingArea.trim();
+    const caption = pendingCaption.trim();
+    console.log('[DEBUG] validation', { area, caption, hasAreaOrCaption: !!(area || caption) });
+    if (!area && !caption) {
+      toast({
+        title: t('sitePhotos.missingId'),
+        description: t('sitePhotos.missingIdDesc'),
+        variant: 'destructive',
+      });
+      return;
+    }
+    const list = Array.from(files);
+    if (!list.length) return;
+
+    setUploading(true);
+    setUploadError(null);
+    let ok = 0;
+    let skipped = 0;
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const raw = list[i];
+        console.log('[DEBUG] processing file', i, { name: raw.name, type: raw.type, size: raw.size, isImage: isImageFile(raw) });
+        if (!isImageFile(raw)) {
+          skipped++;
+          continue;
+        }
+        setUploadStatus(
+          list.length > 1
+            ? `Preparando foto ${i + 1} de ${list.length}…`
+            : 'Preparando foto…',
+        );
+        let file: File;
+        try {
+          file = await prepareImageForUpload(raw);
+          console.log('[DEBUG] prepareImageForUpload ok', { preparedName: file.name, preparedSize: file.size });
+        } catch (prepErr: any) {
+          console.warn('[DEBUG] prepareImageForUpload failed, uploading raw:', prepErr);
+          file = raw;
+        }
+        setUploadStatus(
+          list.length > 1
+            ? `Subiendo foto ${i + 1} de ${list.length}…`
+            : 'Subiendo foto…',
+        );
+        console.log('[DEBUG] calling uploadSitePhoto', { projectId, fileName: file.name, fileSize: file.size });
+        const result = await uploadSitePhoto(projectId, file, {
+          caption: caption || null,
+          area: area || null,
+          trade: pendingTrade.trim() || null,
+          tag: pendingTag,
+        });
+        console.log('[DEBUG] uploadSitePhoto result', result);
+        ok++;
+      }
+      console.log('[DEBUG] loop done', { ok, skipped });
+      if (ok > 0) {
+        setUploadStatus(null);
+        toast({ title: ok === 1 ? t('sitePhotos.photoUploaded') : t('sitePhotos.photosUploaded', { count: ok }) });
+        setPendingCaption('');
+        setPendingArea('');
+        setPendingTrade('');
+        console.log('[DEBUG] calling load() to refresh photos');
+        await load();
+        console.log('[DEBUG] load() done');
+      } else if (skipped > 0) {
+        const msg = t('sitePhotos.invalidFormat');
+        setUploadError(msg);
+        toast({ title: t('sitePhotos.unsupportedFormat'), description: msg, variant: 'destructive' });
+      }
+    } catch (e: any) {
+      console.error('[DEBUG] uploadFiles error:', e);
+      const msg = e?.message ?? t('sitePhotos.uploadError');
+      setUploadError(msg);
+      setUploadStatus(null);
+      toast({ title: msg, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
+    }
+  };
     if (!projectId) {
       toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
       return;

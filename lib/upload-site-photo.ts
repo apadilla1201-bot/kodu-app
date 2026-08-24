@@ -15,6 +15,13 @@ export async function uploadSitePhoto(
   if (meta?.area) fd.append('area', meta.area);
   if (meta?.trade) fd.append('trade', meta.trade);
 
+  console.log('[DEBUG uploadSitePhoto] POST', `/api/projects/${projectId}/photos/upload`, {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    meta,
+  });
+
   const res = await fetch(`/api/projects/${projectId}/photos/upload`, {
     method: 'POST',
     body: fd,
@@ -22,6 +29,8 @@ export async function uploadSitePhoto(
   });
 
   const data = await res.json().catch(() => ({}));
+  console.log('[DEBUG uploadSitePhoto] response', { status: res.status, ok: res.ok, data });
+
   if (!res.ok) {
     throw new Error(data?.error || `Error al subir (${res.status})`);
   }
