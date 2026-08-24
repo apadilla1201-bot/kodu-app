@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useI18n } from '@/hooks/use-i18n';
 import {
+  Bug,
   Camera,
   ImageIcon,
   Loader2,
@@ -73,8 +74,14 @@ export function SitePhotosContent({
   const [pendingTrade, setPendingTrade] = useState('');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
 
   const selectedProject = projects.find((p) => p.id === projectId);
+
+  const addDebug = useCallback((msg: string) => {
+    setDebugLog((prev) => [...prev, `${new Date().toLocaleTimeString()}  ${msg}`]);
+  }, []);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -104,14 +111,14 @@ export function SitePhotosContent({
   }, [selected]);
 
   const uploadFiles = async (files: FileList | File[]) => {
-    console.log('[UPLOAD] start', { projectId, fileCount: Array.from(files).length });
+    addDebug(`[UPLOAD] start projectId=${projectId} fileCount=${Array.from(files).length}`);
     if (!projectId) {
       toast({ title: t('sitePhotos.selectProjectFirst'), variant: 'destructive' });
       return;
     }
     const area = pendingArea.trim();
     const caption = pendingCaption.trim();
-    console.log('[UPLOAD] validation', { area, caption, hasId: !!(area || caption) });
+    addDebug(`[UPLOAD] validation area="${area}" caption="${caption}" hasId=${!!(area || caption)}`);
     if (!area && !caption) {
       toast({
         title: t('sitePhotos.missingId'),
@@ -121,7 +128,10 @@ export function SitePhotosContent({
       return;
     }
     const list = Array.from(files);
-    if (!list.length) return;
+    if (!list.length) {
+      addDebug('[UPLOAD] abort: no files');
+      return;
+    }
 
     setUploading(true);
     setUploadError(null);
@@ -130,8 +140,9 @@ export function SitePhotosContent({
     try {
       for (let i = 0; i < list.length; i++) {
         const raw = list[i];
-        console.log('[UPLOAD] file', i, { name: raw.name, type: raw.type, size: raw.size });
+        addDebug(`[UPLOAD] file ${i} name=${raw.name} type=${raw.type} size=${raw.size}`);
         if (!isImageFile(raw)) {
+          addDebug(`[UPLOAD] file ${i} SKIPPED (not image)`);
           skipped++;
           continue;
         }
@@ -143,9 +154,9 @@ export function SitePhotosContent({
         let file: File;
         try {
           file = await prepareImageForUpload(raw);
-          console.log('[UPLOAD] prepared', file.name, file.size);
+          addDebug(`[UPLOAD] prepared ${file.name} size=${file.size}`);
         } catch (prepErr: any) {
-          console.warn('[UPLOAD] prepare failed, using raw:', prepErr);
+          addDebug(`[UPLOAD] prepare failed, using raw: ${prepErr?.message || prepErr}`);
           file = raw;
         }
         setUploadStatus(
@@ -153,33 +164,38 @@ export function SitePhotosContent({
             ? `Subiendo foto ${i + 1} de ${list.length}…`
             : 'Subiendo foto…',
         );
-        console.log('[UPLOAD] calling API…');
-        const result = await uploadSitePhoto(projectId, file, {
-          caption: caption || null,
-          area: area || null,
-          trade: pendingTrade.trim() || null,
-          tag: pendingTag,
-        });
-        console.log('[UPLOAD] API result', result);
+        addDebug('[UPLOAD] calling API…');
+        const result = await uploadSitePhoto(
+          projectId,
+          file,
+          {
+            caption: caption || null,
+            area: area || null,
+            trade: pendingTrade.trim() || null,
+            tag: pendingTag,
+          },
+          addDebug,
+        );
+        addDebug(`[UPLOAD] API result ${JSON.stringify(result)}`);
         ok++;
       }
-      console.log('[UPLOAD] loop done', { ok, skipped });
+      addDebug(`[UPLOAD] loop done ok=${ok} skipped=${skipped}`);
       if (ok > 0) {
         setUploadStatus(null);
         toast({ title: ok === 1 ? t('sitePhotos.photoUploaded') : t('sitePhotos.photosUploaded', { count: ok }) });
         setPendingCaption('');
         setPendingArea('');
         setPendingTrade('');
-        console.log('[UPLOAD] refreshing list…');
+        addDebug('[UPLOAD] refreshing list…');
         await load();
-        console.log('[UPLOAD] refresh done');
+        addDebug('[UPLOAD] refresh done');
       } else if (skipped > 0) {
         const msg = t('sitePhotos.invalidFormat');
         setUploadError(msg);
         toast({ title: t('sitePhotos.unsupportedFormat'), description: msg, variant: 'destructive' });
       }
     } catch (e: any) {
-      console.error('[UPLOAD] ERROR:', e);
+      addDebug(`[UPLOAD] ERROR: ${e?.message || e}`);
       const msg = e?.message ?? t('sitePhotos.uploadError');
       setUploadError(msg);
       setUploadStatus(null);
@@ -426,7 +442,34 @@ export function SitePhotosContent({
           >
             <Upload className="w-4 h-4" /> Galería
           </button>
+          <button
+            type="button"
+            onClick={() => setShowDebug((s) => !s)}
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 border rounded-lg text-xs font-medium hover:bg-muted"
+            title="Mostrar/ocultar diagnóstico"
+          >
+            <Bug className="w-3.5 h-3.5" /> {showDebug ? 'Ocultar' : 'Diagnóstico'}
+          </button>
         </div>
+
+        {/* Debug panel */}
+        {showDebug && (
+          <div className="border rounded-lg bg-slate-900 text-slate-100 text-[11px] p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-[#C9A96E]">Panel de diagnóstico</span>
+              <button
+                type="button"
+                onClick={() => setDebugLog([])}
+                className="text-[10px] underline opacity-70 hover:opacity-100"
+              >
+                Limpiar
+              </button>
+            </div>
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono leading-relaxed">
+              {debugLog.length === 0 ? 'Esperando acción…' : debugLog.join('\n')}
+            </pre>
+          </div>
+        )}
 
         {/* Preview of selected files — shows BEFORE upload so user can confirm */}
         {pendingFiles.length > 0 && (

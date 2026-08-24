@@ -5,7 +5,14 @@ export async function uploadSitePhoto(
   projectId: string,
   file: File,
   meta?: { caption?: string | null; tag?: string; area?: string | null; trade?: string | null },
+  onDebug?: (msg: string) => void,
 ): Promise<Record<string, unknown>> {
+  const log = (msg: string) => {
+    if (onDebug) onDebug(msg);
+    // eslint-disable-next-line no-console
+    console.log(msg);
+  };
+
   const fd = new FormData();
   fd.append('file', file, file.name);
   fd.append('fileName', file.name);
@@ -15,12 +22,7 @@ export async function uploadSitePhoto(
   if (meta?.area) fd.append('area', meta.area);
   if (meta?.trade) fd.append('trade', meta.trade);
 
-  console.log('[DEBUG uploadSitePhoto] POST', `/api/projects/${projectId}/photos/upload`, {
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: file.type,
-    meta,
-  });
+  log(`[DEBUG uploadSitePhoto] POST /api/projects/${projectId}/photos/upload fileName=${file.name} size=${file.size} type=${file.type}`);
 
   const res = await fetch(`/api/projects/${projectId}/photos/upload`, {
     method: 'POST',
@@ -29,7 +31,7 @@ export async function uploadSitePhoto(
   });
 
   const data = await res.json().catch(() => ({}));
-  console.log('[DEBUG uploadSitePhoto] response', { status: res.status, ok: res.ok, data });
+  log(`[DEBUG uploadSitePhoto] response status=${res.status} ok=${res.ok}`);
 
   if (!res.ok) {
     throw new Error(data?.error || `Error al subir (${res.status})`);
