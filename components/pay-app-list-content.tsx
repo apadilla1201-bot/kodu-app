@@ -32,7 +32,6 @@ const statusColors: Record<string, string> = {
 export function PayAppListContent({ projects, initialProjectId }: { projects: any[]; initialProjectId?: string }) {
   const { t } = useI18n();
   const [search, setSearch] = useState('');
-  const [search, setSearch] = useState('');
   const [selectedProject, setSelectedProject] = useState<string>(initialProjectId ?? 'all');
 
   const filtered = projects.filter(p => {
