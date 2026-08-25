@@ -129,7 +129,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       if (sheets?.g703) parts.push('G703');
       if (sheets?.g702) parts.push('G702');
       if (sheets?.settings) parts.push('Settings');
-      setImportSummary(`Sheets encontrados: ${parts.join(', ')} — ${data.lineItems?.length ?? 0} líneas extraídas`);
+      setImportSummary(t('payApps.importSummary', { sheets: parts.join(', '), count: data.lineItems?.length ?? 0 }));
       setStep('review');
       toast.success(t('payApps.excelImported', { count: data.lineItems?.length ?? 0 }));
     } catch (e: any) {
@@ -167,7 +167,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       if (type === 'g703' && data.lineItems?.length > 0) {
         setImportedLines(data.lineItems);
         setG703Parsed(true);
-        toast.success(`G703: ${data.lineItems.length} líneas extraídas`);
+        toast.success(t('payApps.g703LinesExtracted', { count: data.lineItems.length }));
       }
 
       if ((type === 'g702' && g703Parsed) || (type === 'g703' && g702Parsed) || (type === 'g703' && !g702File)) {
@@ -220,9 +220,9 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
         };
       });
       setImportedLines(lines);
-      setImportSummary(`Clonado de PA #${appNumber - 1}: ${lines.length} líneas trasladadas`);
+      setImportSummary(t('payApps.cloneSummary', { number: appNumber - 1, count: lines.length }));
       setStep('review');
-      toast.success(`Clonadas ${lines.length} líneas de PA #${appNumber - 1}`);
+      toast.success(t('payApps.cloneSuccess', { count: lines.length, number: appNumber - 1 }));
     } catch (e: any) {
       toast.error(e.message || t('payApps.cloneError'));
     } finally {
@@ -258,15 +258,11 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
     if (!projectId) return;
     // "Paid by Owner": obligatorio responder — así nadie se lo salta por no saber.
     if (!pboAnswered) {
-      toast.error(locale === 'es'
-        ? 'Responde si el Owner hizo pagos directos en este período (sí / no).'
-        : 'Please answer whether the Owner made direct payments this period (yes / no).');
+      toast.error(t('payApps.pboRequired'));
       return;
     }
     if (pboHas && !(Number(pboAmount) > 0)) {
-      toast.error(locale === 'es'
-        ? 'Escribe el monto pagado por el Owner en este período.'
-        : 'Enter the amount paid by the Owner this period.');
+      toast.error(t('payApps.pboAmountRequired'));
       return;
     }
     setSaving(true);
@@ -348,7 +344,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label>Proyecto *</Label>
+              <Label>{t('payApps.projectLabel')} *</Label>
               <Select value={projectId} onValueChange={setProjectId}>
                 <SelectTrigger><SelectValue placeholder={t('payApps.selectProject')} /></SelectTrigger>
                 <SelectContent>
@@ -380,7 +376,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                   </div>
                 </div>
                 <Button onClick={() => setStep('method')} className="w-full bg-[#C9A96E] hover:bg-[#B8975D] text-white" size="lg">
-                  Continuar <ChevronRight className="w-4 h-4 ml-2" />
+                  {t('payApps.continue')} <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               </>
             )}
@@ -392,7 +388,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       {step === 'method' && (
         <Card>
           <CardHeader>
-            <CardTitle>¿Cómo desea ingresar los datos?</CardTitle>
+            <CardTitle>{t('payApps.inputMethodTitle')}</CardTitle>
             <CardDescription>
               PA #{appNumber} para #{selectedProject?.projectNumber} — {selectedProject?.projectName}
             </CardDescription>
@@ -405,7 +401,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               </div>
               <div className="flex-1">
                 <p className="font-semibold">{t('payApps.importExcel')}</p>
-                <p className="text-xs text-muted-foreground">Workbook con hojas G702, G703 y PROJECT SETTINGS</p>
+                <p className="text-xs text-muted-foreground">{t('payApps.excelWorkbookHint')}</p>
               </div>
               <input
                 type="file"
@@ -467,7 +463,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                   <Copy className="w-6 h-6 text-[#C9A96E]" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold">Roll Forward de PA #{appNumber - 1}</p>
+                  <p className="font-semibold">{t('payApps.rollForward', { number: appNumber - 1 })}</p>
                   <p className="text-xs text-muted-foreground">{t('payApps.clonePrevDesc')}</p>
                 </div>
                 {importing && method === 'clone' ? <Loader2 className="w-5 h-5 animate-spin" /> : <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E]" />}
@@ -475,7 +471,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
             )}
 
             <button onClick={() => setStep('project')} className="text-sm text-muted-foreground hover:text-foreground mt-2">
-              ← Volver a selección de proyecto
+              {t('payApps.backToProjectSelect')}
             </button>
           </CardContent>
         </Card>
@@ -511,7 +507,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 />
                 {importing && g703File && !g703Parsed ? <Loader2 className="w-4 h-4 animate-spin ml-auto" /> : null}
               </label>
-              {g703Parsed && <p className="text-xs text-green-600">{importedLines.length} líneas extraídas</p>}
+              {g703Parsed && <p className="text-xs text-green-600">{t('payApps.linesExtracted', { count: importedLines.length })}</p>}
             </div>
 
             {/* G702 Upload */}
@@ -536,16 +532,16 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 />
                 {importing && g702File && !g702Parsed ? <Loader2 className="w-4 h-4 animate-spin ml-auto" /> : null}
               </label>
-              {g702Parsed && <p className="text-xs text-green-600">Header data extraído</p>}
+              {g702Parsed && <p className="text-xs text-green-600">{t('payApps.headerExtracted')}</p>}
             </div>
 
             <div className="flex gap-3 pt-2">
               <button onClick={() => setStep('method')} className="text-sm text-muted-foreground hover:text-foreground">
-                ← Atrás
+                ← {t('common.back')}
               </button>
               {(g703Parsed || g702Parsed) && (
                 <Button onClick={() => setStep('review')} className="ml-auto bg-[#C9A96E] hover:bg-[#B8975D] text-white">
-                  Continuar a Revisión <ChevronRight className="w-4 h-4 ml-1" />
+                  {t('payApps.continueReview')} <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               )}
             </div>
@@ -576,15 +572,15 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               {/* Dates */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <Label className="text-xs">Fecha Aplicación</Label>
+                  <Label className="text-xs">{t('payApps.applicationDate')}</Label>
                   <Input type="date" value={applicationDate} onChange={e => setApplicationDate(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Período Desde</Label>
+                  <Label className="text-xs">{t('payApps.periodFrom')}</Label>
                   <Input type="date" value={periodFrom} onChange={e => setPeriodFrom(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Período Hasta</Label>
+                  <Label className="text-xs">{t('payApps.periodTo')}</Label>
                   <Input type="date" value={periodTo} onChange={e => setPeriodTo(e.target.value)} />
                 </div>
               </div>
@@ -593,13 +589,11 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               <div className={`rounded-lg border p-4 space-y-3 ${pboAnswered ? 'border-green-200 bg-green-50/50' : 'border-[#C9A96E]/60 bg-[#F7F6F2]'}`}>
                 <p className="text-sm font-semibold flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-[#C9A96E]" />
-                  {locale === 'es'
-                    ? '¿El Owner hizo pagos directos a subs o suplidores en este período?'
-                    : 'Did the Owner make direct payments to subs or suppliers this period?'}
+                  {t('payApps.pboQuestion')}
                 </p>
                 {pboCarry > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    {locale === 'es' ? 'Acumulado a la fecha (automático)' : 'Accumulated to date (automatic)'}: <strong>{fmt(pboCarry)}</strong>
+                    {t('payApps.pboAccumulated')}: <strong>{fmt(pboCarry)}</strong>
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
@@ -610,7 +604,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                     onClick={() => { setPboHas(false); setPboAnswered(true); setPboAmount(''); }}
                     className={pboHas === false ? 'bg-[#0F1B33] text-white' : ''}
                   >
-                    {locale === 'es' ? 'No, ninguno' : 'No, none'}
+                    {t('payApps.pboNo')}
                   </Button>
                   <Button
                     type="button"
@@ -619,7 +613,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                     onClick={() => { setPboHas(true); setPboAnswered(true); }}
                     className={pboHas === true ? 'bg-[#0F1B33] text-white' : ''}
                   >
-                    {locale === 'es' ? 'Sí, hubo pagos' : 'Yes, there were payments'}
+                    {t('payApps.pboYes')}
                   </Button>
                   {pboHas && (
                     <>
@@ -627,13 +621,13 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                         type="number"
                         step="any"
                         min="0"
-                        placeholder={locale === 'es' ? 'Monto de este período' : 'Amount this period'}
+                        placeholder={t('payApps.pboAmountPlaceholder')}
                         value={pboAmount}
                         onChange={(e) => setPboAmount(e.target.value)}
                         className="w-44"
                       />
                       <Input
-                        placeholder={locale === 'es' ? 'Detalle (a quién se pagó)' : 'Detail (who was paid)'}
+                        placeholder={t('payApps.pboDetailPlaceholder')}
                         value={pboDetail}
                         onChange={(e) => setPboDetail(e.target.value)}
                         className="flex-1 min-w-[180px]"
@@ -643,9 +637,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 </div>
                 {pboHas && Number(pboAmount) > 0 && (
                   <p className="text-xs text-green-800">
-                    {locale === 'es'
-                      ? `En el G702: 7b acumulado ${fmt(pboCarry)} · 7c este período ${fmt(Number(pboAmount))} · 7d total ${fmt(pboCarry + Number(pboAmount))}`
-                      : `On the G702: 7b accumulated ${fmt(pboCarry)} · 7c this period ${fmt(Number(pboAmount))} · 7d total ${fmt(pboCarry + Number(pboAmount))}`}
+                    {t('payApps.pboSummary', { carry: fmt(pboCarry), amount: fmt(Number(pboAmount)), total: fmt(pboCarry + Number(pboAmount)) })}
                   </p>
                 )}
               </div>
@@ -657,9 +649,9 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                   className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors"
                 >
                   <span className="text-sm font-semibold flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-[#C9A96E]" /> Datos G702 (Header)
+                    <FileText className="w-4 h-4 text-[#C9A96E]" /> {t('payApps.g702HeaderTitle')}
                     {editHeader && Object.keys(editHeader).length > 0 && (
-                      <span className="text-xs text-muted-foreground font-normal">— {Object.keys(editHeader).length} campos</span>
+                      <span className="text-xs text-muted-foreground font-normal">— {t('payApps.fieldsCount', { count: Object.keys(editHeader).length })}</span>
                     )}
                   </span>
                   {headerExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -680,7 +672,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                       <div><Label className="text-xs">Contract Date</Label>
                         <input type="date" value={(editHeader.contractDate ?? '').split('T')[0]} onChange={e => setEditHeader({...editHeader, contractDate: e.target.value})} className={inputClass} /></div>
                     </div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Porcentajes y Montos</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">{t('payApps.percentagesAndAmounts')}</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div><Label className="text-xs">O&P %</Label>
                         <input type="number" step="any" value={editHeader.opPercent ?? ''} onChange={e => setEditHeader({...editHeader, opPercent: parseFloat(e.target.value) || 0})} className={inputClass} /></div>
@@ -709,19 +701,19 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">G703 — Líneas ({importedLines.length})</CardTitle>
+                <CardTitle className="text-base">{t('payApps.g703LinesTitle', { count: importedLines.length })}</CardTitle>
                 <div className="flex gap-2">
                   <button
                     onClick={() => addLine(true)}
                     className="text-xs px-3 py-1.5 rounded-lg border border-[#0F1B33] text-[#0F1B33] hover:bg-[#0F1B33]/5 flex items-center gap-1"
                   >
-                    <Plus className="w-3 h-3" /> Sección
+                    <Plus className="w-3 h-3" /> {t('payApps.addSection')}
                   </button>
                   <button
                     onClick={() => addLine(false)}
                     className="text-xs px-3 py-1.5 rounded-lg bg-[#C9A96E] text-white hover:bg-[#B8975D] flex items-center gap-1"
                   >
-                    <Plus className="w-3 h-3" /> Línea
+                    <Plus className="w-3 h-3" /> {t('payApps.addLine')}
                   </button>
                 </div>
               </div>
@@ -737,7 +729,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                     </div>
                     <div className="p-2 rounded bg-muted text-center">
                       <p className="text-lg font-bold font-mono">{sectionCount}</p>
-                      <p className="text-muted-foreground">Secciones</p>
+                      <p className="text-muted-foreground">{t('payApps.sectionsCount')}</p>
                     </div>
                     <div className="p-2 rounded bg-muted text-center">
                       <p className="text-lg font-bold font-mono">{feeCount}</p>
@@ -745,7 +737,7 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                     </div>
                     <div className="p-2 rounded bg-muted text-center">
                       <p className="text-sm font-bold font-mono">${totalScheduled.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
-                      <p className="text-muted-foreground">Valor Total</p>
+                      <p className="text-muted-foreground">{t('payApps.totalValue')}</p>
                     </div>
                   </div>
                   <table className="w-full text-xs">
@@ -753,11 +745,11 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                       <tr>
                         <th className="px-2 py-2 text-left w-8"></th>
                         <th className="px-2 py-2 text-left w-20 font-medium">Item #</th>
-                        <th className="px-2 py-2 text-left font-medium min-w-[180px]">Descripción</th>
+                        <th className="px-2 py-2 text-left font-medium min-w-[180px]">{t('payApps.description')}</th>
                         <th className="px-2 py-2 text-left w-16 font-medium">Sub</th>
                         <th className="px-2 py-2 text-right w-24 font-medium">Valor Prog.</th>
                         <th className="px-2 py-2 text-right w-20 font-medium">Prev. Compl.</th>
-                        <th className="px-2 py-2 text-right w-20 font-medium bg-[#C9A96E]/20">Este Período</th>
+                        <th className="px-2 py-2 text-right w-20 font-medium bg-[#C9A96E]/20">{t('payApps.thisPeriod')}</th>
                         <th className="px-2 py-2 text-right w-16 font-medium">Retainage</th>
                         <th className="px-2 py-2 w-8"></th>
                       </tr>
@@ -819,13 +811,13 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               ) : (
                 <div className="p-8 text-center">
                   <Pencil className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground mb-3">PA vacía — agregue líneas usando los botones de arriba.</p>
+                  <p className="text-sm text-muted-foreground mb-3">{t('payApps.emptyPaMessage')}</p>
                   <div className="flex gap-2 justify-center">
                     <button onClick={() => addLine(true)} className="text-xs px-3 py-1.5 rounded-lg border border-border hover:border-[#C9A96E] flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> Agregar Sección
+                      <Plus className="w-3 h-3" /> {t('payApps.addSection')}
                     </button>
                     <button onClick={() => addLine(false)} className="text-xs px-3 py-1.5 rounded-lg bg-[#C9A96E] text-white hover:bg-[#B8975D] flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> Agregar Línea
+                      <Plus className="w-3 h-3" /> {t('payApps.addLine')}
                     </button>
                   </div>
                 </div>
@@ -836,10 +828,10 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
           {/* Action bar */}
           <div className="sticky bottom-4 bg-card border border-border rounded-xl p-4 shadow-lg flex items-center justify-between">
             <button onClick={() => setStep('method')} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-              <ArrowLeft className="w-4 h-4" /> Atrás
+              <ArrowLeft className="w-4 h-4" /> {t('common.back')}
             </button>
             <div className="text-xs text-muted-foreground">
-              {nonSectionLines.length} líneas · {fmt(totalScheduled)} valor total
+              {t('payApps.linesCountSummary', { count: nonSectionLines.length, total: fmt(totalScheduled) })}
             </div>
             <Button onClick={handleCreate} disabled={saving} className="bg-[#2E7D32] hover:bg-[#256d29] text-white" size="lg">
               {saving ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {t('payApps.creating')}</> : <><FileText className="w-4 h-4 mr-2" /> {t('payApps.createPa', { number: appNumber })}</>}
