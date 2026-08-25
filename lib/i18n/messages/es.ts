@@ -267,6 +267,15 @@ export const esMessages: Messages = {
     logSubmitted: 'Daily log enviado',
     logApproved: 'Daily log aprobado',
     pdfFailed: 'No se pudo generar el PDF',
+    aiExecutiveReport: 'Reporte Ejecutivo con AI',
+    selectPhotosForReport: 'Seleccionar Fotos para el Reporte',
+    wordContext: 'Contexto del Documento Word (opcional)',
+    wordContextPlaceholder: 'Pega aquí el contenido de tu documento Word, o escribe contexto adicional para la AI...',
+    analyzeWithAi: 'Analizar con AI',
+    aiPreviewTitle: 'Vista previa del Reporte Ejecutivo con AI',
+    selectAll: 'Seleccionar todas',
+    clear: 'Limpiar',
+
   },
   sitePhotos: {
     title: 'Fotos de obra',

@@ -41,6 +41,13 @@ export async function POST(
     const defaults = weekRangeEnding();
     const from = String(body?.from || defaults.from).slice(0, 10);
     const to = String(body?.to || defaults.to).slice(0, 10);
+    const photoIds = Array.isArray(body?.photoIds) ? body.photoIds as string[] : null;
+    const aiGenerated = body?.aiGenerated as {
+      overview?: string;
+      milestones?: { title: string; bullets: string[] }[];
+      openItems?: { num: number; item: string; deadline: string; responsible: string; priority: string }[];
+      actionItems?: { num: number; action: string; responsible: string; targetDate: string }[];
+    } | null;
 
     const fromDate = logDateFromInput(from);
     const toDate = logDateFromInput(to);
@@ -114,8 +121,12 @@ export async function POST(
       }, { status: 400 });
     }
 
+    const filteredPhotos = photoIds?.length
+      ? photos.filter((p) => photoIds.includes(p.id))
+      : photos;
+
     const photosByDayMap = new Map<string, typeof photos>();
-    for (const p of photos) {
+    for (const p of filteredPhotos) {
       const key = dateKey(p.takenAt);
       if (!photosByDayMap.has(key)) photosByDayMap.set(key, []);
       photosByDayMap.get(key)!.push(p);
@@ -198,7 +209,9 @@ export async function POST(
       companyAddressFull: brand.addressFull,
       logoHtml: brand.logoHtml,
       tcoTarget: String(body?.tcoTarget || '').trim() || tcoFromSchedule,
-      overview: String(body?.overview || '').trim() || autoOverview(project, mappedLogs),
+      overview: aiGenerated?.overview?.trim()
+        ? aiGenerated.overview.trim()
+        : String(body?.overview || '').trim() || autoOverview(project, mappedLogs),
       photoIntro: String(body?.photoIntro || '').trim() || autoPhotoIntro(),
       logs: mappedLogs,
       photosByDay: photosByDay.map((d) => ({
@@ -207,9 +220,15 @@ export async function POST(
       })),
       milestones: customMilestones?.length
         ? customMilestones
-        : autoMilestones(mappedSubmittals, mappedLogs),
-      openItems: autoOpenItems(mappedRfis, mappedLogs),
-      actionItems: autoActionItems(mappedRfis, mappedLogs),
+        : aiGenerated?.milestones?.length
+          ? aiGenerated.milestones
+          : autoMilestones(mappedSubmittals, mappedLogs),
+      openItems: aiGenerated?.openItems?.length
+        ? aiGenerated.openItems
+        : autoOpenItems(mappedRfis, mappedLogs),
+      actionItems: aiGenerated?.actionItems?.length
+        ? aiGenerated.actionItems
+        : autoActionItems(mappedRfis, mappedLogs),
       openRfis: mappedRfis,
     };
 

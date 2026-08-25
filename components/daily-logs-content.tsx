@@ -81,6 +81,18 @@ export function DailyLogsContent({
   const [reportTcoTarget, setReportTcoTarget] = useState('');
   const [reportOptionsOpen, setReportOptionsOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportPhotos, setReportPhotos] = useState<PhotoOpt[]>([]);
+  const [selectedReportPhotoIds, setSelectedReportPhotoIds] = useState<string[]>([]);
+  const [wordContext, setWordContext] = useState('');
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiPreview, setAiPreview] = useState<{
+    overview: string;
+    milestones: { title: string; bullets: string[] }[];
+    openItems: { num: number; item: string; deadline: string; responsible: string; priority: string }[];
+    actionItems: { num: number; action: string; responsible: string; targetDate: string }[];
+  } | null>(null);
+  const [showAiPreview, setShowAiPreview] = useState(false);
 
   const [form, setForm] = useState({
     weather: '',
@@ -229,6 +241,101 @@ export function DailyLogsContent({
     router.push(`/dashboard/rfis/new?projectId=${projectId}&fromDailyLog=1`);
   };
 
+  const loadReportPhotos = async () => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/photos?from=${reportFrom}&to=${reportTo}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        const photos = data.photos || [];
+        setReportPhotos(photos);
+        setSelectedReportPhotoIds(photos.map((p: PhotoOpt) => p.id));
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const toggleReportPhoto = (id: string) => {
+    setSelectedReportPhotoIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const analyzeWithAi = async () => {
+    if (!projectId) return;
+    setAiAnalyzing(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/field-report/ai-analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          from: reportFrom,
+          to: reportTo,
+          wordContext: wordContext.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'AI analysis failed');
+      }
+      const data = await res.json();
+      setAiPreview(data);
+      setShowAiPreview(true);
+    } catch (e: any) {
+      toast({ title: e?.message ?? 'AI analysis failed', variant: 'destructive' });
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
+  const downloadAiFieldReport = async () => {
+    if (!projectId || !aiPreview) return;
+    setGeneratingReport(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/field-report/pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          from: reportFrom,
+          to: reportTo,
+          overview: reportOverview.trim() || aiPreview.overview,
+          tcoTarget: reportTcoTarget.trim(),
+          photoIds: selectedReportPhotoIds,
+          aiGenerated: {
+            overview: aiPreview.overview,
+            milestones: aiPreview.milestones,
+            openItems: aiPreview.openItems,
+            actionItems: aiPreview.actionItems,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || t('dailyLogs.pdfFailed'));
+      }
+      const blob = await res.blob();
+      const proj = projects.find((p) => p.id === projectId);
+      const fname = `REPORT_${proj?.projectNumber ?? 'project'}_${reportTo}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: t('errors.pdfReady') });
+      setShowAiPreview(false);
+    } catch (e: any) {
+      toast({ title: e?.message ?? t('errors.generatePdf'), variant: 'destructive' });
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
+
   const downloadOwnerFieldReport = async () => {
     if (!projectId) return;
     setGeneratingReport(true);
@@ -338,10 +445,19 @@ export function DailyLogsContent({
               type="button"
               disabled={generatingReport || !projectId}
               onClick={downloadOwnerFieldReport}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 border border-[#0F1B33] text-[#0F1B33] rounded-lg text-sm font-semibold disabled:opacity-50"
             >
               {generatingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
               {generatingReport ? t('dailyLogs.generating') : t('dailyLogs.generatePdf')}
+            </button>
+            <button
+              type="button"
+              disabled={aiAnalyzing || !projectId}
+              onClick={() => { loadReportPhotos(); setShowPhotoModal(true); }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
+            >
+              {aiAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              {t('dailyLogs.aiExecutiveReport')}
             </button>
           </div>
         </div>
@@ -543,5 +659,122 @@ export function DailyLogsContent({
         </div>
       )}
     </div>
+
+    {/* Photo Selection Modal */}
+    {showPhotoModal && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-card rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6">
+          <h3 className="text-lg font-semibold mb-4">{t('dailyLogs.selectPhotosForReport')}</h3>
+          <div className="mb-4">
+            <label className="text-xs font-medium text-muted-foreground uppercase">{t('dailyLogs.wordContext')}</label>
+            <textarea
+              value={wordContext}
+              onChange={(e) => setWordContext(e.target.value)}
+              rows={3}
+              placeholder="{t('dailyLogs.wordContextPlaceholder')}"
+              className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm resize-y"
+            />
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground">{selectedReportPhotoIds.length} of {reportPhotos.length} selected</p>
+            <div className="flex gap-2">
+              <button onClick={() => setSelectedReportPhotoIds(reportPhotos.map((p) => p.id))} className="text-xs px-2 py-1 border rounded hover:bg-muted">{t('dailyLogs.selectAll')}</button>
+              <button onClick={() => setSelectedReportPhotoIds([])} className="text-xs px-2 py-1 border rounded hover:bg-muted">Clear</button>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            {reportPhotos.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => toggleReportPhoto(p.id)}
+                className={`relative aspect-square rounded overflow-hidden border-2 ${
+                  selectedReportPhotoIds.includes(p.id) ? 'border-[#C9A96E]' : 'border-transparent'
+                }`}
+              >
+                <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                {selectedReportPhotoIds.includes(p.id) && (
+                  <div className="absolute top-1 right-1 w-5 h-5 bg-[#C9A96E] rounded-full flex items-center justify-center text-white text-xs">✓</div>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowPhotoModal(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+            <button
+              onClick={() => { setShowPhotoModal(false); analyzeWithAi(); }}
+              disabled={aiAnalyzing}
+              className="px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
+            >
+              {aiAnalyzing ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : null}
+              {t('dailyLogs.analyzeWithAi')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* AI Preview Modal */}
+    {showAiPreview && aiPreview && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-card rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6">
+          <h3 className="text-lg font-semibold mb-4">{t('dailyLogs.aiExecutiveReport')} Preview</h3>
+          <div className="space-y-4 mb-6">
+            <div>
+              <h4 className="text-sm font-semibold text-[#0F1B33] border-b border-[#C9A96E] pb-1 mb-2">Overview</h4>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{aiPreview.overview}</p>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-[#0F1B33] border-b border-[#C9A96E] pb-1 mb-2">Milestones ({aiPreview.milestones.length})</h4>
+              <div className="space-y-2">
+                {aiPreview.milestones.map((m, i) => (
+                  <div key={i} className="text-sm">
+                    <p className="font-medium">{m.title}</p>
+                    <ul className="list-disc list-inside text-muted-foreground">
+                      {m.bullets.map((b, j) => <li key={j}>{b}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-[#0F1B33] border-b border-[#C9A96E] pb-1 mb-2">Open Items ({aiPreview.openItems.length})</h4>
+              <div className="space-y-1">
+                {aiPreview.openItems.map((item) => (
+                  <div key={item.num} className="text-sm flex gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">#{item.num}</span>
+                    <span>{item.item}</span>
+                    <span className={`text-xs px-1.5 rounded ${item.priority === 'CRITICAL' ? 'bg-red-100 text-red-700' : item.priority === 'HIGH' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'}`}>{item.priority}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-[#0F1B33] border-b border-[#C9A96E] pb-1 mb-2">Action Items ({aiPreview.actionItems.length})</h4>
+              <div className="space-y-1">
+                {aiPreview.actionItems.map((item) => (
+                  <div key={item.num} className="text-sm flex gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">#{item.num}</span>
+                    <span>{item.action}</span>
+                    <span className="text-xs text-muted-foreground">→ {item.targetDate}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowAiPreview(false)} className="px-4 py-2 border rounded-lg text-sm">Back</button>
+            <button
+              onClick={downloadAiFieldReport}
+              disabled={generatingReport}
+              className="px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
+            >
+              {generatingReport ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : <Download className="w-4 h-4 inline mr-1" />}
+              Download PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }

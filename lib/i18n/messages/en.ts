@@ -265,6 +265,15 @@ export const enMessages = {
     logSubmitted: 'Daily log submitted',
     logApproved: 'Daily log approved',
     pdfFailed: 'Could not generate PDF',
+    aiExecutiveReport: 'AI Executive Report',
+    selectPhotosForReport: 'Select Photos for Report',
+    wordContext: 'Word Document Context (optional)',
+    wordContextPlaceholder: 'Paste content from your Word document here, or write additional context for the AI...',
+    analyzeWithAi: 'Analyze with AI',
+    aiPreviewTitle: 'AI Executive Report Preview',
+    selectAll: 'Select All',
+    clear: 'Clear',
+
   },
   sitePhotos: {
     title: 'Site Photos',
