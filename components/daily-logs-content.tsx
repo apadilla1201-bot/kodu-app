@@ -377,6 +377,7 @@ export function DailyLogsContent({
   const selectedProject = projects.find((p) => p.id === projectId);
 
   return (
+    <>
     <div className="space-y-6 pb-24 lg:pb-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
@@ -718,7 +719,7 @@ export function DailyLogsContent({
     {showAiPreview && aiPreview && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-card rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6">
-          <h3 className="text-lg font-semibold mb-4">{t('dailyLogs.aiExecutiveReport')} Preview</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('dailyLogs.aiPreviewTitle')}</h3>
           <div className="space-y-4 mb-6">
             <div>
               <h4 className="text-sm font-semibold text-[#0F1B33] border-b border-[#C9A96E] pb-1 mb-2">Overview</h4>
@@ -776,5 +777,5 @@ export function DailyLogsContent({
         </div>
       </div>
     )}
-  );
+  </>);
 }
