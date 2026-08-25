@@ -27,95 +27,113 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
+    const mode = body?.mode === 'pmReport' ? 'pmReport' : 'dailyLogs';
     const from = String(body?.from || '').slice(0, 10);
     const to = String(body?.to || '').slice(0, 10);
     const wordContext = String(body?.wordContext || '').trim();
+    const documentText = String(body?.documentText || '').trim();
+    const photoDescriptions = Array.isArray(body?.photoDescriptions)
+      ? body.photoDescriptions as string[]
+      : [];
 
-    if (!from || !to) {
-      return NextResponse.json({ error: 'from and to dates are required' }, { status: 400 });
+    let logEntries = '';
+    let rfiEntries = '';
+    let submittalEntries = '';
+
+    if (mode === 'dailyLogs') {
+      if (!from || !to) {
+        return NextResponse.json({ error: 'from and to dates are required' }, { status: 400 });
+      }
+
+      const fromDate = logDateFromInput(from);
+      const toDate = logDateFromInput(to);
+      toDate.setHours(23, 59, 59, 999);
+
+      if (fromDate > toDate) {
+        return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
+      }
+
+      const [logs, rfis, submittals] = await Promise.all([
+        prisma.dailyLog.findMany({
+          where: {
+            projectId: params.id,
+            logDate: { gte: fromDate, lte: toDate },
+          },
+          orderBy: { logDate: 'asc' },
+        }),
+        prisma.rFI.findMany({
+          where: {
+            projectId: params.id,
+            status: { in: ['Open', 'Pending', 'Submitted'] },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            rfiNumber: true,
+            subject: true,
+            question: true,
+            status: true,
+            priority: true,
+            dateDue: true,
+            assignedTo: true,
+            ballInCourt: true,
+          },
+        }),
+        prisma.submittal.findMany({
+          where: {
+            projectId: params.id,
+            OR: [
+              { submittedDate: { gte: fromDate, lte: toDate } },
+              { updatedAt: { gte: fromDate, lte: toDate } },
+            ],
+          },
+          orderBy: { submittalNumber: 'asc' },
+          take: 12,
+          select: {
+            submittalNumber: true,
+            title: true,
+            status: true,
+            subcontractor: true,
+            submittedDate: true,
+          },
+        }),
+      ]);
+
+      logEntries = logs.map((l) => {
+        const parts: string[] = [];
+        if (l.workPerformed) parts.push(`Work: ${l.workPerformed}`);
+        if (l.crewNotes) parts.push(`Crew: ${l.crewNotes}`);
+        if (l.deliveries) parts.push(`Deliveries: ${l.deliveries}`);
+        if (l.delays) parts.push(`Delays/Issues: ${l.delays}`);
+        if (l.weather) parts.push(`Weather: ${l.weather}`);
+        return `Date: ${l.logDate.toISOString().split('T')[0]} | Author: ${l.authorName || 'Unknown'} | ${parts.join(' | ')}`;
+      }).join('\n');
+
+      rfiEntries = rfis.map((r) => {
+        return `RFI ${r.rfiNumber}: ${r.subject} | Status: ${r.status} | Priority: ${r.priority} | Due: ${r.dateDue ? r.dateDue.toISOString().split('T')[0] : 'N/A'} | Assigned: ${r.assignedTo || 'N/A'} | Ball in court: ${r.ballInCourt || 'N/A'}${r.question ? ` | Question: ${r.question}` : ''}`;
+      }).join('\n');
+
+      submittalEntries = submittals.map((s) => {
+        return `Submittal ${s.submittalNumber}: ${s.title} | Status: ${s.status} | Sub: ${s.subcontractor || 'N/A'} | Date: ${s.submittedDate ? s.submittedDate.toISOString().split('T')[0] : 'N/A'}`;
+      }).join('\n');
     }
 
-    const fromDate = logDateFromInput(from);
-    const toDate = logDateFromInput(to);
-    toDate.setHours(23, 59, 59, 999);
+    const systemPrompt = `You are a senior construction project manager writing an **Owner Progress Report** for a high-end construction project.
 
-    if (fromDate > toDate) {
-      return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
-    }
+TONE AND STYLE (CRITICAL):
+- Professional, diplomatic, and cautiously optimistic.
+- This report is for the OWNER. Do NOT include negative news, complaints, blame, or criticism unless explicitly indicated by the PM in the source material.
+- Frame any challenges as "items for Owner awareness" or "coordination points" rather than problems.
+- Focus on PROGRESS, MILESTONES ACHIEVED, and forward momentum.
+- If the source material mentions delays or issues, rephrase them diplomatically or omit them unless they require Owner action.
+- Write in English unless the project context clearly indicates Spanish.
+- Dates in the output should be natural language (e.g., "This week", "August 2026", "Ongoing").
 
-    const [logs, rfis, submittals] = await Promise.all([
-      prisma.dailyLog.findMany({
-        where: {
-          projectId: params.id,
-          logDate: { gte: fromDate, lte: toDate },
-        },
-        orderBy: { logDate: 'asc' },
-      }),
-      prisma.rFI.findMany({
-        where: {
-          projectId: params.id,
-          status: { in: ['Open', 'Pending', 'Submitted'] },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-        select: {
-          rfiNumber: true,
-          subject: true,
-          question: true,
-          status: true,
-          priority: true,
-          dateDue: true,
-          assignedTo: true,
-          ballInCourt: true,
-        },
-      }),
-      prisma.submittal.findMany({
-        where: {
-          projectId: params.id,
-          OR: [
-            { submittedDate: { gte: fromDate, lte: toDate } },
-            { updatedAt: { gte: fromDate, lte: toDate } },
-          ],
-        },
-        orderBy: { submittalNumber: 'asc' },
-        take: 12,
-        select: {
-          submittalNumber: true,
-          title: true,
-          status: true,
-          subcontractor: true,
-          submittedDate: true,
-        },
-      }),
-    ]);
-
-    // Build context for AI
-    const logEntries = logs.map((l) => {
-      const parts: string[] = [];
-      if (l.workPerformed) parts.push(`Work: ${l.workPerformed}`);
-      if (l.crewNotes) parts.push(`Crew: ${l.crewNotes}`);
-      if (l.deliveries) parts.push(`Deliveries: ${l.deliveries}`);
-      if (l.delays) parts.push(`Delays/Issues: ${l.delays}`);
-      if (l.weather) parts.push(`Weather: ${l.weather}`);
-      return `Date: ${l.logDate.toISOString().split('T')[0]} | Author: ${l.authorName || 'Unknown'} | ${parts.join(' | ')}`;
-    }).join('\n');
-
-    const rfiEntries = rfis.map((r) => {
-      return `RFI ${r.rfiNumber}: ${r.subject} | Status: ${r.status} | Priority: ${r.priority} | Due: ${r.dateDue ? r.dateDue.toISOString().split('T')[0] : 'N/A'} | Assigned: ${r.assignedTo || 'N/A'} | Ball in court: ${r.ballInCourt || 'N/A'}${r.question ? ` | Question: ${r.question}` : ''}`;
-    }).join('\n');
-
-    const submittalEntries = submittals.map((s) => {
-      return `Submittal ${s.submittalNumber}: ${s.title} | Status: ${s.status} | Sub: ${s.subcontractor || 'N/A'} | Date: ${s.submittedDate ? s.submittedDate.toISOString().split('T')[0] : 'N/A'}`;
-    }).join('\n');
-
-    const systemPrompt = `You are a senior construction project manager writing an executive field report for the Owner of a luxury construction project (Ritz-Carlton / high-end residential style).
-
-Analyze the daily logs, RFIs, and submittals from the reporting period and generate a structured JSON response with these exact keys:
-
+OUTPUT FORMAT — structured JSON with these exact keys:
 {
-  "overview": "2-3 paragraph executive narrative. Summarize the reporting period, key trades active, major decisions made, and any critical-path items. Write in a professional, confident tone suitable for an Owner who is not on site daily.",
+  "overview": "2-3 paragraph executive narrative. Summarize the reporting period or the PM's document, key activities, major decisions, and any items for Owner awareness. Suitable for an Owner who is not on site daily.",
   "milestones": [
-    { "title": "Short headline (e.g., 'Sauna Power Allocation Resolved')", "bullets": ["2-4 sentences describing the milestone, decision, and impact"] }
+    { "title": "Short headline", "bullets": ["2-4 sentences describing the milestone, decision, and impact"] }
   ],
   "openItems": [
     { "num": 1, "item": "Clear description of the open item / decision needed", "deadline": "This week / Month Year / Ongoing", "responsible": "Party responsible", "priority": "CRITICAL / HIGH / MEDIUM / LOW" }
@@ -125,15 +143,35 @@ Analyze the daily logs, RFIs, and submittals from the reporting period and gener
   ]
 }
 
-Guidelines:
-- Generate 3-6 milestones based on actual work, RFIs, and submittal activity.
-- Mark items as CRITICAL if they are on the critical path or could delay the project.
+GUIDELINES:
+- Generate 3-6 milestones based on actual work, RFIs, submittal activity, or the PM document.
+- Mark items as CRITICAL only if they are on the critical path or could delay the project and require Owner action.
 - Action items should be concrete, assignable tasks — not vague observations.
-- Use the Word document context (if provided) to enrich or override auto-detected items.
-- Write in English unless the project context clearly indicates Spanish.
-- Dates in the output should be natural language (e.g., "This week", "August 2026", "Ongoing").`;
+- Use the provided document text and Word context to enrich or override auto-detected items.
+- If photo descriptions are provided, reference them naturally in the overview or milestones (e.g., "as documented in the attached field photography").`;
 
-    const userPrompt = `Project: ${project.projectName} (${project.projectNumber})
+    let userPrompt = '';
+
+    if (mode === 'pmReport') {
+      if (!documentText) {
+        return NextResponse.json({ error: 'documentText is required for pmReport mode' }, { status: 400 });
+      }
+
+      userPrompt = `Project: ${project.projectName} (${project.projectNumber})
+Client: ${project.client || 'Owner'}
+Location: ${project.location || 'N/A'}
+Report Mode: PM Report + Photos (no daily logs)
+
+--- PM REPORT DOCUMENT ---
+${documentText}
+
+${wordContext ? `--- ADDITIONAL CONTEXT ---\n${wordContext}` : ''}
+
+${photoDescriptions.length ? `--- FIELD PHOTOGRAPHY DESCRIPTIONS ---\n${photoDescriptions.join('\n')}` : ''}
+
+Generate the Owner Progress Report JSON now.`;
+    } else {
+      userPrompt = `Project: ${project.projectName} (${project.projectNumber})
 Client: ${project.client || 'Owner'}
 Location: ${project.location || 'N/A'}
 Reporting Period: ${from} to ${to}
@@ -149,7 +187,10 @@ ${submittalEntries || 'No submittal activity.'}
 
 ${wordContext ? `--- ADDITIONAL CONTEXT FROM OWNER DOCUMENT ---\n${wordContext}` : ''}
 
-Generate the executive report JSON now.`;
+${photoDescriptions.length ? `--- FIELD PHOTOGRAPHY DESCRIPTIONS ---\n${photoDescriptions.join('\n')}` : ''}
+
+Generate the Owner Progress Report JSON now.`;
+    }
 
     const aiResult = await askClaudeJSON<{
       overview: string;

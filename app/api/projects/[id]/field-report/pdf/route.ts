@@ -38,6 +38,7 @@ export async function POST(
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
     const body = await request.json().catch(() => ({}));
+    const mode = body?.mode === 'pmReport' ? 'pmReport' : 'dailyLogs';
     const defaults = weekRangeEnding();
     const from = String(body?.from || defaults.from).slice(0, 10);
     const to = String(body?.to || defaults.to).slice(0, 10);
@@ -57,22 +58,32 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid date range' }, { status: 400 });
     }
 
+    // Fetch photos: if explicit photoIds given, use those; otherwise fall back to date range
+    const photoQuery = photoIds?.length
+      ? prisma.sitePhoto.findMany({
+          where: { projectId: params.id, id: { in: photoIds } },
+          orderBy: { takenAt: 'asc' },
+        })
+      : prisma.sitePhoto.findMany({
+          where: {
+            projectId: params.id,
+            takenAt: { gte: fromDate, lte: toDate },
+          },
+          orderBy: { takenAt: 'asc' },
+        });
+
     const [logs, photos, openRfis, submittals, schedule] = await Promise.all([
-      prisma.dailyLog.findMany({
-        where: {
-          projectId: params.id,
-          logDate: { gte: fromDate, lte: toDate },
-        },
-        include: { photos: { orderBy: { takenAt: 'asc' } } },
-        orderBy: { logDate: 'asc' },
-      }),
-      prisma.sitePhoto.findMany({
-        where: {
-          projectId: params.id,
-          takenAt: { gte: fromDate, lte: toDate },
-        },
-        orderBy: { takenAt: 'asc' },
-      }),
+      mode === 'dailyLogs'
+        ? prisma.dailyLog.findMany({
+            where: {
+              projectId: params.id,
+              logDate: { gte: fromDate, lte: toDate },
+            },
+            include: { photos: { orderBy: { takenAt: 'asc' } } },
+            orderBy: { logDate: 'asc' },
+          })
+        : Promise.resolve([]),
+      photoQuery,
       prisma.rFI.findMany({
         where: {
           projectId: params.id,
@@ -91,33 +102,41 @@ export async function POST(
           ballInCourt: true,
         },
       }),
-      prisma.submittal.findMany({
-        where: {
-          projectId: params.id,
-          OR: [
-            { submittedDate: { gte: fromDate, lte: toDate } },
-            { updatedAt: { gte: fromDate, lte: toDate } },
-          ],
-        },
-        orderBy: { submittalNumber: 'asc' },
-        take: 12,
-        select: {
-          submittalNumber: true,
-          title: true,
-          status: true,
-          subcontractor: true,
-          submittedDate: true,
-        },
-      }),
+      mode === 'dailyLogs'
+        ? prisma.submittal.findMany({
+            where: {
+              projectId: params.id,
+              OR: [
+                { submittedDate: { gte: fromDate, lte: toDate } },
+                { updatedAt: { gte: fromDate, lte: toDate } },
+              ],
+            },
+            orderBy: { submittalNumber: 'asc' },
+            take: 12,
+            select: {
+              submittalNumber: true,
+              title: true,
+              status: true,
+              subcontractor: true,
+              submittedDate: true,
+            },
+          })
+        : Promise.resolve([]),
       prisma.schedule.findFirst({
         where: { projectId: params.id, status: 'Active' },
         select: { tcoDate: true, projectFinish: true },
       }),
     ]);
 
-    if (!logs.length && !photos.length) {
+    if (mode === 'dailyLogs' && !logs.length && !photos.length) {
       return NextResponse.json({
         error: 'No hay daily logs ni fotos en este rango de fechas. Amplía las fechas o agrega datos de campo.',
+      }, { status: 400 });
+    }
+
+    if (mode === 'pmReport' && !photos.length) {
+      return NextResponse.json({
+        error: 'No photos selected. Choose at least one photo for the report.',
       }, { status: 400 });
     }
 
@@ -205,6 +224,7 @@ export async function POST(
       from,
       to,
       preparedBy: session.user?.name || 'Project Team',
+      preparedFor: project.client ?? 'Owner',
       companyName: brand.name,
       companyAddressFull: brand.addressFull,
       logoHtml: brand.logoHtml,
@@ -230,6 +250,7 @@ export async function POST(
         ? aiGenerated.actionItems
         : autoActionItems(mappedRfis, mappedLogs),
       openRfis: mappedRfis,
+      mode,
     };
 
     const html = await buildFieldReportHtml(reportData, locale);

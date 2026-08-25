@@ -80,6 +80,7 @@ export type FieldReportData = {
   from: string;
   to: string;
   preparedBy: string;
+  preparedFor?: string | null;
   companyName?: string | null;
   companyAddressFull?: string | null;
   logoHtml?: string;
@@ -92,6 +93,7 @@ export type FieldReportData = {
   openItems: FieldReportOpenItem[];
   actionItems: FieldReportActionItem[];
   openRfis: FieldReportRfi[];
+  mode?: 'dailyLogs' | 'pmReport';
 };
 
 function esc(s: string | null | undefined): string {
@@ -412,6 +414,14 @@ export async function buildFieldReportHtml(data: FieldReportData, locale: AppLoc
     const pair = embedded.slice(i, i + 2);
     photoRows.push(`<div class="photo-row">${pair.map((p) => photoCell(p, locale)).join('')}</div>`);
   }
+
+  const fieldStatusSection = data.logs.length ? `
+  <div class="section">
+    <div class="sec-hdr">${esc(pdf('fieldStatus', { week: weekLabel }))}</div>
+    <div class="sec-body">
+      <ul class="field-list">${fieldBullets}</ul>
+    </div>
+  </div>` : '';
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
