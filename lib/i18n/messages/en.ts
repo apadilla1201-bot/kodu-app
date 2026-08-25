@@ -273,6 +273,14 @@ export const enMessages = {
     aiPreviewTitle: 'AI Executive Report Preview',
     selectAll: 'Select All',
     clear: 'Clear',
+    modeDailyLogs: 'From Daily Logs',
+    modePmReport: 'From PM Report + Photos',
+    uploadPmReport: 'Upload PM Report (PDF or Word)',
+    docExtracted: 'Document extracted successfully',
+    docExtractFailed: 'Failed to extract document',
+    extractingDoc: 'Extracting text...',
+    docReady: 'Document ready',
+    downloadPdf: 'Download PDF',
 
   },
   sitePhotos: {
@@ -819,6 +827,7 @@ export const enMessages = {
       location: 'Location',
       reportDate: 'Report Date',
       preparedBy: 'Prepared By',
+      preparedFor: 'Prepared For',
       tcoTarget: 'TCO Target',
       tcoDefault: 'See master schedule',
       overview: '1. Project Overview',

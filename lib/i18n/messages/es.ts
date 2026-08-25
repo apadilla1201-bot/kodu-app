@@ -275,6 +275,14 @@ export const esMessages: Messages = {
     aiPreviewTitle: 'Vista previa del Reporte Ejecutivo con AI',
     selectAll: 'Seleccionar todas',
     clear: 'Limpiar',
+    modeDailyLogs: 'Desde Diarios de Obra',
+    modePmReport: 'Desde Reporte del PM + Fotos',
+    uploadPmReport: 'Subir Reporte del PM (PDF o Word)',
+    docExtracted: 'Documento extraído con éxito',
+    docExtractFailed: 'Error al extraer documento',
+    extractingDoc: 'Extrayendo texto...',
+    docReady: 'Documento listo',
+    downloadPdf: 'Descargar PDF',
 
   },
   sitePhotos: {

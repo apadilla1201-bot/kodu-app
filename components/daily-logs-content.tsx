@@ -17,6 +17,7 @@ import {
   MicOff,
   Save,
   Send,
+  Upload,
 } from 'lucide-react';
 import {
   WEATHER_OPTIONS,
@@ -93,6 +94,9 @@ export function DailyLogsContent({
     actionItems: { num: number; action: string; responsible: string; targetDate: string }[];
   } | null>(null);
   const [showAiPreview, setShowAiPreview] = useState(false);
+  const [reportMode, setReportMode] = useState<'dailyLogs' | 'pmReport'>('dailyLogs');
+  const [uploadedDocText, setUploadedDocText] = useState('');
+  const [extractingDoc, setExtractingDoc] = useState(false);
 
   const [form, setForm] = useState({
     weather: '',
@@ -244,7 +248,10 @@ export function DailyLogsContent({
   const loadReportPhotos = async () => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/photos?from=${reportFrom}&to=${reportTo}`, { credentials: 'include' });
+      const url = reportMode === 'pmReport'
+        ? `/api/projects/${projectId}/photos`
+        : `/api/projects/${projectId}/photos?from=${reportFrom}&to=${reportTo}`;
+      const res = await fetch(url, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         const photos = data.photos || [];
@@ -266,15 +273,24 @@ export function DailyLogsContent({
     if (!projectId) return;
     setAiAnalyzing(true);
     try {
+      const payload: any = {
+        mode: reportMode,
+        from: reportFrom,
+        to: reportTo,
+        wordContext: wordContext.trim(),
+      };
+      if (reportMode === 'pmReport') {
+        payload.documentText = uploadedDocText.trim();
+        payload.photoDescriptions = selectedReportPhotoIds.map((id) => {
+          const p = reportPhotos.find((ph) => ph.id === id);
+          return p ? `${p.caption || p.tag || 'Photo'} (${p.imageUrl})` : '';
+        }).filter(Boolean);
+      }
       const res = await fetch(`/api/projects/${projectId}/field-report/ai-analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          from: reportFrom,
-          to: reportTo,
-          wordContext: wordContext.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -299,6 +315,7 @@ export function DailyLogsContent({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          mode: reportMode,
           from: reportFrom,
           to: reportTo,
           overview: reportOverview.trim() || aiPreview.overview,
@@ -666,21 +683,92 @@ export function DailyLogsContent({
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-card rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6">
           <h3 className="text-lg font-semibold mb-4">{t('dailyLogs.selectPhotosForReport')}</h3>
-          <div className="mb-4">
-            <label className="text-xs font-medium text-muted-foreground uppercase">{t('dailyLogs.wordContext')}</label>
-            <textarea
-              value={wordContext}
-              onChange={(e) => setWordContext(e.target.value)}
-              rows={3}
-              placeholder="{t('dailyLogs.wordContextPlaceholder')}"
-              className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm resize-y"
-            />
+
+          {/* Mode Toggle */}
+          <div className="mb-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setReportMode('dailyLogs')}
+              className={`px-3 py-1.5 text-xs rounded-lg border ${reportMode === 'dailyLogs' ? 'bg-[#0F1B33] text-[#C9A96E] border-[#0F1B33]' : 'hover:bg-muted'}`}
+            >
+              {t('dailyLogs.modeDailyLogs')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setReportMode('pmReport'); loadReportPhotos(); }}
+              className={`px-3 py-1.5 text-xs rounded-lg border ${reportMode === 'pmReport' ? 'bg-[#0F1B33] text-[#C9A96E] border-[#0F1B33]' : 'hover:bg-muted'}`}
+            >
+              {t('dailyLogs.modePmReport')}
+            </button>
           </div>
+
+          {reportMode === 'pmReport' && (
+            <div className="mb-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase">{t('dailyLogs.uploadPmReport')}</label>
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.doc"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setExtractingDoc(true);
+                    try {
+                      const formData = new FormData();
+                      formData.append('file', file);
+                      const res = await fetch(`/api/projects/${projectId}/field-report/extract-document`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        body: formData,
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        setUploadedDocText(data.text || '');
+                        toast({ title: t('dailyLogs.docExtracted') });
+                      } else {
+                        throw new Error(data.error || 'Extraction failed');
+                      }
+                    } catch (e: any) {
+                      toast({ title: e?.message ?? t('dailyLogs.docExtractFailed'), variant: 'destructive' });
+                    } finally {
+                      setExtractingDoc(false);
+                    }
+                  }}
+                  className="mt-1 block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-[#0F1B33] file:text-[#C9A96E]"
+                />
+                {extractingDoc && <p className="text-xs text-muted-foreground mt-1">{t('dailyLogs.extractingDoc')}</p>}
+                {uploadedDocText && <p className="text-xs text-green-600 mt-1">{t('dailyLogs.docReady')}</p>}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase">{t('dailyLogs.wordContext')}</label>
+                <textarea
+                  value={wordContext}
+                  onChange={(e) => setWordContext(e.target.value)}
+                  rows={2}
+                  placeholder={t('dailyLogs.wordContextPlaceholder')}
+                  className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm resize-y"
+                />
+              </div>
+            </div>
+          )}
+
+          {reportMode === 'dailyLogs' && (
+            <div className="mb-4">
+              <label className="text-xs font-medium text-muted-foreground uppercase">{t('dailyLogs.wordContext')}</label>
+              <textarea
+                value={wordContext}
+                onChange={(e) => setWordContext(e.target.value)}
+                rows={3}
+                placeholder={t('dailyLogs.wordContextPlaceholder')}
+                className="mt-1 w-full px-3 py-2 border rounded-lg bg-background text-sm resize-y"
+              />
+            </div>
+          )}
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-muted-foreground">{selectedReportPhotoIds.length} of {reportPhotos.length} selected</p>
             <div className="flex gap-2">
               <button onClick={() => setSelectedReportPhotoIds(reportPhotos.map((p) => p.id))} className="text-xs px-2 py-1 border rounded hover:bg-muted">{t('dailyLogs.selectAll')}</button>
-              <button onClick={() => setSelectedReportPhotoIds([])} className="text-xs px-2 py-1 border rounded hover:bg-muted">Clear</button>
+              <button onClick={() => setSelectedReportPhotoIds([])} className="text-xs px-2 py-1 border rounded hover:bg-muted">{t('common.clear')}</button>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2 mb-4">
@@ -701,7 +789,7 @@ export function DailyLogsContent({
             ))}
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowPhotoModal(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
+            <button onClick={() => setShowPhotoModal(false)} className="px-4 py-2 border rounded-lg text-sm">{t('common.cancel')}</button>
             <button
               onClick={() => { setShowPhotoModal(false); analyzeWithAi(); }}
               disabled={aiAnalyzing}
@@ -764,14 +852,14 @@ export function DailyLogsContent({
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setShowAiPreview(false)} className="px-4 py-2 border rounded-lg text-sm">Back</button>
+            <button onClick={() => setShowAiPreview(false)} className="px-4 py-2 border rounded-lg text-sm">{t('common.cancel')}</button>
             <button
               onClick={downloadAiFieldReport}
               disabled={generatingReport}
               className="px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold disabled:opacity-50"
             >
               {generatingReport ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : <Download className="w-4 h-4 inline mr-1" />}
-              Download PDF
+              {t('dailyLogs.downloadPdf')}
             </button>
           </div>
         </div>
