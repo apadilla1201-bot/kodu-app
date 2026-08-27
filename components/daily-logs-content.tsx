@@ -15,6 +15,7 @@ import {
   Loader2,
   Mic,
   MicOff,
+  Printer,
   Save,
   Send,
   Upload,
@@ -112,6 +113,7 @@ export function DailyLogsContent({
     safetyNotes?: string | null;
     hoursWorked?: string | null;
   } | null>(null);
+  const [downloadingLogId, setDownloadingLogId] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     weather: '',
@@ -441,6 +443,37 @@ export function DailyLogsContent({
     }
   };
 
+  const downloadDailyLogPdf = async (logId: string, logDateStr: string) => {
+    if (!projectId) return;
+    setDownloadingLogId(logId);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/daily-logs/${logId}/pdf`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to generate PDF');
+      }
+      const blob = await res.blob();
+      const proj = projects.find((p) => p.id === projectId);
+      const dateKeyStr = logDateStr.slice(0, 10);
+      const fname = `DAILY_LOG_${proj?.projectNumber ?? 'project'}_${dateKeyStr}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: 'PDF downloaded' });
+    } catch (e: any) {
+      toast({ title: e?.message ?? 'Failed to download PDF', variant: 'destructive' });
+    } finally {
+      setDownloadingLogId(null);
+    }
+  };
+
   const selectedProject = projects.find((p) => p.id === projectId);
 
   return (
@@ -750,16 +783,25 @@ export function DailyLogsContent({
               <ul className="space-y-2 max-h-64 overflow-y-auto">
                 {history.length === 0 && <li className="text-xs text-muted-foreground">{t('dailyLogs.noLogsYet')}</li>}
                 {history.map((h) => (
-                  <li key={h.id}>
+                  <li key={h.id} className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setLogDate(dateKey(h.logDate))}
-                      className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted ${
+                      className={`flex-1 text-left px-2 py-1.5 rounded text-xs hover:bg-muted ${
                         dateKey(h.logDate) === logDate ? 'bg-muted font-medium' : ''
                       }`}
                     >
                       {formatLogDate(h.logDate)}
                       <span className="ml-2 text-muted-foreground">{h.status} · {h._count?.photos ?? 0} fotos</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={downloadingLogId === h.id}
+                      onClick={(e) => { e.stopPropagation(); downloadDailyLogPdf(h.id, h.logDate); }}
+                      className="px-1.5 py-1 text-[#0F1B33] hover:bg-muted rounded disabled:opacity-50"
+                      title="Download PDF"
+                    >
+                      {downloadingLogId === h.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Printer className="w-3 h-3" />}
                     </button>
                   </li>
                 ))}
