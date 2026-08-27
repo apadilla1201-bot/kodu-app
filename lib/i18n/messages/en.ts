@@ -281,7 +281,14 @@ export const enMessages = {
     extractingDoc: 'Extracting text...',
     docReady: 'Document ready',
     downloadPdf: 'Download PDF',
-
+    importFromPdf: 'Import from Field Report PDF',
+    importFromPdfHint: 'Upload a daily report PDF (Fieldwire, Procore, etc.) and AI will convert it to a Kodu Daily Log.',
+    selectPdf: 'Select PDF',
+    importingPdf: 'Analyzing PDF...',
+    pdfImported: 'Daily report imported — review and save',
+    pdfImportFailed: 'PDF import failed',
+    pdfExtracted: 'Extracted from PDF',
+    reviewAndSave: 'Review the fields below and click Save Draft or Send to PM.',
   },
   sitePhotos: {
     title: 'Site Photos',

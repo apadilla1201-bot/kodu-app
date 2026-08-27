@@ -283,7 +283,14 @@ export const esMessages: Messages = {
     extractingDoc: 'Extrayendo texto...',
     docReady: 'Documento listo',
     downloadPdf: 'Descargar PDF',
-
+    importFromPdf: 'Importar desde PDF de campo',
+    importFromPdfHint: 'Sube un PDF de reporte diario (Fieldwire, Procore, etc.) y la IA lo convertirá a un Daily Log de Kodu.',
+    selectPdf: 'Seleccionar PDF',
+    importingPdf: 'Analizando PDF...',
+    pdfImported: 'Reporte diario importado — revísalo y guárdalo',
+    pdfImportFailed: 'Error al importar PDF',
+    pdfExtracted: 'Extraído del PDF',
+    reviewAndSave: 'Revisa los campos abajo y haz clic en Guardar borrador o Enviar al PM.',
   },
   sitePhotos: {
     title: 'Fotos de obra',

@@ -97,6 +97,21 @@ export function DailyLogsContent({
   const [reportMode, setReportMode] = useState<'dailyLogs' | 'pmReport'>('dailyLogs');
   const [uploadedDocText, setUploadedDocText] = useState('');
   const [extractingDoc, setExtractingDoc] = useState(false);
+  const [importingPdf, setImportingPdf] = useState(false);
+  const [pdfExtracted, setPdfExtracted] = useState<{
+    logDate?: string;
+    authorName?: string;
+    weather?: string | null;
+    temperature?: string | null;
+    workPerformed?: string | null;
+    crewNotes?: string | null;
+    deliveries?: string | null;
+    delays?: string | null;
+    equipment?: string | null;
+    inspections?: string | null;
+    safetyNotes?: string | null;
+    hoursWorked?: string | null;
+  } | null>(null);
 
   const [form, setForm] = useState({
     weather: '',
@@ -243,6 +258,41 @@ export function DailyLogsContent({
     }
     sessionStorage.setItem('kodu_rfi_draft_note', note);
     router.push(`/dashboard/rfis/new?projectId=${projectId}&fromDailyLog=1`);
+  };
+
+  const handlePdfImport = async (file: File) => {
+    if (!projectId) return;
+    setImportingPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`/api/projects/${projectId}/daily-logs/import-pdf`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+
+      const extracted = data.extracted;
+      setPdfExtracted(extracted);
+
+      if (extracted.logDate) setLogDate(extracted.logDate);
+      setForm((f) => ({
+        weather: extracted.weather ?? f.weather,
+        temperature: extracted.temperature ?? f.temperature,
+        workPerformed: extracted.workPerformed ?? f.workPerformed,
+        crewNotes: extracted.crewNotes ?? f.crewNotes,
+        deliveries: extracted.deliveries ?? f.deliveries,
+        delays: extracted.delays ?? f.delays,
+      }));
+
+      toast({ title: t('dailyLogs.pdfImported') || 'Daily report imported — review and save' });
+    } catch (e: any) {
+      toast({ title: (t('dailyLogs.pdfImportFailed') || 'PDF import failed'), variant: 'destructive' });
+    } finally {
+      setImportingPdf(false);
+    }
   };
 
   const loadReportPhotos = async () => {
@@ -542,80 +592,122 @@ export function DailyLogsContent({
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border rounded-xl p-5 space-y-4 shadow-sm">
-            <p className="font-medium text-sm text-muted-foreground">
-              {selectedProject ? `#${selectedProject.projectNumber} — ${selectedProject.projectName}` : ''}
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium">{t('dailyLogs.weather')}</label>
-                <select value={form.weather} onChange={(e) => update('weather', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm">
-                  <option value="">—</option>
-                  {WEATHER_OPTIONS.map((w) => <option key={w} value={w}>{w}</option>)}
-                </select>
+          <div className="lg:col-span-2 space-y-4">
+            {/* Import from Field Report PDF */}
+            <div className="bg-gradient-to-br from-[#0F1B33]/5 to-[#2E7D32]/10 border border-[#2E7D32]/25 rounded-xl p-4 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-[#2E7D32]" />
+                    {t('dailyLogs.importFromPdf') || 'Import from Field Report PDF'}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t('dailyLogs.importFromPdfHint') || 'Upload a daily report PDF (Fieldwire, Procore, etc.) and AI will convert it to a Kodu Daily Log.'}
+                  </p>
+                </div>
+                <label className="inline-flex items-center gap-2 px-4 py-2 bg-[#0F1B33] text-[#C9A96E] rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-50 hover:opacity-90 transition-opacity">
+                  {importingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {importingPdf ? (t('dailyLogs.importingPdf') || 'Analyzing...') : (t('dailyLogs.selectPdf') || 'Select PDF')}
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePdfImport(file);
+                      e.target.value = '';
+                    }}
+                    disabled={importingPdf}
+                    className="hidden"
+                  />
+                </label>
               </div>
-              <div>
-                <label className="text-xs font-medium">{t('dailyLogs.temperature')}</label>
-                <input value={form.temperature} onChange={(e) => update('temperature', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm" placeholder="85" />
-              </div>
+              {pdfExtracted && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-xs font-medium text-green-800">
+                    {t('dailyLogs.pdfExtracted') || 'Extracted from PDF:'} {pdfExtracted.authorName ? `— ${pdfExtracted.authorName}` : ''} {pdfExtracted.logDate ? `(${pdfExtracted.logDate})` : ''}
+                  </p>
+                  <p className="text-[10px] text-green-600 mt-1">
+                    {t('dailyLogs.reviewAndSave') || 'Review the fields below and click Save Draft or Send to PM.'}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {(['workPerformed', 'crewNotes', 'deliveries', 'delays'] as const).map((field) => {
-              const fieldLabels: Record<typeof field, string> = {
-                workPerformed: t('dailyLogs.workPerformed'),
-                crewNotes: t('dailyLogs.crewNotes'),
-                deliveries: t('dailyLogs.deliveries'),
-                delays: t('dailyLogs.delays'),
-              };
-              return (
-              <div key={field}>
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium">{fieldLabels[field]}</label>
-                  {(field === 'workPerformed' || field === 'delays') && (
-                    <button
-                      type="button"
-                      onClick={() => startVoice(field)}
-                      disabled={listening}
-                      className="text-xs inline-flex items-center gap-1 text-[#C9A96E] hover:underline disabled:opacity-50"
-                    >
-                      {listening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                      {t('dailyLogs.voice')}
-                    </button>
-                  )}
+            <div className="bg-card border rounded-xl p-5 space-y-4 shadow-sm">
+              <p className="font-medium text-sm text-muted-foreground">
+                {selectedProject ? `#${selectedProject.projectNumber} — ${selectedProject.projectName}` : ''}
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium">{t('dailyLogs.weather')}</label>
+                  <select value={form.weather} onChange={(e) => update('weather', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm">
+                    <option value="">—</option>
+                    {WEATHER_OPTIONS.map((w) => <option key={w} value={w}>{w}</option>)}
+                  </select>
                 </div>
-                <textarea
-                  value={form[field]}
-                  onChange={(e) => update(field, e.target.value)}
-                  rows={field === 'workPerformed' ? 4 : 2}
-                  className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
-                />
+                <div>
+                  <label className="text-xs font-medium">{t('dailyLogs.temperature')}</label>
+                  <input value={form.temperature} onChange={(e) => update('temperature', e.target.value)} className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm" placeholder="85" />
+                </div>
               </div>
-            );})}
 
-            {form.delays.trim() && (
-              <button
-                type="button"
-                onClick={draftRfiFromDelays}
-                className="inline-flex items-center gap-2 text-sm text-[#0F1B33] font-medium hover:underline"
-              >
-                <FileQuestion className="w-4 h-4" /> {t('dailyLogs.draftRfi')}
-              </button>
-            )}
+              {(['workPerformed', 'crewNotes', 'deliveries', 'delays'] as const).map((field) => {
+                const fieldLabels: Record<typeof field, string> = {
+                  workPerformed: t('dailyLogs.workPerformed'),
+                  crewNotes: t('dailyLogs.crewNotes'),
+                  deliveries: t('dailyLogs.deliveries'),
+                  delays: t('dailyLogs.delays'),
+                };
+                return (
+                <div key={field}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium">{fieldLabels[field]}</label>
+                    {(field === 'workPerformed' || field === 'delays') && (
+                      <button
+                        type="button"
+                        onClick={() => startVoice(field)}
+                        disabled={listening}
+                        className="text-xs inline-flex items-center gap-1 text-[#C9A96E] hover:underline disabled:opacity-50"
+                      >
+                        {listening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                        {t('dailyLogs.voice')}
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    value={form[field]}
+                    onChange={(e) => update(field, e.target.value)}
+                    rows={field === 'workPerformed' ? 4 : 2}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg bg-background text-sm"
+                  />
+                </div>
+              );})}
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <button type="button" disabled={saving} onClick={() => save('Draft')} className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50">
-                <Save className="w-4 h-4" /> {t('dailyLogs.saveDraft')}
-              </button>
-              <button type="button" disabled={saving} onClick={() => save('Submitted')} className="inline-flex items-center gap-2 px-4 py-2 bg-[#C9A96E] text-white rounded-lg text-sm font-semibold disabled:opacity-50">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {t('dailyLogs.sendToPm')}
-              </button>
-              {log?.status === 'Submitted' && (
-                <button type="button" disabled={saving} onClick={() => save('Approved')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                  {t('dailyLogs.approve')}
+              {form.delays.trim() && (
+                <button
+                  type="button"
+                  onClick={draftRfiFromDelays}
+                  className="inline-flex items-center gap-2 text-sm text-[#0F1B33] font-medium hover:underline"
+                >
+                  <FileQuestion className="w-4 h-4" /> {t('dailyLogs.draftRfi')}
                 </button>
               )}
+
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button type="button" disabled={saving} onClick={() => save('Draft')} className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium disabled:opacity-50">
+                  <Save className="w-4 h-4" /> {t('dailyLogs.saveDraft')}
+                </button>
+                <button type="button" disabled={saving} onClick={() => save('Submitted')} className="inline-flex items-center gap-2 px-4 py-2 bg-[#C9A96E] text-white rounded-lg text-sm font-semibold disabled:opacity-50">
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {t('dailyLogs.sendToPm')}
+                </button>
+                {log?.status === 'Submitted' && (
+                  <button type="button" disabled={saving} onClick={() => save('Approved')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                    {t('dailyLogs.approve')}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
