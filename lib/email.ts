@@ -585,6 +585,8 @@ export async function sendDailyLogSubmittedEmail(opts: {
   temperature?: string | null;
   photoCount: number;
   logId: string;
+  /** Optional photo attachments — filename + base64 content */
+  attachments?: { filename: string; content: string }[];
 }) {
   const link = `${appBaseUrl()}/dashboard/daily-logs?projectId=${opts.logId}`;
   const brand = await emailBrand(opts.companyId);
@@ -607,6 +609,21 @@ export async function sendDailyLogSubmittedEmail(opts: {
     ? `<p><strong>Weather:</strong> ${escHtml(opts.weather)}${opts.temperature ? ` (${escHtml(opts.temperature)})` : ''}</p>`
     : '';
 
+  // Thumbnails inline usando cid references
+  let photoGallery = '';
+  if (opts.attachments?.length) {
+    const thumbs = opts.attachments.map((att, i) => {
+      const cid = `photo-${i}-${att.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      return `<img src="cid:${cid}" alt="${escHtml(att.filename)}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;margin:4px;border:1px solid #e5e7eb;" />`;
+    }).join('');
+    photoGallery = `
+      <div style="background:white;padding:12px;border-radius:4px;border-left:4px solid ${GOLD};margin:8px 0;">
+        <p style="margin:0 0 8px 0;color:#666;font-size:12px;text-transform:uppercase;">Photos (${opts.attachments.length})</p>
+        <div style="display:flex;flex-wrap:wrap;">${thumbs}</div>
+      </div>
+    `;
+  }
+
   const html = wrapEmail(
     NAVY,
     'Daily Log Submitted',
@@ -616,7 +633,8 @@ export async function sendDailyLogSubmittedEmail(opts: {
       <p><strong>Date:</strong> ${opts.logDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
       <p><strong>Submitted By:</strong> ${escHtml(opts.authorName)}</p>
       ${weatherLine}
-      <p><strong>Photos:</strong> ${opts.photoCount}</p>
+      <p><strong>Photos:</strong> ${opts.photoCount}${opts.attachments?.length ? ` (${opts.attachments.length} attached)` : ''}</p>
+      ${photoGallery}
       ${sections.join('')}
       <p style="margin-top:16px;"><a href="${link}" style="display:inline-block;background:${NAVY};color:${GOLD};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Daily Log in Kodu</a></p>
     `,
@@ -629,5 +647,13 @@ export async function sendDailyLogSubmittedEmail(opts: {
     replyTo: opts.replyTo,
     subject: `Daily Log Submitted — ${escHtml(opts.projectNumber)} — ${opts.logDate.toLocaleDateString('en-US')}`,
     html,
+    attachments: opts.attachments?.length
+      ? opts.attachments.map((att, i) => ({
+          filename: att.filename,
+          content: att.content,
+          // contentId para inline thumbnails
+          ...(true ? { contentId: `photo-${i}-${att.filename.replace(/[^a-zA-Z0-9.-]/g, '_')}` } : {}),
+        })) as any
+      : undefined,
   });
 }

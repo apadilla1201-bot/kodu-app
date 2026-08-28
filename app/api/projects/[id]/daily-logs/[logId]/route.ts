@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
-import { getFileUrl } from '@/lib/s3';
+import { getFileUrl, downloadFileBuffer } from '@/lib/s3';
 import { sendDailyLogSubmittedEmail } from '@/lib/email';
 
 export async function GET(
@@ -134,6 +134,26 @@ export async function PATCH(
               include: { photos: true },
             });
 
+            // Descargar fotos para adjuntar al email (máx 10, máx ~20MB total)
+            const attachments: { filename: string; content: string }[] = [];
+            const MAX_ATTACH = 10;
+            const MAX_BYTES = 20 * 1024 * 1024;
+            let totalBytes = 0;
+            const photos = logWithPhotos?.photos?.slice(0, MAX_ATTACH) ?? [];
+            for (const photo of photos) {
+              try {
+                const buffer = await downloadFileBuffer(photo.cloudStoragePath);
+                if (totalBytes + buffer.length > MAX_BYTES) break;
+                attachments.push({
+                  filename: photo.fileName || `photo-${photo.id}.jpg`,
+                  content: buffer.toString('base64'),
+                });
+                totalBytes += buffer.length;
+              } catch (err) {
+                console.warn('[daily-log] failed to download photo for email:', photo.id, err);
+              }
+            }
+
             await sendDailyLogSubmittedEmail({
               companyId: project.companyId,
               to: pmEmails,
@@ -150,6 +170,7 @@ export async function PATCH(
               temperature: updated.temperature,
               photoCount: logWithPhotos?.photos?.length ?? 0,
               logId: params.id, // usamos projectId para el link de daily-logs
+              attachments: attachments.length ? attachments : undefined,
             });
           }
         }
