@@ -9,6 +9,7 @@ import {
   ImageIcon,
   Loader2,
   MapPin,
+  Search,
   Trash2,
   Upload,
   X,
@@ -63,6 +64,11 @@ export function SitePhotosContent({
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [areaFilter, setAreaFilter] = useState<string>('all');
+  const [tradeFilter, setTradeFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [areas, setAreas] = useState<string[]>([]);
+  const [trades, setTrades] = useState<string[]>([]);
   const [selected, setSelected] = useState<SitePhotoRow | null>(null);
   const [editCaption, setEditCaption] = useState('');
   const [editArea, setEditArea] = useState('');
@@ -87,17 +93,24 @@ export function SitePhotosContent({
     if (!projectId) return;
     setLoading(true);
     try {
-      const qs = tagFilter !== 'all' ? `?tag=${tagFilter}` : '';
-      const res = await fetch(`/api/projects/${projectId}/photos${qs}`, { credentials: 'include' });
+      const qs = new URLSearchParams();
+      if (tagFilter !== 'all') qs.set('tag', tagFilter);
+      if (areaFilter !== 'all') qs.set('area', areaFilter);
+      if (tradeFilter !== 'all') qs.set('trade', tradeFilter);
+      if (searchQuery.trim()) qs.set('search', searchQuery.trim());
+      const query = qs.toString() ? `?${qs.toString()}` : '';
+      const res = await fetch(`/api/projects/${projectId}/photos${query}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       setPhotos(data.photos || []);
+      setAreas(data.areas || []);
+      setTrades(data.trades || []);
     } catch {
       toast({ title: t('sitePhotos.loadFailed'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [projectId, tagFilter, toast]);
+  }, [projectId, tagFilter, areaFilter, tradeFilter, searchQuery, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -291,6 +304,15 @@ export function SitePhotosContent({
 
   const uploadLabel = (count: number) =>
     count === 1 ? t('sitePhotos.uploadOne') : t('sitePhotos.uploadN', { count });
+
+  const clearFilters = () => {
+    setTagFilter('all');
+    setAreaFilter('all');
+    setTradeFilter('all');
+    setSearchQuery('');
+  };
+
+  const hasActiveFilters = tagFilter !== 'all' || areaFilter !== 'all' || tradeFilter !== 'all' || searchQuery.trim().length > 0;
 
   return (
     <div className="space-y-6 pb-24 lg:pb-6">
@@ -539,25 +561,66 @@ export function SitePhotosContent({
         )}
       </div>
 
-      {/* Tag filter */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setTagFilter('all')}
-          className={`px-3 py-1 rounded-full text-xs font-medium ${tagFilter === 'all' ? 'bg-[#0F1B33] text-[#C9A96E]' : 'bg-muted'}`}
-        >
-          {t('common.all')} ({photos.length})
-        </button>
-        {PHOTO_TAGS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTagFilter(t.id)}
-            className={`px-3 py-1 rounded-full text-xs font-medium ${tagFilter === t.id ? t.color + ' ring-1 ring-[#C9A96E]' : 'bg-muted text-muted-foreground'}`}
+      {/* Filters */}
+      <div className="bg-card border rounded-xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search photos..."
+              className="w-full pl-9 pr-3 py-2 border rounded-lg bg-background text-sm"
+            />
+          </div>
+          {/* Tag filter */}
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
           >
-            {photoTagLabel(t.id, locale)}
-          </button>
-        ))}
+            <option value="all">All Tags</option>
+            {PHOTO_TAGS.map((t) => (
+              <option key={t.id} value={t.id}>{photoTagLabel(t.id, locale)}</option>
+            ))}
+          </select>
+          {/* Area filter */}
+          <select
+            value={areaFilter}
+            onChange={(e) => setAreaFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
+          >
+            <option value="all">All Areas</option>
+            {areas.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+          {/* Trade filter */}
+          <select
+            value={tradeFilter}
+            onChange={(e) => setTradeFilter(e.target.value)}
+            className="px-3 py-2 border rounded-lg bg-background text-sm"
+          >
+            <option value="all">All Trades</option>
+            {trades.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{photos.length} results</span>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs text-[#C9A96E] hover:underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (

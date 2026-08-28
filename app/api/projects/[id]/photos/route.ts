@@ -31,15 +31,29 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const tag = searchParams.get('tag');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const area = searchParams.get('area');
+    const trade = searchParams.get('trade');
+    const search = searchParams.get('search');
 
-    const where: {
-      projectId: string;
-      tag?: string;
-      takenAt?: { gte?: Date; lte?: Date };
-    } = { projectId: params.id };
+    const where: any = { projectId: params.id };
 
     if (tag && tag !== 'all' && VALID_TAGS.has(tag as PhotoTagId)) {
       where.tag = tag;
+    }
+    if (area && area !== 'all') {
+      where.area = { contains: area, mode: 'insensitive' };
+    }
+    if (trade && trade !== 'all') {
+      where.trade = { contains: trade, mode: 'insensitive' };
+    }
+    if (search?.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { caption: { contains: q, mode: 'insensitive' } },
+        { area: { contains: q, mode: 'insensitive' } },
+        { trade: { contains: q, mode: 'insensitive' } },
+        { fileName: { contains: q, mode: 'insensitive' } },
+      ];
     }
     if (from || to) {
       where.takenAt = {};
@@ -58,6 +72,14 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
     const withUrls = await Promise.all(photos.map(withImageUrl));
 
+    // Distinct areas and trades for filter dropdowns
+    const allPhotos = await prisma.sitePhoto.findMany({
+      where: { projectId: params.id },
+      select: { area: true, trade: true },
+    });
+    const areas = [...new Set(allPhotos.map((p) => p.area).filter(Boolean))].sort() as string[];
+    const trades = [...new Set(allPhotos.map((p) => p.trade).filter(Boolean))].sort() as string[];
+
     return NextResponse.json({
       project: {
         id: project.id,
@@ -66,6 +88,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       },
       photos: withUrls,
       tags: PHOTO_TAGS,
+      areas,
+      trades,
       total: withUrls.length,
     });
   } catch (error: any) {
