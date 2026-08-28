@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { getFileUrl } from '@/lib/s3';
+import { sendDailyLogSubmittedEmail } from '@/lib/email';
 
 export async function GET(
   _request: Request,
@@ -90,6 +91,74 @@ export async function PATCH(
         });
       }
     }
+
+    // ── NOTIFICACIÓN: Daily Log enviado al PM ──────────────────────────
+    const becameSubmitted = body.status === 'Submitted' && existing.status !== 'Submitted';
+    if (becameSubmitted) {
+      try {
+        // Buscar PM del proyecto (en orden de prioridad)
+        const project = await prisma.project.findFirst({
+          where: { id: params.id, companyId },
+          select: { id: true, projectNumber: true, projectName: true, userId: true, companyId: true },
+        });
+        if (project) {
+          // 1) ProjectMember con role='pm'
+          const pmMember = await prisma.projectMember.findFirst({
+            where: { projectId: params.id, role: 'pm' },
+            include: { user: { select: { email: true, name: true } } },
+          });
+          // 2) ProjectContact con role='Project Manager'
+          const pmContact = await prisma.projectContact.findFirst({
+            where: {
+              projectId: params.id,
+              role: { contains: 'Manager', mode: 'insensitive' },
+              isActive: true,
+            },
+          });
+          // 3) Creador del proyecto
+          const projectOwner = await prisma.user.findUnique({
+            where: { id: project.userId },
+            select: { email: true, name: true },
+          });
+
+          const pmEmails: string[] = [];
+          if (pmMember?.user?.email) pmEmails.push(pmMember.user.email);
+          if (pmContact?.email) pmEmails.push(pmContact.email);
+          if (projectOwner?.email && !pmEmails.includes(projectOwner.email)) {
+            pmEmails.push(projectOwner.email);
+          }
+
+          if (pmEmails.length) {
+            const logWithPhotos = await prisma.dailyLog.findUnique({
+              where: { id: params.logId },
+              include: { photos: true },
+            });
+
+            await sendDailyLogSubmittedEmail({
+              companyId: project.companyId,
+              to: pmEmails,
+              replyTo: session.user?.email ?? undefined,
+              projectName: project.projectName,
+              projectNumber: project.projectNumber,
+              logDate: updated.logDate,
+              authorName: updated.authorName,
+              workPerformed: updated.workPerformed,
+              crewNotes: updated.crewNotes,
+              deliveries: updated.deliveries,
+              delays: updated.delays,
+              weather: updated.weather,
+              temperature: updated.temperature,
+              photoCount: logWithPhotos?.photos?.length ?? 0,
+              logId: params.id, // usamos projectId para el link de daily-logs
+            });
+          }
+        }
+      } catch (notifyErr: any) {
+        // No fallar la operación si el email falla
+        console.error('[daily-log] notification error:', notifyErr);
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────
 
     const withPhotos = await prisma.dailyLog.findUnique({
       where: { id: updated.id },

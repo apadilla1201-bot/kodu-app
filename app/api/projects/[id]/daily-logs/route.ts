@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth-options';
 import { prisma } from '@/lib/prisma';
 import { getFileUrl } from '@/lib/s3';
 import { logDateFromInput, dateKey } from '@/lib/daily-log';
+import { sendDailyLogSubmittedEmail } from '@/lib/email';
 
 async function assertProject(projectId: string, companyId: string) {
   return prisma.project.findFirst({ where: { id: projectId, companyId } });
@@ -103,6 +104,63 @@ export async function POST(request: Request, { params }: { params: { id: string 
         data: { dailyLogId: log.id },
       });
     }
+
+    // ── NOTIFICACIÓN: Daily Log enviado al PM ──────────────────────────
+    if (body.status === 'Submitted') {
+      try {
+        // Buscar PM del proyecto (en orden de prioridad)
+        const pmMember = await prisma.projectMember.findFirst({
+          where: { projectId: params.id, role: 'pm' },
+          include: { user: { select: { email: true, name: true } } },
+        });
+        const pmContact = await prisma.projectContact.findFirst({
+          where: {
+            projectId: params.id,
+            role: { contains: 'Manager', mode: 'insensitive' },
+            isActive: true,
+          },
+        });
+        const projectOwner = await prisma.user.findUnique({
+          where: { id: project.userId },
+          select: { email: true, name: true },
+        });
+
+        const pmEmails: string[] = [];
+        if (pmMember?.user?.email) pmEmails.push(pmMember.user.email);
+        if (pmContact?.email) pmEmails.push(pmContact.email);
+        if (projectOwner?.email && !pmEmails.includes(projectOwner.email)) {
+          pmEmails.push(projectOwner.email);
+        }
+
+        if (pmEmails.length) {
+          const withPhotos = await prisma.dailyLog.findUnique({
+            where: { id: log.id },
+            include: { photos: true },
+          });
+
+          await sendDailyLogSubmittedEmail({
+            companyId: project.companyId,
+            to: pmEmails,
+            replyTo: session.user?.email ?? undefined,
+            projectName: project.projectName,
+            projectNumber: project.projectNumber,
+            logDate: log.logDate,
+            authorName: log.authorName,
+            workPerformed: log.workPerformed,
+            crewNotes: log.crewNotes,
+            deliveries: log.deliveries,
+            delays: log.delays,
+            weather: log.weather,
+            temperature: log.temperature,
+            photoCount: withPhotos?.photos?.length ?? 0,
+            logId: params.id,
+          });
+        }
+      } catch (notifyErr: any) {
+        console.error('[daily-log] POST notification error:', notifyErr);
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────
 
     const withPhotos = await prisma.dailyLog.findUnique({
       where: { id: log.id },

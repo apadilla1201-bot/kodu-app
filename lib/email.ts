@@ -562,3 +562,72 @@ export async function sendCorDecidedNoticeEmail(opts: {
     html,
   });
 }
+
+// ============================================================
+// Daily Log emails — NUEVO
+// ============================================================
+
+/** Cuando el superintendent envía (Submitted) un Daily Log, notificar al PM. */
+export async function sendDailyLogSubmittedEmail(opts: {
+  companyId?: string | null;
+  to: string | string[];
+  cc?: string | string[];
+  replyTo?: string;
+  projectName: string;
+  projectNumber: string;
+  logDate: Date;
+  authorName: string;
+  workPerformed?: string | null;
+  crewNotes?: string | null;
+  deliveries?: string | null;
+  delays?: string | null;
+  weather?: string | null;
+  temperature?: string | null;
+  photoCount: number;
+  logId: string;
+}) {
+  const link = `${appBaseUrl()}/dashboard/daily-logs?projectId=${opts.logId}`;
+  const brand = await emailBrand(opts.companyId);
+
+  const sections: string[] = [];
+  if (opts.workPerformed?.trim()) {
+    sections.push(`<div style="background:white;padding:12px;border-radius:4px;border-left:4px solid ${GOLD};margin:8px 0;"><p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Work Performed</p><p style="margin:4px 0 0 0;">${escHtml(opts.workPerformed.substring(0, 600))}</p></div>`);
+  }
+  if (opts.crewNotes?.trim()) {
+    sections.push(`<div style="background:white;padding:12px;border-radius:4px;border-left:4px solid ${GOLD};margin:8px 0;"><p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Crew Notes</p><p style="margin:4px 0 0 0;">${escHtml(opts.crewNotes.substring(0, 400))}</p></div>`);
+  }
+  if (opts.deliveries?.trim()) {
+    sections.push(`<div style="background:white;padding:12px;border-radius:4px;border-left:4px solid ${GOLD};margin:8px 0;"><p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Deliveries</p><p style="margin:4px 0 0 0;">${escHtml(opts.deliveries.substring(0, 400))}</p></div>`);
+  }
+  if (opts.delays?.trim()) {
+    sections.push(`<div style="background:white;padding:12px;border-radius:4px;border-left:4px solid #B91C1C;margin:8px 0;"><p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;">Delays / Issues</p><p style="margin:4px 0 0 0;">${escHtml(opts.delays.substring(0, 400))}</p></div>`);
+  }
+
+  const weatherLine = opts.weather
+    ? `<p><strong>Weather:</strong> ${escHtml(opts.weather)}${opts.temperature ? ` (${escHtml(opts.temperature)})` : ''}</p>`
+    : '';
+
+  const html = wrapEmail(
+    NAVY,
+    'Daily Log Submitted',
+    GOLD,
+    `
+      <p><strong>Project:</strong> ${escHtml(opts.projectName)} (#${escHtml(opts.projectNumber)})</p>
+      <p><strong>Date:</strong> ${opts.logDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p><strong>Submitted By:</strong> ${escHtml(opts.authorName)}</p>
+      ${weatherLine}
+      <p><strong>Photos:</strong> ${opts.photoCount}</p>
+      ${sections.join('')}
+      <p style="margin-top:16px;"><a href="${link}" style="display:inline-block;background:${NAVY};color:${GOLD};padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;">View Daily Log in Kodu</a></p>
+    `,
+    brand
+  );
+
+  return sendEmail({
+    to: opts.to,
+    cc: opts.cc,
+    replyTo: opts.replyTo,
+    subject: `Daily Log Submitted — ${escHtml(opts.projectNumber)} — ${opts.logDate.toLocaleDateString('en-US')}`,
+    html,
+  });
+}
