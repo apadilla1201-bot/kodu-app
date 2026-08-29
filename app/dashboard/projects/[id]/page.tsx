@@ -50,6 +50,21 @@ export default async function ProjectDetailPage({ params, searchParams }: { para
 
   if (!project) notFound();
 
+  // Fetch project team (members + contacts + invites)
+  const teamMembers = await prisma.projectMember.findMany({
+    where: { projectId: params.id },
+    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+    orderBy: { role: 'asc' },
+  });
+  const teamContacts = await prisma.projectContact.findMany({
+    where: { projectId: params.id, isActive: true },
+    orderBy: [{ role: 'asc' }, { name: 'asc' }],
+  });
+  const teamInvites = await prisma.userInvite.findMany({
+    where: { projectId: params.id, companyId, status: 'pending' },
+    orderBy: { createdAt: 'desc' },
+  });
+
   const serialized = {
     id: project.id,
     projectNumber: project.projectNumber ?? '',
@@ -167,6 +182,32 @@ export default async function ProjectDetailPage({ params, searchParams }: { para
       })),
       createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : null,
     })),
+    team: {
+      members: teamMembers.map((m) => ({
+        id: m.id,
+        userId: m.userId,
+        name: m.user?.name ?? '',
+        email: m.user?.email ?? '',
+        role: m.role,
+        type: 'member' as const,
+      })),
+      contacts: teamContacts.map((c) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        role: c.role,
+        company: c.company,
+        phone: c.phone,
+        type: 'contact' as const,
+      })),
+      invites: teamInvites.map((i) => ({
+        id: i.id,
+        email: i.email,
+        name: i.name,
+        role: i.role,
+        status: i.status,
+      })),
+    },
   };
 
   return <ProjectDetailContent project={serialized} initialTab={searchParams?.tab ?? 'overview'} />;

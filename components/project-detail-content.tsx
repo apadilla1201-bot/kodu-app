@@ -10,7 +10,7 @@ import {
   ArrowLeft, Plus, Search, FileText, CheckCircle2, Clock, XCircle,
   DollarSign, Download, Building2, MapPin, Hash,
   FileQuestion, Receipt, LayoutDashboard, AlertTriangle, MessageSquare,
-  Calendar, ChevronRight, Wallet, CalendarDays, BarChart3, Upload, ArrowUpDown, Trash2, Loader2, FileBarChart, FileStack, Printer,
+  Calendar, ChevronRight, Wallet, CalendarDays, BarChart3, Upload, ArrowUpDown, Trash2, Loader2, FileBarChart, FileStack, Printer, Users,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -79,6 +79,11 @@ interface ProjectDetail {
   rfis: RFIItem[]; submittals: SubmittalItem[]; payApplications: PayApp[];
   budgets: BudgetSummary[];
   schedules: ScheduleSummary[];
+  team: {
+    members: Array<{ id: string; userId: string; name: string; email: string; role: string; type: 'member' }>;
+    contacts: Array<{ id: string; name: string; email: string; role: string; company: string | null; phone: string | null; type: 'contact' }>;
+    invites: Array<{ id: string; email: string; name: string | null; role: string; status: string }>;
+  };
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
@@ -134,6 +139,7 @@ function fmtDateShort(d: string | null | undefined): string {
 
 const tabs = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'team', label: 'Team', icon: Users },
   { key: 'budget', label: 'Budget', icon: Wallet },
   { key: 'schedule', label: 'Schedule', icon: CalendarDays },
   { key: 'cors', label: 'Change Orders', icon: FileText },
@@ -152,6 +158,11 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
   const [updatingId, setUpdatingId] = useState('');
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [reordering, setReordering] = useState(false);
+  // Team states
+  const [teamContacts, setTeamContacts] = useState(project.team?.contacts ?? []);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<null | { id: string; name: string; email: string; role: string; company: string; phone: string }>(null);
+  const [savingContact, setSavingContact] = useState(false);
   const router = useRouter();
   const { t } = useI18n();
 
@@ -200,6 +211,56 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
       toast.error(t('project.reportError'));
     } finally {
       setGeneratingReport(false);
+    }
+  };
+
+  // ── Team Contact CRUD ───────────────────────────
+  const handleSaveContact = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingContact) return;
+    setSavingContact(true);
+    try {
+      const url = editingContact.id
+        ? `/api/projects/${project.id}/contacts/${editingContact.id}`
+        : `/api/projects/${project.id}/contacts`;
+      const method = editingContact.id ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingContact.name,
+          email: editingContact.email,
+          role: editingContact.role,
+          company: editingContact.company,
+          phone: editingContact.phone,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      if (editingContact.id) {
+        setTeamContacts((prev) => prev.map((c) => (c.id === editingContact.id ? { ...c, ...data, type: 'contact' as const } : c)));
+      } else {
+        setTeamContacts((prev) => [...prev, { ...data, type: 'contact' as const }]);
+      }
+      setShowContactModal(false);
+      setEditingContact(null);
+      toast.success(editingContact.id ? 'Contact updated' : 'Contact added');
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving contact');
+    } finally {
+      setSavingContact(false);
+    }
+  };
+
+  const handleDeleteContact = async (contactId: string) => {
+    if (!confirm('Delete this contact?')) return;
+    try {
+      const res = await fetch(`/api/projects/${project.id}/contacts/${contactId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      setTeamContacts((prev) => prev.filter((c) => c.id !== contactId));
+      toast.success('Contact removed');
+    } catch {
+      toast.error('Failed to delete contact');
     }
   };
 
@@ -1041,6 +1102,195 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
           )}
         </div>
       )}
+      {/* ANALYTICS TAB */}
+      {activeTab === 'analytics' && (
+        <ProjectAnalytics projectId={project.id} />
+      )}
+
+      {/* TEAM TAB */}
+      {activeTab === 'team' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Project Team</h3>
+            <button
+              onClick={() => { setEditingContact({ id: '', name: '', email: '', role: 'Consultant', company: '', phone: '' }); setShowContactModal(true); }}
+              className="inline-flex items-center gap-2 bg-[#0F1B33] text-[#C9A96E] px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add Contact
+            </button>
+          </div>
+
+          {/* Combine members + contacts by role */}
+          {(() => {
+            const all = [
+              ...(project.team?.members ?? []).map(m => ({ ...m, company: '', phone: '', source: 'member' as const })),
+              ...(teamContacts ?? []).map(c => ({ ...c, source: 'contact' as const })),
+            ];
+            const byRole: Record<string, typeof all> = {};
+            for (const p of all) {
+              const r = p.role || 'Other';
+              if (!byRole[r]) byRole[r] = [];
+              byRole[r].push(p);
+            }
+            const roleOrder = ['Project Manager', 'Superintendent', 'Architect', 'Engineer', 'Designer', 'Consultant', 'Owner', 'Subcontractor', 'admin', 'pm', 'superintendent', 'owner', 'subcontractor', 'viewer'];
+            const sortedRoles = Object.keys(byRole).sort((a, b) => {
+              const ia = roleOrder.indexOf(a);
+              const ib = roleOrder.indexOf(b);
+              if (ia !== -1 && ib !== -1) return ia - ib;
+              if (ia !== -1) return -1;
+              if (ib !== -1) return 1;
+              return a.localeCompare(b);
+            });
+            return sortedRoles.map((role) => (
+              <div key={role} className="bg-card rounded-xl border border-border shadow-[var(--shadow-sm)] overflow-hidden">
+                <div className="bg-muted/50 px-5 py-3 border-b border-border">
+                  <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">{role}</h4>
+                </div>
+                <div className="divide-y divide-border">
+                  {byRole[role].map((p) => (
+                    <div key={p.id} className="flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-[#0F1B33] text-[#C9A96E] flex items-center justify-center text-sm font-bold shrink-0">
+                            {(p.name || '?').charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{p.name || '—'}</p>
+                            <p className="text-xs text-muted-foreground">{p.company || (p.source === 'member' ? 'Kodu PM User' : '')}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="hidden sm:flex items-center gap-6 text-sm text-muted-foreground mr-4">
+                        {p.email && <span className="truncate max-w-[180px]">{p.email}</span>}
+                        {p.phone && <span className="truncate max-w-[120px]">{p.phone}</span>}
+                      </div>
+                      {p.source === 'contact' && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => { setEditingContact(p as any); setShowContactModal(true); }}
+                            className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+                            title="Edit"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteContact(p.id)}
+                            className="p-2 hover:bg-red-50 rounded-lg text-muted-foreground hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ));
+          })()}
+
+          {/* Pending invites */}
+          {(project.team?.invites ?? []).length > 0 && (
+            <div className="bg-card rounded-xl border border-border shadow-[var(--shadow-sm)] overflow-hidden">
+              <div className="bg-amber-50/50 px-5 py-3 border-b border-border">
+                <h4 className="font-semibold text-sm uppercase tracking-wide text-amber-700">Pending Invites</h4>
+              </div>
+              <div className="divide-y divide-border">
+                {(project.team?.invites ?? []).map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-sm font-bold shrink-0">?</div>
+                      <div>
+                        <p className="font-medium text-sm">{inv.name || inv.email}</p>
+                        <p className="text-xs text-muted-foreground">{inv.role} · Invitation sent</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-amber-600 bg-amber-100 px-2.5 py-1 rounded-full font-medium">Pending</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Contact Modal */}
+      {showContactModal && editingContact && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold">{editingContact.id ? 'Edit Contact' : 'Add Contact'}</h3>
+            <form onSubmit={handleSaveContact} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editingContact.name}
+                  onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={editingContact.email}
+                  onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Role</label>
+                <select
+                  value={editingContact.role}
+                  onChange={(e) => setEditingContact({ ...editingContact, role: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                >
+                  {['Project Manager', 'Superintendent', 'Architect', 'Subcontractor', 'Owner', 'Designer', 'Engineer', 'Consultant'].map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Company</label>
+                <input
+                  type="text"
+                  value={editingContact.company}
+                  onChange={(e) => setEditingContact({ ...editingContact, company: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={editingContact.phone}
+                  onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setShowContactModal(false); setEditingContact(null); }}
+                  className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingContact}
+                  className="px-4 py-2 rounded-lg bg-[#0F1B33] text-[#C9A96E] text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors disabled:opacity-50"
+                >
+                  {savingContact ? 'Saving...' : (editingContact.id ? 'Update' : 'Add')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ANALYTICS TAB */}
       {activeTab === 'analytics' && (
         <ProjectAnalytics projectId={project.id} />
