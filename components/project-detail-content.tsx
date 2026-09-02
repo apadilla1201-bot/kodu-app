@@ -171,11 +171,6 @@ export function ProjectDetailContent({ project, userRole, initialTab }: { projec
   const [newMemberRole, setNewMemberRole] = useState('pm');
   const [savingMember, setSavingMember] = useState(false);
   const router = useRouter();
-  const [teamContacts, setTeamContacts] = useState(project.team?.contacts ?? []);
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [editingContact, setEditingContact] = useState<null | { id: string; name: string; email: string; role: string; company: string; phone: string }>(null);
-  const [savingContact, setSavingContact] = useState(false);
-  const router = useRouter();
   const { t } = useI18n();
 
   const handleDeleteAllPAs = async () => {
@@ -274,8 +269,6 @@ export function ProjectDetailContent({ project, userRole, initialTab }: { projec
     } catch {
       toast.error('Failed to delete contact');
     }
-  };
-
   };
 
   // ── Team Member assignment (Admin/PM only) ──────
@@ -1154,6 +1147,62 @@ export function ProjectDetailContent({ project, userRole, initialTab }: { projec
           )}
         </div>
       )}
+      {/* Add Team Member Modal */}
+      {showMemberModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold">Add Team Member</h3>
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">User</label>
+                <select
+                  value={newMemberUserId}
+                  onChange={(e) => setNewMemberUserId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  required
+                >
+                  <option value="">Select a user...</option>
+                  {availableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
+                  ))}
+                </select>
+                {availableUsers.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">No available users. All company users are already on this project.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Project Role</label>
+                <select
+                  value={newMemberRole}
+                  onChange={(e) => setNewMemberRole(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                >
+                  {['admin', 'pm', 'superintendent', 'owner', 'subcontractor', 'viewer'].map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowMemberModal(false)}
+                  className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingMember || !newMemberUserId}
+                  className="px-4 py-2 rounded-lg bg-[#0F1B33] text-[#C9A96E] text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors disabled:opacity-50"
+                >
+                  {savingMember ? 'Adding...' : 'Add to Project'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ANALYTICS TAB */}
       {activeTab === 'analytics' && (
         <ProjectAnalytics projectId={project.id} />
