@@ -6,6 +6,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useI18n } from '@/hooks/use-i18n';
+import { isFullAccess } from '@/lib/permissions';
+import {
 import {
   ArrowLeft, Plus, Search, FileText, CheckCircle2, Clock, XCircle,
   DollarSign, Download, Building2, MapPin, Hash,
@@ -151,7 +153,7 @@ const tabs = [
 
 /* ── Main Component ──────────────────────────────────────────────── */
 
-export function ProjectDetailContent({ project, initialTab }: { project: ProjectDetail; initialTab?: string }) {
+export function ProjectDetailContent({ project, userRole, initialTab }: { project: ProjectDetail; userRole?: string; initialTab?: string }) {
   const [activeTab, setActiveTab] = useState(initialTab || 'overview');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -159,6 +161,17 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [reordering, setReordering] = useState(false);
   // Team states
+  const [teamContacts, setTeamContacts] = useState(project.team?.contacts ?? []);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<null | { id: string; name: string; email: string; role: string; company: string; phone: string }>(null);
+  const [savingContact, setSavingContact] = useState(false);
+  // Add team member (existing user) states
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name: string | null; email: string; role: string }>>([]);
+  const [newMemberUserId, setNewMemberUserId] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('pm');
+  const [savingMember, setSavingMember] = useState(false);
+  const router = useRouter();
   const [teamContacts, setTeamContacts] = useState(project.team?.contacts ?? []);
   const [showContactModal, setShowContactModal] = useState(false);
   const [editingContact, setEditingContact] = useState<null | { id: string; name: string; email: string; role: string; company: string; phone: string }>(null);
@@ -261,6 +274,46 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
       toast.success('Contact removed');
     } catch {
       toast.error('Failed to delete contact');
+    }
+  };
+
+  };
+
+  // ── Team Member assignment (Admin/PM only) ──────
+  const loadAvailableUsers = async () => {
+    try {
+      const res = await fetch(`/api/projects/${project.id}/members`);
+      const data = await res.json();
+      if (res.ok && data.users) {
+        setAvailableUsers(data.users);
+        if (data.users.length) setNewMemberUserId(data.users[0].id);
+      }
+    } catch (err) {
+      console.error('loadAvailableUsers error:', err);
+    }
+  };
+
+  const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!newMemberUserId) return;
+    setSavingMember(true);
+    try {
+      const user = availableUsers.find((u) => u.id === newMemberUserId);
+      if (!user) throw new Error('User not selected');
+      const res = await fetch(`/api/projects/${project.id}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, role: newMemberRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to assign');
+      toast.success(`${user.name || user.email} added to project`);
+      setShowMemberModal(false);
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || 'Error assigning member');
+    } finally {
+      setSavingMember(false);
     }
   };
 
@@ -1112,12 +1165,22 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Project Team</h3>
-            <button
-              onClick={() => { setEditingContact({ id: '', name: '', email: '', role: 'Consultant', company: '', phone: '' }); setShowContactModal(true); }}
-              className="inline-flex items-center gap-2 bg-[#0F1B33] text-[#C9A96E] px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors"
-            >
-              <Plus className="w-4 h-4" /> Add Contact
-            </button>
+            <div className="flex items-center gap-2">
+              {isFullAccess(userRole ?? '') && (
+                <button
+                  onClick={() => { loadAvailableUsers(); setShowMemberModal(true); }}
+                  className="inline-flex items-center gap-2 bg-[#0F1B33] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Team Member
+                </button>
+              )}
+              <button
+                onClick={() => { setEditingContact({ id: '', name: '', email: '', role: 'Consultant', company: '', phone: '' }); setShowContactModal(true); }}
+                className="inline-flex items-center gap-2 bg-[#0F1B33] text-[#C9A96E] px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Add Contact
+              </button>
+            </div>
           </div>
 
           {/* Combine members + contacts by role */}
@@ -1284,6 +1347,62 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                   className="px-4 py-2 rounded-lg bg-[#0F1B33] text-[#C9A96E] text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors disabled:opacity-50"
                 >
                   {savingContact ? 'Saving...' : (editingContact.id ? 'Update' : 'Add')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Team Member Modal */}
+      {showMemberModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold">Add Team Member</h3>
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">User</label>
+                <select
+                  value={newMemberUserId}
+                  onChange={(e) => setNewMemberUserId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  required
+                >
+                  <option value="">Select a user...</option>
+                  {availableUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
+                  ))}
+                </select>
+                {availableUsers.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">No available users. All company users are already on this project.</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Project Role</label>
+                <select
+                  value={newMemberRole}
+                  onChange={(e) => setNewMemberRole(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                >
+                  {['admin', 'pm', 'superintendent', 'owner', 'subcontractor', 'viewer'].map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowMemberModal(false)}
+                  className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingMember || !newMemberUserId}
+                  className="px-4 py-2 rounded-lg bg-[#0F1B33] text-[#C9A96E] text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors disabled:opacity-50"
+                >
+                  {savingMember ? 'Adding...' : 'Add to Project'}
                 </button>
               </div>
             </form>

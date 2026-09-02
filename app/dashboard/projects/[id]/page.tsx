@@ -210,5 +210,5 @@ export default async function ProjectDetailPage({ params, searchParams }: { para
     },
   };
 
-  return <ProjectDetailContent project={serialized} initialTab={searchParams?.tab ?? 'overview'} />;
+  return <ProjectDetailContent project={serialized} userRole={role} initialTab={searchParams?.tab ?? 'overview'} />;
 }
