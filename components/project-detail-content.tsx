@@ -1132,7 +1132,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
               if (!byRole[r]) byRole[r] = [];
               byRole[r].push(p);
             }
-            const roleOrder = ['Project Manager', 'Superintendent', 'Architect', 'Engineer', 'Designer', 'Consultant', 'Owner', 'Subcontractor', 'admin', 'pm', 'superintendent', 'owner', 'subcontractor', 'viewer'];
+            const roleOrder = ['Project Manager', 'Superintendent', 'Architect', 'Engineer', 'EOR', 'Designer', 'Consultant', 'Owner', 'Subcontractor', 'admin', 'pm', 'superintendent', 'owner', 'subcontractor', 'viewer'];
             const sortedRoles = Object.keys(byRole).sort((a, b) => {
               const ia = roleOrder.indexOf(a);
               const ib = roleOrder.indexOf(b);
@@ -1247,7 +1247,7 @@ export function ProjectDetailContent({ project, initialTab }: { project: Project
                   onChange={(e) => setEditingContact({ ...editingContact, role: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
                 >
-                  {['Project Manager', 'Superintendent', 'Architect', 'Subcontractor', 'Owner', 'Designer', 'Engineer', 'Consultant'].map((r) => (
+                  {['Project Manager', 'Superintendent', 'Architect', 'Subcontractor', 'Owner', 'Designer', 'Engineer', 'EOR', 'Consultant'].map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>

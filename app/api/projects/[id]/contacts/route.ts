@@ -13,6 +13,8 @@ const ROLES = [
   'Owner',
   'Designer',
   'Engineer',
+  'EOR',
+  'Consultant',
   'Consultant',
 ];
 
