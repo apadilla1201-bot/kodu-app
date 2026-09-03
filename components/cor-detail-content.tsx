@@ -69,6 +69,10 @@ function fmt(n: number): string {
 export function CORDetailContent({ cor }: { cor: CORDetail }) {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [forwardEmails, setForwardEmails] = useState('');
+  const [forwardMessage, setForwardMessage] = useState('');
+  const [forwardLoading, setForwardLoading] = useState(false);
   const [generatedPdfName, setGeneratedPdfName] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -379,6 +383,38 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
     } finally { setGeneratingPdf(false); }
   };
 
+  const handleForwardPdf = async () => {
+    const emails = forwardEmails.split(',').map((e) => e.trim()).filter((e) => e.length > 0);
+    if (emails.length === 0) {
+      toast.error('Enter at least one email address');
+      return;
+    }
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = emails.filter((e) => !EMAIL_RE.test(e));
+    if (invalid.length > 0) {
+      toast.error(`Invalid emails: ${invalid.join(', ')}`);
+      return;
+    }
+    setForwardLoading(true);
+    try {
+      const res = await fetch(`/api/cors/${cor.id}/forward`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails, message: forwardMessage }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to forward');
+      toast.success(`COR forwarded to ${data?.sentTo?.length ?? 0} recipient(s)`);
+      setShowForwardModal(false);
+      setForwardEmails('');
+      setForwardMessage('');
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Failed to forward COR');
+    } finally {
+      setForwardLoading(false);
+    }
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     setUpdatingStatus(true);
     try {
@@ -474,6 +510,14 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
                 <button onClick={handleGeneratePdf} disabled={generatingPdf} className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50">
                   {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   Generate PDF
+                </button>
+                <button
+                  onClick={() => setShowForwardModal(true)}
+                  title="Forward PDF by email to multiple recipients"
+                  className="inline-flex items-center gap-2 bg-white border border-[#0F1B33] text-[#0F1B33] hover:bg-[#0F1B33]/5 px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Forward PDF
                 </button>
               </>
             )}
@@ -824,6 +868,62 @@ export function CORDetailContent({ cor }: { cor: CORDetail }) {
           </div>
         </div>
       )}
-    </div>
+    
+      {/* Forward PDF Modal */}
+      {showForwardModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold">Forward COR PDF by Email</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                  Recipient Emails *
+                </label>
+                <textarea
+                  value={forwardEmails}
+                  onChange={(e) => setForwardEmails(e.target.value)}
+                  rows={2}
+                  placeholder="architect@firm.com, engineer@company.com"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Separate multiple emails with commas.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                  Message (optional)
+                </label>
+                <textarea
+                  value={forwardMessage}
+                  onChange={(e) => setForwardMessage(e.target.value)}
+                  rows={3}
+                  placeholder="Please review the attached Change Order and respond at your earliest convenience."
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setShowForwardModal(false); setForwardEmails(''); setForwardMessage(''); }}
+                className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleForwardPdf}
+                disabled={forwardLoading}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0F1B33] text-[#C9A96E] text-sm font-medium hover:bg-[#0F1B33]/90 transition-colors disabled:opacity-50"
+              >
+                {forwardLoading ? (
+                  <span className="animate-spin w-4 h-4 border-2 border-[#C9A96E]/30 border-t-[#C9A96E] rounded-full" />
+                ) : (
+                  <ExternalLink className="w-4 h-4" />
+                )}
+                {forwardLoading ? 'Sending...' : 'Send PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+</div>
   );
 }

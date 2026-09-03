@@ -70,6 +70,8 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
   const [emailTo, setEmailTo] = useState('');
   const [emailMsg, setEmailMsg] = useState('');
   const [sending, setSending] = useState(false);
+  const [emailMsg, setEmailMsg] = useState('');
+  const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const attachments = submittal.attachments ?? [];
@@ -139,6 +141,38 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
 
   // Enviar el reporte (portada koduPM + anexos mergeados) como PDF adjunto
   const handleSendReport = async () => {
+    const emails = emailTo.split(',').map((e) => e.trim()).filter((e) => e.length > 0);
+    if (emails.length === 0) return;
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalid = emails.filter((e) => !EMAIL_RE.test(e));
+    if (invalid.length > 0) {
+      toast({ title: 'Invalid emails', description: `Check: ${invalid.join(', ')}`, variant: 'destructive' });
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch(`/api/submittals/${submittal.id}/send-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ emails, message: emailMsg.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 413) {
+        toast({ title: t('submittals.reportTooLarge'), variant: 'destructive' });
+        return;
+      }
+      if (!res.ok) throw new Error(data?.error ?? t('submittals.sendReportError'));
+      toast({ title: t('submittals.reportSent', { email: `${data?.sentTo?.length ?? 0} recipient(s)` }) });
+      setEmailOpen(false);
+      setEmailTo('');
+      setEmailMsg('');
+    } catch (err: any) {
+      toast({ title: err?.message ?? t('submittals.sendReportError'), variant: 'destructive' });
+    } finally {
+      setSending(false);
+    }
+  };
     if (!emailTo.trim()) return;
     setSending(true);
     try {
@@ -315,14 +349,15 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                   {t('submittals.recipientEmail')}
                 </label>
-                <input
-                  type="email"
+                <textarea
                   value={emailTo}
                   onChange={(e) => setEmailTo(e.target.value)}
-                  placeholder="name@company.com"
+                  rows={2}
+                  placeholder="architect@firm.com, engineer@company.com"
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A96E]"
                   autoFocus
                 />
+                <p className="text-xs text-slate-400 mt-1">Separate multiple emails with commas.</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">

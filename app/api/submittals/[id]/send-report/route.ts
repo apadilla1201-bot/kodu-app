@@ -21,6 +21,19 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const companyId = (session.user as any)?.companyId ?? '';
 
     const body = await request.json().catch(() => ({}));
+    const rawEmails = body?.emails;
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emails = Array.isArray(rawEmails)
+      ? rawEmails.map((e: string) => e.trim().toLowerCase()).filter((e: string) => EMAIL_RE.test(e))
+      : rawEmails ? [String(rawEmails).trim().toLowerCase()].filter((e: string) => EMAIL_RE.test(e))
+      : [];
+    if (emails.length === 0) {
+      return NextResponse.json({ error: 'At least one valid recipient email is required' }, { status: 400 });
+    }
+
+    const locale = await getSessionLocale();
+      return NextResponse.json({ error: 'At least one valid recipient email is required' }, { status: 400 });
+    }
     const toEmail = resolveEmailAddress(body?.email);
     if (!toEmail) {
       return NextResponse.json({ error: 'A valid recipient email is required' }, { status: 400 });
@@ -64,6 +77,29 @@ export async function POST(request: Request, { params }: { params: { id: string 
       </div>`;
 
     const result = await sendEmail({
+      to: emails,
+      cc: creatorEmail ? [creatorEmail] : undefined,
+      replyTo: creatorEmail || undefined,
+      subject: `Submittal ${report.submittalNumber} — ${report.title} · ${report.projectNumber} ${report.projectName}`,
+      html,
+      attachments: [
+        {
+          filename: report.fileName,
+          content: Buffer.from(report.bytes).toString('base64'),
+        },
+      ],
+    });
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error ?? 'send_failed' }, { status: 502 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      sentTo: emails,
+      mergedAttachments: report.mergedAttachments,
+      skippedAttachments: report.skippedAttachments,
+    });
       to: toEmail,
       cc: creatorEmail ? [creatorEmail] : undefined,
       replyTo: creatorEmail || undefined,
