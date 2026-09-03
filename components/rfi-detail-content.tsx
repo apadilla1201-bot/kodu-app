@@ -318,9 +318,6 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
           </button>
           <button
             onClick={handleSendApproval}
-          </button>
-          <button
-            onClick={handleSendApproval}
             disabled={sendingApproval}
             title="Send to Owner / Owner Rep for approval (secure link)"
             className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-[#0F1B33] px-4 py-2 rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
@@ -679,7 +676,7 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
           </div>
         </div>
       </div>
-
+  
       {/* Forward PDF Modal */}
       {showForwardModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -735,15 +732,6 @@ export function RFIDetailContent({ rfi }: { rfi: RFIData }) {
           </div>
         </div>
       )}
-    </div>
-              <div className="border-t border-border pt-3">
-                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide mb-1">Notes</p>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{rfi.notes}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+  </div>
   );
 }

@@ -17,17 +17,6 @@ const ROLES = [
   'Engineer',
   'Consultant',
 ];
-  'Project Manager',
-  'Superintendent',
-  'Architect',
-  'Subcontractor',
-  'Owner',
-  'Designer',
-  'Engineer',
-  'EOR',
-  'Consultant',
-  'Consultant',
-];
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   try {
