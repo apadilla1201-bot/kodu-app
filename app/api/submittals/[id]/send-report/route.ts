@@ -32,14 +32,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 
     const locale = await getSessionLocale();
-      return NextResponse.json({ error: 'At least one valid recipient email is required' }, { status: 400 });
-    }
-    const toEmail = resolveEmailAddress(body?.email);
-    if (!toEmail) {
-      return NextResponse.json({ error: 'A valid recipient email is required' }, { status: 400 });
-    }
-
-    const locale = await getSessionLocale();
     const report = await buildSubmittalReportPdf(params?.id ?? '', companyId, locale);
     if (!report) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -97,29 +89,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({
       ok: true,
       sentTo: emails,
-      mergedAttachments: report.mergedAttachments,
-      skippedAttachments: report.skippedAttachments,
-    });
-      to: toEmail,
-      cc: creatorEmail ? [creatorEmail] : undefined,
-      replyTo: creatorEmail || undefined,
-      subject: `Submittal ${report.submittalNumber} — ${report.title} · ${report.projectNumber} ${report.projectName}`,
-      html,
-      attachments: [
-        {
-          filename: report.fileName,
-          content: Buffer.from(report.bytes).toString('base64'),
-        },
-      ],
-    });
-
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error ?? 'send_failed' }, { status: 502 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      sentTo: toEmail,
       mergedAttachments: report.mergedAttachments,
       skippedAttachments: report.skippedAttachments,
     });

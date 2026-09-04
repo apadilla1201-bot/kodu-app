@@ -70,8 +70,6 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
   const [emailTo, setEmailTo] = useState('');
   const [emailMsg, setEmailMsg] = useState('');
   const [sending, setSending] = useState(false);
-  const [emailMsg, setEmailMsg] = useState('');
-  const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const attachments = submittal.attachments ?? [];
@@ -166,30 +164,6 @@ export function SubmittalDetailContent({ submittal }: { submittal: SubmittalData
       toast({ title: t('submittals.reportSent', { email: `${data?.sentTo?.length ?? 0} recipient(s)` }) });
       setEmailOpen(false);
       setEmailTo('');
-      setEmailMsg('');
-    } catch (err: any) {
-      toast({ title: err?.message ?? t('submittals.sendReportError'), variant: 'destructive' });
-    } finally {
-      setSending(false);
-    }
-  };
-    if (!emailTo.trim()) return;
-    setSending(true);
-    try {
-      const res = await fetch(`/api/submittals/${submittal.id}/send-report`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email: emailTo.trim(), message: emailMsg.trim() || undefined }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 413) {
-        toast({ title: t('submittals.reportTooLarge'), variant: 'destructive' });
-        return;
-      }
-      if (!res.ok) throw new Error(data?.error ?? t('submittals.sendReportError'));
-      toast({ title: t('submittals.reportSent', { email: data?.sentTo ?? emailTo.trim() }) });
-      setEmailOpen(false);
       setEmailMsg('');
     } catch (err: any) {
       toast({ title: err?.message ?? t('submittals.sendReportError'), variant: 'destructive' });
