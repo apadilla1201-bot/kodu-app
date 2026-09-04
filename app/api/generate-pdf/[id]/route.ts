@@ -451,7 +451,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
   </style>
 </head>
 <body>
-${justificationHtml}
 ${corRequestHtml}
 </body>
 </html>
