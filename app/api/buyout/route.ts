@@ -74,6 +74,48 @@ export async function GET(request: Request) {
       };
     }
 
+    // CORs from the Change Order table: approved (added to real total) vs pending (informational only)
+    const cors = await prisma.changeOrder.findMany({
+      where: { projectId },
+      select: { status: true, totalAmount: true },
+    });
+    const totalCorApproved = cors
+      .filter((c) => c.status === 'Approved')
+      .reduce((s, c) => s + (c.totalAmount || 0), 0);
+    const totalCorPending = cors
+      .filter((c) => c.status === 'Pending')
+      .reduce((s, c) => s + (c.totalAmount || 0), 0);
+    const corCountApproved = cors.filter((c) => c.status === 'Approved').length;
+    const corCountPending = cors.filter((c) => c.status === 'Pending').length;
+
+    // Cash flow movements: one row per Pay Application (monthly outputs + faltante comparison)
+    const payApps = await prisma.payApplication.findMany({
+      where: { projectId },
+      orderBy: { applicationNumber: 'asc' },
+      include: { lineItems: { where: { isSection: false } } },
+    });
+    let prevCompleted = 0;
+    const cashFlow = payApps.map((pa) => {
+      const completed =
+        pa.g702TotalCompleted != null && pa.g702TotalCompleted > 0
+          ? pa.g702TotalCompleted
+          : sumPayAppCompleted(pa.lineItems);
+      const contractSum =
+        pa.g702ContractSumToDate != null && pa.g702ContractSumToDate > 0
+          ? pa.g702ContractSumToDate
+          : sumPayAppRevised(pa.lineItems);
+      const periodExecuted = Math.max(0, completed - prevCompleted);
+      prevCompleted = completed;
+      return {
+        applicationNumber: pa.applicationNumber,
+        periodFrom: pa.periodFrom,
+        periodTo: pa.periodTo,
+        periodExecuted,
+        cumulativeExecuted: completed,
+        contractSumToDate: contractSum,
+      };
+    });
+
     const kpiLines = items.filter((i) => isBuyoutKpiLine(i.lineType));
     const paScopedLines = kpiLines.filter((i) => isPaScopedBuyoutLine(i));
 
@@ -151,6 +193,12 @@ export async function GET(request: Request) {
         : 'Buyout log',
       latestPayAppNumber: investedFromPa?.applicationNumber ?? null,
       contractSumToDate: investedFromPa?.g702ContractSumToDate ?? null,
+      totalCorApproved,
+      totalCorPending,
+      corCountApproved,
+      corCountPending,
+      realProjectTotal: totalBudget + totalCorApproved,
+      realRemainingToExecute: totalBudget + totalCorApproved - totalInvested,
     };
 
     return NextResponse.json({
@@ -163,6 +211,7 @@ export async function GET(request: Request) {
       summary,
       byDivision,
       alerts,
+      cashFlow,
     });
   } catch (error: any) {
     console.error('GET /api/buyout error:', error);

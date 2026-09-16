@@ -59,6 +59,12 @@ interface Summary {
   investedSource?: string;
   latestPayAppNumber?: number | null;
   contractSumToDate?: number | null;
+  totalCorApproved?: number;
+  totalCorPending?: number;
+  corCountApproved?: number;
+  corCountPending?: number;
+  realProjectTotal?: number;
+  realRemainingToExecute?: number;
 }
 
 interface AlertRow {
@@ -88,11 +94,20 @@ const statusStyle: Record<string, string> = {
   Complete: 'bg-slate-200 text-slate-700',
 };
 
-function Kpi({ label, value, sub, warn }: { label: string; value: string; sub?: string; warn?: boolean }) {
+function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'default' | 'warn' | 'accent' | 'amber' }) {
+  const t = tone ?? 'default';
+  const border =
+    t === 'warn' ? 'border-red-300' :
+    t === 'accent' ? 'border-[#C9A96E] bg-[#C9A96E]/10' :
+    t === 'amber' ? 'border-amber-300 bg-amber-50' : 'border-border';
+  const valueColor =
+    t === 'warn' ? 'text-red-600' :
+    t === 'accent' ? 'text-[#0F1B33]' :
+    t === 'amber' ? 'text-amber-700' : 'text-foreground';
   return (
-    <div className={`bg-card border rounded-xl p-4 ${warn ? 'border-red-300' : 'border-border'}`}>
+    <div className={`bg-card border rounded-xl p-4 ${border}`}>
       <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">{label}</p>
-      <p className={`text-xl font-bold mt-1 ${warn ? 'text-red-600' : 'text-foreground'}`}>{value}</p>
+      <p className={`text-xl font-bold mt-1 ${valueColor}`}>{value}</p>
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
   );
@@ -105,6 +120,7 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
   const [items, setItems] = useState<BuyoutItem[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [byDivision, setByDivision] = useState<any[]>([]);
+  const [cashFlow, setCashFlow] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [projectMeta, setProjectMeta] = useState<{ projectNumber: string; projectName: string } | null>(null);
   const [search, setSearch] = useState('');
@@ -126,6 +142,7 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
       setItems(data.items || []);
       setSummary(data.summary);
       setByDivision(data.byDivision || []);
+      setCashFlow(data.cashFlow || []);
       setAlerts(data.alerts || []);
       setProjectMeta(data.project);
     } catch {
@@ -353,45 +370,97 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
       )}
 
       {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           <Kpi
-            label="Contract Budget"
+            label="Budgeted"
             value={fmtMoney(summary.totalBudget)}
             sub={summary.budgetSource || 'Pay App contract sum'}
           />
           <Kpi
-            label="Buyout Proposal"
-            value={fmtMoney(summary.totalProposal)}
-            sub={
-              summary.latestPayAppNumber
-                ? `PA #${summary.latestPayAppNumber} revised budget`
-                : 'Full procurement log'
-            }
-          />
-          <Kpi
-            label="Buyout Contracted"
+            label="Contracted"
             value={fmtMoney(summary.totalContracted)}
             sub={
               summary.latestPayAppNumber
-                ? `PA #${summary.latestPayAppNumber} billed scope`
-                : `Log budget ${fmtMoney(summary.procurementBudget ?? summary.totalBudget)}`
+                ? `Buyout log · PA #${summary.latestPayAppNumber} billed scope`
+                : 'Buyout log contracted value'
             }
           />
           <Kpi
-            label="Cash Invested"
+            label="Executed"
             value={fmtMoney(summary.totalInvested)}
-            sub={
-              summary.investedSource
-                ? `Executed to date · ${summary.investedSource}`
-                : 'Executed to date'
-            }
+            sub={summary.investedSource ? `To date · ${summary.investedSource}` : 'To date'}
           />
           <Kpi
-            label="Remaining"
-            value={fmtMoney(summary.totalRemaining)}
-            sub={`${(summary.remainingPct * 100).toFixed(0)}% of contract spent`}
+            label="CORs Approved"
+            value={fmtMoney(summary.totalCorApproved ?? 0)}
+            sub={`${summary.corCountApproved ?? 0} CORs · added to total`}
           />
-          <Kpi label="Alerts" value={String(summary.alertCount)} sub={`${summary.highAlerts} high`} warn={summary.highAlerts > 0} />
+          <Kpi
+            label="CORs Pending"
+            value={fmtMoney(summary.totalCorPending ?? 0)}
+            sub={`${summary.corCountPending ?? 0} CORs · not included`}
+            tone="amber"
+          />
+          <Kpi
+            label="Real Project Total"
+            value={fmtMoney(summary.realProjectTotal ?? 0)}
+            sub="Budget + approved CORs"
+            tone="accent"
+          />
+          <Kpi
+            label="Remaining to Execute"
+            value={fmtMoney(summary.realRemainingToExecute ?? 0)}
+            sub="Real total − executed"
+          />
+          <Kpi label="Alerts" value={String(summary.alertCount)} sub={`${summary.highAlerts} high`} tone={summary.highAlerts > 0 ? 'warn' : 'default'} />
+        </div>
+      )}
+
+      {cashFlow.length > 0 && summary && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h2 className="text-sm font-semibold mb-1 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-[#C9A96E]" /> Cash Flow — Monthly Pay Application Movements
+          </h2>
+          <p className="text-xs text-muted-foreground mb-4">
+            Real Project Total = Budget + approved CORs. Pending CORs are NOT included in the total.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-[#0F1B33] text-white text-left">
+                  <th className="px-3 py-2 font-semibold">PA #</th>
+                  <th className="px-3 py-2 font-semibold">Period</th>
+                  <th className="px-3 py-2 font-semibold text-right">Executed (period)</th>
+                  <th className="px-3 py-2 font-semibold text-right">Executed (cumulative)</th>
+                  <th className="px-3 py-2 font-semibold text-right">Real Project Total</th>
+                  <th className="px-3 py-2 font-semibold text-right">Remaining (Faltante)</th>
+                  <th className="px-3 py-2 font-semibold text-right">% Executed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cashFlow.map((row) => {
+                  const realTotal = summary.realProjectTotal ?? 0;
+                  const remaining = realTotal - row.cumulativeExecuted;
+                  const pct = realTotal > 0 ? (row.cumulativeExecuted / realTotal) * 100 : 0;
+                  return (
+                    <tr key={row.applicationNumber} className="border-t border-border hover:bg-muted/40">
+                      <td className="px-3 py-2 font-semibold">#{row.applicationNumber}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {new Date(row.periodFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {' – '}
+                        {new Date(row.periodTo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono text-[#C9A96E]">{fmtMoney(row.periodExecuted)}</td>
+                      <td className="px-3 py-2 text-right font-mono">{fmtMoney(row.cumulativeExecuted)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold">{fmtMoney(realTotal)}</td>
+                      <td className={`px-3 py-2 text-right font-mono ${remaining < 0 ? 'text-red-600' : ''}`}>{fmtMoney(remaining)}</td>
+                      <td className="px-3 py-2 text-right font-mono">{pct.toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
