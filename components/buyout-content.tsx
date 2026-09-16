@@ -65,6 +65,8 @@ interface Summary {
   corCountPending?: number;
   realProjectTotal?: number;
   realRemainingToExecute?: number;
+  corAlreadyIncluded?: number;
+  paNetChangeCo?: number;
 }
 
 interface AlertRow {
@@ -393,7 +395,11 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
           <Kpi
             label="CORs Approved"
             value={fmtMoney(summary.totalCorApproved ?? 0)}
-            sub={`${summary.corCountApproved ?? 0} CORs · added to total`}
+            sub={
+              (summary.corAlreadyIncluded ?? 0) > 0
+                ? `${summary.corCountApproved ?? 0} CORs · ${fmtMoney(summary.corAlreadyIncluded ?? 0)} already in PA · ${fmtMoney((summary.totalCorApproved ?? 0) - (summary.corAlreadyIncluded ?? 0))} added to total`
+                : `${summary.corCountApproved ?? 0} CORs · added to total`
+            }
           />
           <Kpi
             label="CORs Pending"
@@ -422,7 +428,7 @@ export function BuyoutContent({ projects, initialProjectId }: { projects: Projec
             <DollarSign className="w-4 h-4 text-[#C9A96E]" /> Cash Flow — Monthly Pay Application Movements
           </h2>
           <p className="text-xs text-muted-foreground mb-4">
-            Real Project Total = Budget + approved CORs. Pending CORs are NOT included in the total.
+            Real Project Total = Budget + approved CORs not already carried by the Pay Application. Pending CORs are NOT included.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

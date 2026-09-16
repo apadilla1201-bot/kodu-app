@@ -142,6 +142,23 @@ export async function GET(request: Request) {
     }
 
     const totalBudget = contractBudget;
+
+    // Net change by change orders already embedded in the PA (G702 line 2 = line 3 - line 1).
+    // Excel-imported PAs (projects started before koduPM, e.g. Arena Madness) already carry
+    // approved CORs inside the contract sum — never double-count them on top of the COR table.
+    const paNetChangeCo =
+      latestPa && contractBudget > 0
+        ? Math.max(
+            0,
+            latestPa.g702NetChange != null
+              ? latestPa.g702NetChange
+              : contractBudget - (latestPa.originalContractSum || 0)
+          )
+        : 0;
+    const corAlreadyIncluded = Math.min(totalCorApproved, paNetChangeCo);
+    const corApprovedExtra = totalCorApproved - corAlreadyIncluded;
+    const realProjectTotal = totalBudget + corApprovedExtra;
+
     const totalRemaining = computeRemaining(totalBudget, totalInvested);
     const lineItems = investedFromPa ? paScopedLines : kpiLines;
 
@@ -197,8 +214,10 @@ export async function GET(request: Request) {
       totalCorPending,
       corCountApproved,
       corCountPending,
-      realProjectTotal: totalBudget + totalCorApproved,
-      realRemainingToExecute: totalBudget + totalCorApproved - totalInvested,
+      realProjectTotal,
+      realRemainingToExecute: realProjectTotal - totalInvested,
+      corAlreadyIncluded,
+      paNetChangeCo,
     };
 
     return NextResponse.json({
