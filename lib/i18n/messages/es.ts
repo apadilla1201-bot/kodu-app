@@ -374,6 +374,8 @@ export const esMessages: Messages = {
     budgetLinesLoaded: '{count} líneas cargadas desde el Budget — ingrese las cantidades a cobrar de este período.',
     budgetLinesLoadedWithPa: '{count} líneas cargadas desde el Budget (progreso heredado de PA #{number}) — ingrese las cantidades a cobrar de este período.',
     budgetLoadError: 'Error al cargar el Budget',
+    corApprovedIncluded: 'Incluye {count} CORs aprobadas por {amount}. Las pendientes o rechazadas NO se incluyen.',
+    corApprovedNoCsi: 'Atención: {count} CORs aprobadas no tienen código CSI y no se pudieron distribuir.',
     clonePrev: 'Clonar PA anterior',
     clonePrevDesc: 'Clonar PA anterior y actualizar montos completados',
     backToProjectSelect: '← Volver a selección de proyecto',

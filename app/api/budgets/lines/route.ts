@@ -26,6 +26,13 @@ export async function GET(req: NextRequest) {
     include: { lineItems: { orderBy: { sortOrder: 'asc' } } },
   });
 
+  // Solo CORs APROBADAS pueden aparecer en el Pay Application
+  const approvedCors = await prisma.changeOrder.findMany({
+    where: { projectId, status: 'Approved' },
+    select: { corNumber: true, csiCode: true, totalAmount: true },
+    orderBy: { sequence: 'asc' },
+  });
+
   const lastPa = await prisma.payApplication.findFirst({
     where: { projectId },
     orderBy: { applicationNumber: 'desc' },
@@ -51,5 +58,6 @@ export async function GET(req: NextRequest) {
       : null,
     lastPaLines: lastPa?.lineItems ?? [],
     lastPaNumber: lastPa?.applicationNumber ?? null,
+    approvedCors,
   });
 }

@@ -372,6 +372,8 @@ export const enMessages = {
     budgetLinesLoaded: '{count} lines loaded from the Budget — enter the amounts to bill this period.',
     budgetLinesLoadedWithPa: '{count} lines loaded from the Budget (progress inherited from PA #{number}) — enter the amounts to bill this period.',
     budgetLoadError: 'Failed to load the Budget',
+    corApprovedIncluded: 'Includes {count} approved CORs totaling {amount}. Pending or rejected CORs are NOT included.',
+    corApprovedNoCsi: 'Warning: {count} approved CORs have no CSI code and could not be distributed.',
     clonePrev: 'Clone Previous PA',
     clonePrevDesc: 'Clone previous PA and update completed amounts',
     backToProjectSelect: '← Back to project selection',

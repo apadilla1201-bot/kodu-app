@@ -260,6 +260,17 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
         prevMap.set(key, (prevMap.get(key) || 0) + (li.previousCompleted || 0) + (li.thisCompleted || 0));
       }
 
+      // Solo CORs APROBADAS entran al PA, agrupadas por division CSI (2 primeros digitos)
+      const normDigits = (s: string) => (s || '').replace(/[^0-9]/g, '');
+      const corByDiv = new Map<string, number>();
+      let corNoCsi = 0;
+      for (const cor of data.approvedCors ?? []) {
+        const csi = normDigits(cor.csiCode);
+        if (!csi) { corNoCsi += 1; continue; }
+        const div = csi.slice(0, 2);
+        corByDiv.set(div, (corByDiv.get(div) || 0) + (cor.totalAmount || 0));
+      }
+
       let order = 0;
       const lines = (data.budget.lineItems as any[])
         .filter((li: any) => !li.isSubtotal)
@@ -277,14 +288,16 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
             };
           }
           const key = (li.itemNumber || '').trim() || normDesc(li.description);
+          const div = normDigits(li.divisionCode).slice(0, 2);
           return {
             ...emptyLine(),
             sortOrder: order,
             itemNumber: li.itemNumber ?? '',
             description: li.description ?? '',
             subVendor: li.subVendor ?? '',
-            scheduledValue: li.revisedValue || li.scheduledValue || 0,
-            previousChanges: li.currentChanges || 0,
+            scheduledValue: li.scheduledValue || 0,
+            // SOLO CORs aprobadas: nunca lo que trajera el Excel del budget
+            previousChanges: (div && corByDiv.get(div)) || 0,
             currentChanges: 0,
             previousCompleted: prevMap.get(key) || 0,
             thisCompleted: 0,
@@ -307,11 +320,13 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       setImportedHeader(header);
       setEditHeader(header);
       setImportedLines(lines);
-      setImportSummary(
-        data.lastPaNumber
-          ? t('payApps.budgetLinesLoadedWithPa', { count: lines.length, number: data.lastPaNumber })
-          : t('payApps.budgetLinesLoaded', { count: lines.length })
-      );
+      const corTotal = (data.approvedCors ?? []).reduce((s: number, c: any) => s + (c.totalAmount || 0), 0);
+      let summaryText = data.lastPaNumber
+        ? t('payApps.budgetLinesLoadedWithPa', { count: lines.length, number: data.lastPaNumber })
+        : t('payApps.budgetLinesLoaded', { count: lines.length });
+      if (corTotal > 0) summaryText += ' ' + t('payApps.corApprovedIncluded', { count: (data.approvedCors ?? []).length, amount: fmt(corTotal) });
+      if (corNoCsi > 0) summaryText += ' ' + t('payApps.corApprovedNoCsi', { count: corNoCsi });
+      setImportSummary(summaryText);
       setStep('review');
     } catch (e: any) {
       toast.error(e.message || t('payApps.budgetLoadError'));
