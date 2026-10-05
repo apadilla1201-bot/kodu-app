@@ -79,6 +79,10 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
   const [headerExpanded, setHeaderExpanded] = useState(false);
   const [editHeader, setEditHeader] = useState<any>({});
 
+  // Manual basado en Budget
+  const [manualNoBudget, setManualNoBudget] = useState(false);
+  const [manualLoading, setManualLoading] = useState(false);
+
   // "Paid by Owner" — el sistema pregunta y acumula solo
   const [pboAnswered, setPboAnswered] = useState(false);
   const [pboHas, setPboHas] = useState<boolean | null>(null);
@@ -227,6 +231,92 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
       toast.error(e.message || t('payApps.cloneError'));
     } finally {
       setImporting(false);
+    }
+  };
+
+  /* ── Manual basado en Budget: solo partidas del budget activo ── */
+  const normDesc = (s: string) => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const handleManual = async () => {
+    if (!projectId) return;
+    setMethod('manual');
+    setManualLoading(true);
+    setManualNoBudget(false);
+    try {
+      const res = await fetch(`/api/budgets/lines?projectId=${projectId}`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load budget');
+
+      if (!data.budget || data.budget.lineItems.length === 0) {
+        setManualNoBudget(true);
+        return;
+      }
+
+      // Lo ya cobrado por partida (del ultimo PA) para heredar previousCompleted
+      const prevMap = new Map<string, number>();
+      for (const li of data.lastPaLines ?? []) {
+        const key = (li.itemNumber || '').trim() || normDesc(li.description);
+        if (!key) continue;
+        prevMap.set(key, (prevMap.get(key) || 0) + (li.previousCompleted || 0) + (li.thisCompleted || 0));
+      }
+
+      let order = 0;
+      const lines = (data.budget.lineItems as any[])
+        .filter((li: any) => !li.isSubtotal)
+        .map((li: any) => {
+          order += 1;
+          if (li.isSection) {
+            return {
+              ...emptyLine(),
+              sortOrder: order,
+              itemNumber: li.itemNumber ?? '',
+              description: li.description ?? '',
+              sectionCode: li.divisionCode ?? '',
+              sectionTitle: li.description ?? '',
+              isSection: true,
+            };
+          }
+          const key = (li.itemNumber || '').trim() || normDesc(li.description);
+          return {
+            ...emptyLine(),
+            sortOrder: order,
+            itemNumber: li.itemNumber ?? '',
+            description: li.description ?? '',
+            subVendor: li.subVendor ?? '',
+            scheduledValue: li.revisedValue || li.scheduledValue || 0,
+            previousChanges: li.currentChanges || 0,
+            currentChanges: 0,
+            previousCompleted: prevMap.get(key) || 0,
+            thisCompleted: 0,
+            isFee: li.isFee ?? false,
+            isBelowLine: li.isBelowLine ?? false,
+            sectionCode: li.divisionCode ?? '',
+          };
+        });
+
+      // Header G702 desde el budget
+      const b = data.budget;
+      const header: any = {
+        originalContractSum: b.grandTotal || b.constructionSubtotal || 0,
+        constructionSubtotal: b.constructionSubtotal || 0,
+        opPercent: b.opPercent ?? 0.08,
+        glPercent: b.glPercent ?? 0.02,
+        contingencyPercent: b.contingencyPercent ?? 0.10,
+        glInsuranceAmount: b.glAmount || 0,
+      };
+      setImportedHeader(header);
+      setEditHeader(header);
+      setImportedLines(lines);
+      setImportSummary(
+        data.lastPaNumber
+          ? t('payApps.budgetLinesLoadedWithPa', { count: lines.length, number: data.lastPaNumber })
+          : t('payApps.budgetLinesLoaded', { count: lines.length })
+      );
+      setStep('review');
+    } catch (e: any) {
+      toast.error(e.message || t('payApps.budgetLoadError'));
+    } finally {
+      setManualLoading(false);
     }
   };
 
@@ -430,17 +520,11 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E]" />
             </button>
 
-            {/* Manual */}
+            {/* Manual — basado en Budget */}
             <button
-              onClick={() => {
-                setMethod('manual');
-                setImportedLines([]);
-                setImportedHeader({});
-                setEditHeader({});
-                setImportSummary('');
-                setStep('review');
-              }}
-              className="flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C9A96E] cursor-pointer transition-all w-full text-left group"
+              onClick={handleManual}
+              disabled={manualLoading}
+              className="flex items-center gap-4 p-4 rounded-xl border-2 border-border hover:border-[#C9A96E] cursor-pointer transition-all w-full text-left group disabled:opacity-60"
             >
               <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
                 <Pencil className="w-6 h-6 text-blue-700" />
@@ -449,8 +533,22 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
                 <p className="font-semibold">{t('payApps.manualEntry')}</p>
                 <p className="text-xs text-muted-foreground">{t('payApps.manualEntryDesc')}</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E]" />
+              {manualLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-[#C9A96E]" />}
             </button>
+
+            {manualNoBudget && (
+              <div className="p-4 rounded-xl border-2 border-amber-300 bg-amber-50 text-sm text-amber-800 space-y-2">
+                <p className="font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" /> {t('payApps.manualNoBudget')}
+                </p>
+                <Link
+                  href={`/dashboard/budgets?projectId=${projectId}`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#0F1B33] underline"
+                >
+                  {t('payApps.goToBudget')} <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+            )}
 
             {/* Clone from Previous */}
             {selectedProject?.lastPayAppId && (
@@ -702,20 +800,22 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">{t('payApps.g703LinesTitle', { count: importedLines.length })}</CardTitle>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => addLine(true)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-[#0F1B33] text-[#0F1B33] hover:bg-[#0F1B33]/5 flex items-center gap-1"
-                  >
-                    <Plus className="w-3 h-3" /> {t('payApps.addSection')}
-                  </button>
-                  <button
-                    onClick={() => addLine(false)}
-                    className="text-xs px-3 py-1.5 rounded-lg bg-[#C9A96E] text-white hover:bg-[#B8975D] flex items-center gap-1"
-                  >
-                    <Plus className="w-3 h-3" /> {t('payApps.addLine')}
-                  </button>
-                </div>
+                {method !== 'manual' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => addLine(true)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-[#0F1B33] text-[#0F1B33] hover:bg-[#0F1B33]/5 flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> {t('payApps.addSection')}
+                    </button>
+                    <button
+                      onClick={() => addLine(false)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-[#C9A96E] text-white hover:bg-[#B8975D] flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> {t('payApps.addLine')}
+                    </button>
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -811,15 +911,19 @@ export default function NewPayAppForm({ projects, initialProjectId }: Props) {
               ) : (
                 <div className="p-8 text-center">
                   <Pencil className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground mb-3">{t('payApps.emptyPaMessage')}</p>
-                  <div className="flex gap-2 justify-center">
-                    <button onClick={() => addLine(true)} className="text-xs px-3 py-1.5 rounded-lg border border-border hover:border-[#C9A96E] flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> {t('payApps.addSection')}
-                    </button>
-                    <button onClick={() => addLine(false)} className="text-xs px-3 py-1.5 rounded-lg bg-[#C9A96E] text-white hover:bg-[#B8975D] flex items-center gap-1">
-                      <Plus className="w-3 h-3" /> {t('payApps.addLine')}
-                    </button>
-                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {method === 'manual' ? t('payApps.manualNoBudget') : t('payApps.emptyPaMessage')}
+                  </p>
+                  {method !== 'manual' && (
+                    <div className="flex gap-2 justify-center">
+                      <button onClick={() => addLine(true)} className="text-xs px-3 py-1.5 rounded-lg border border-border hover:border-[#C9A96E] flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> {t('payApps.addSection')}
+                      </button>
+                      <button onClick={() => addLine(false)} className="text-xs px-3 py-1.5 rounded-lg bg-[#C9A96E] text-white hover:bg-[#B8975D] flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> {t('payApps.addLine')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
