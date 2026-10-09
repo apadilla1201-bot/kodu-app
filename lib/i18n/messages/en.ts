@@ -857,6 +857,12 @@ export const enMessages = {
     cfRealToday: 'Actually executed (today)',
     cfRealTotal: 'Real Total',
     cfLeft: 'Remaining at end',
+    cfBasis: 'Projection basis:',
+    cfModeCpm: 'Per current CPM (schedule)',
+    cfModeManual: 'Per my own monthly %',
+    cfNoCpm: 'this project has no active CPM',
+    cfCpmSource: 'CPM {revision} · {costed}/{total} activities with cost loaded · remaining cost {amount}, distributed by activity dates',
+    cfCpmDiff: 'Note: the CPM has {cpm} of remaining loaded cost, but the real remaining to execute is {real}. Review the schedule cost loading.',
   },
   pdf: {
     fieldReport: {

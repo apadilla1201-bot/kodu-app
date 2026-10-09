@@ -101,10 +101,78 @@ export async function GET(req: NextRequest) {
     { revised: 0, executed: 0, remaining: 0 }
   );
 
+  // ── CPM: esparcir costos remanentes de las actividades por mes (ventana restante) ──
+  const schedule = await prisma.schedule.findFirst({
+    where: { projectId, status: 'Active' },
+    orderBy: { updatedAt: 'desc' },
+    include: { activities: true },
+  });
+
+  let cpm: any = null;
+  if (schedule) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const costed = schedule.activities.filter((a) => (a.costLoaded || 0) > 0 && a.finishDate);
+    const remainingCost = costed.reduce(
+      (s, a) => s + (a.costLoaded || 0) * (1 - (a.percentComplete || 0) / 100),
+      0
+    );
+    const finish =
+      schedule.projectFinish ??
+      costed.reduce((max, a) => (a.finishDate! > max ? a.finishDate! : max), today);
+
+    const monthMap = new Map<string, number>();
+    for (const a of costed) {
+      const ws = a.startDate && a.startDate > today ? a.startDate : today;
+      const we = a.finishDate!;
+      if (we <= today) continue;
+      const rem = (a.costLoaded || 0) * (1 - (a.percentComplete || 0) / 100);
+      const totalDays = Math.max(1, Math.round((we.getTime() - ws.getTime()) / 86400000));
+      let cur = new Date(ws.getFullYear(), ws.getMonth(), 1);
+      const endM = new Date(we.getFullYear(), we.getMonth(), 1);
+      let guard = 0;
+      while (cur <= endM && guard < 240) {
+        const mStart = cur > ws ? cur : ws;
+        const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+        const mEnd = next < we ? new Date(next.getTime() - 1) : we;
+        const days = Math.max(0, Math.round((mEnd.getTime() - mStart.getTime()) / 86400000));
+        if (days > 0) {
+          const key = `${cur.getFullYear()}-${cur.getMonth()}`;
+          monthMap.set(key, (monthMap.get(key) || 0) + (rem * days) / totalDays);
+        }
+        cur = next;
+        guard++;
+      }
+    }
+
+    const months = [...monthMap.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([key, amount]) => {
+        const [y, m] = key.split('-').map(Number);
+        return {
+          key,
+          label: new Date(y, m, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          amount,
+        };
+      });
+
+    cpm = {
+      available: true,
+      revision: schedule.revision,
+      finishDate: finish,
+      dataDate: schedule.dataDate,
+      months,
+      remainingCost,
+      costedActivities: costed.length,
+      totalActivities: schedule.activities.length,
+    };
+  }
+
   return NextResponse.json({
     divisions,
     totals,
     latestPaNumber: latestPa?.applicationNumber ?? null,
     hasData: divisions.length > 0,
+    cpm,
   });
 }

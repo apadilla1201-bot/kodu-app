@@ -76,6 +76,7 @@ export function PortfolioAnalyticsContent() {
   const [cfData, setCfData] = useState<any>(null);
   const [cfLoading, setCfLoading] = useState(false);
   const [cfDivPcts, setCfDivPcts] = useState<Record<string, string>>({});
+  const [cfMode, setCfMode] = useState<'manual' | 'cpm'>('manual');
 
   const generateCf = async () => {
     if (!cfProjectId) return;
@@ -86,6 +87,14 @@ export function PortfolioAnalyticsContent() {
       if (!res.ok) throw new Error(data.error || 'Failed');
       setCfData(data);
       setCfDivPcts({});
+      if (data.cpm?.available) {
+        setCfMode('cpm');
+        if (data.cpm.finishDate) {
+          setCfEnd(new Date(data.cpm.finishDate).toISOString().split('T')[0]);
+        }
+      } else {
+        setCfMode('manual');
+      }
     } catch {
       setCfData(null);
     } finally {
@@ -219,10 +228,12 @@ export function PortfolioAnalyticsContent() {
             <label className="text-xs text-muted-foreground">{t('analytics.cfEnd')}</label>
             <input type="date" value={cfEnd} onChange={(e) => setCfEnd(e.target.value)} className="px-3 py-2 border border-border rounded-lg text-sm bg-background" />
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">{t('analytics.cfMonthlyPct')}</label>
-            <input type="number" min="0" max="100" step="any" value={cfPct} onChange={(e) => setCfPct(e.target.value)} className="px-3 py-2 border border-border rounded-lg text-sm bg-background w-28" />
-          </div>
+          {(!cfData || cfMode === 'manual') && (
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">{t('analytics.cfMonthlyPct')}</label>
+              <input type="number" min="0" max="100" step="any" value={cfPct} onChange={(e) => setCfPct(e.target.value)} className="px-3 py-2 border border-border rounded-lg text-sm bg-background w-28" />
+            </div>
+          )}
           <button
             onClick={generateCf}
             disabled={cfLoading || !cfProjectId}
@@ -232,6 +243,40 @@ export function PortfolioAnalyticsContent() {
           </button>
         </div>
 
+        {cfData && (
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t('analytics.cfBasis')}
+            </span>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="cfMode"
+                checked={cfMode === 'cpm'}
+                onChange={() => setCfMode('cpm')}
+                disabled={!cfData.cpm?.available}
+                className="accent-[#C9A96E]"
+              />
+              <span className={cfData.cpm?.available ? '' : 'text-muted-foreground line-through'}>
+                {t('analytics.cfModeCpm')}
+              </span>
+              {!cfData.cpm?.available && (
+                <span className="text-xs text-muted-foreground">({t('analytics.cfNoCpm')})</span>
+              )}
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="cfMode"
+                checked={cfMode === 'manual'}
+                onChange={() => setCfMode('manual')}
+                className="accent-[#C9A96E]"
+              />
+              <span>{t('analytics.cfModeManual')}</span>
+            </label>
+          </div>
+        )}
+
         {cfData && !cfData.hasData && (
           <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">{t('analytics.cfNoData')}</p>
         )}
@@ -240,9 +285,29 @@ export function PortfolioAnalyticsContent() {
           <>
             <p className="text-xs text-muted-foreground">
               {t('analytics.cfSourcePa', { number: cfData.latestPaNumber ?? '—' })}
+              {cfMode === 'cpm' && cfData.cpm?.available && (
+                <span className="block mt-1 text-[#C9A96E]">
+                  {t('analytics.cfCpmSource', {
+                    revision: cfData.cpm.revision,
+                    costed: cfData.cpm.costedActivities,
+                    total: cfData.cpm.totalActivities,
+                    amount: fmtMoney(cfData.cpm.remainingCost),
+                  })}
+                </span>
+              )}
             </p>
 
-            {(cfProjection.leftAtEnd > 1 ? (
+            {cfMode === 'cpm' && cfData.cpm?.available && cfData.cpm.remainingCost > 0 &&
+              Math.abs(cfData.cpm.remainingCost - cfData.totals.remaining) > Math.max(1000, cfData.totals.remaining * 0.02) && (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                {t('analytics.cfCpmDiff', {
+                  cpm: fmtMoney(cfData.cpm.remainingCost),
+                  real: fmtMoney(cfData.totals.remaining),
+                })}
+              </p>
+            )}
+
+            {cfMode === 'manual' && (cfProjection.leftAtEnd > 1 ? (
               <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
                 {t('analytics.cfAlertLeft', { amount: fmtMoney(cfProjection.leftAtEnd) })}
               </p>
@@ -274,18 +339,24 @@ export function PortfolioAnalyticsContent() {
                       <td className="px-3 py-2 text-right font-mono">{fmtMoney(d.executed)}</td>
                       <td className="px-3 py-2 text-right font-mono font-semibold">{fmtMoney(d.remaining)}</td>
                       <td className="px-3 py-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="any"
-                          placeholder={cfPct}
-                          value={cfDivPcts[d.code] ?? ''}
-                          onChange={(e) => setCfDivPcts((prev) => ({ ...prev, [d.code]: e.target.value }))}
-                          className="w-16 px-1 py-0.5 text-right border border-border rounded bg-background font-mono"
-                        />
+                        {cfMode === 'manual' ? (
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="any"
+                            placeholder={cfPct}
+                            value={cfDivPcts[d.code] ?? ''}
+                            onChange={(e) => setCfDivPcts((prev) => ({ ...prev, [d.code]: e.target.value }))}
+                            className="w-16 px-1 py-0.5 text-right border border-border rounded bg-background font-mono"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono">{cfMonthsToFinish(d.remaining, cfDivPcts[d.code] ?? cfPct)}</td>
+                      <td className="px-3 py-2 text-right font-mono">
+                        {cfMode === 'manual' ? cfMonthsToFinish(d.remaining, cfDivPcts[d.code] ?? cfPct) : '—'}
+                      </td>
                     </tr>
                   ))}
                   <tr className="border-t-2 border-[#0F1B33] font-bold bg-muted/40">
@@ -300,7 +371,7 @@ export function PortfolioAnalyticsContent() {
               </table>
             </div>
 
-            {/* Movimientos mensuales */}
+            {/* Movimientos mensuales: CPM o manual */}
             <div className="overflow-x-auto">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{t('analytics.cfMonthly')}</h3>
               <table className="w-full text-xs">
@@ -315,7 +386,10 @@ export function PortfolioAnalyticsContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cfProjection.rows.map((r: any) => {
+                  {(cfMode === 'cpm' && cfData.cpm?.available
+                    ? (() => { let c = 0; return cfData.cpm.months.map((m: any) => { c += m.amount; return { ...m, cum: c }; }); })()
+                    : cfProjection.rows
+                  ).map((r: any) => {
                     const realPlusProj = cfData.totals.executed + r.cum;
                     const left = cfData.totals.revised - realPlusProj;
                     return (

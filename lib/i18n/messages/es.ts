@@ -859,6 +859,12 @@ export const esMessages: Messages = {
     cfRealToday: 'Ejecutado real (hoy)',
     cfRealTotal: 'Total Real',
     cfLeft: 'Faltante al fin de obra',
+    cfBasis: 'Base de la proyección:',
+    cfModeCpm: 'Según el CPM actual (cronograma)',
+    cfModeManual: 'Según mi % mensual propio',
+    cfNoCpm: 'este proyecto no tiene CPM activo',
+    cfCpmSource: 'CPM {revision} · {costed}/{total} actividades con costo cargado · costo remanente {amount}, distribuido por fecha de actividad',
+    cfCpmDiff: 'Ojo: el CPM tiene {cpm} de costo remanente cargado, pero el faltante real por ejecutar es {real}. Revise la carga de costos del cronograma.',
   },
   pdf: {
     fieldReport: {
