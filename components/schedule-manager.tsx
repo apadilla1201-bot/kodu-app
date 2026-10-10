@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import {
   CalendarDays, GitCompare, Clock, Plus, ChevronDown, ChevronRight,
   Loader2, FileSpreadsheet, Download, Upload, ArrowLeftRight,
-  Check, X, AlertTriangle, ArrowRight, Minus,
+  Check, X, AlertTriangle, ArrowRight, Minus, TrendingUp, Pencil,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 
@@ -75,7 +75,7 @@ function fmtShort(d: string | null): string {
 /* ── Component ────────────────────────────────────────────────── */
 export default function ScheduleManager({ schedules, projectId, approvedCORs = [] }: Props) {
   const { t } = useI18n();
-  const [view, setView] = useState<'gantt' | 'versions' | 'compare' | 'lookahead'>('gantt');
+  const [view, setView] = useState<'gantt' | 'progress' | 'versions' | 'compare' | 'lookahead'>('gantt');
   const [allSchedules, setAllSchedules] = useState<ScheduleData[]>(schedules);
   const activeSchedule = useMemo(() => allSchedules.find(s => s.status === 'Active') ?? allSchedules[0] ?? null, [allSchedules]);
 
@@ -96,9 +96,16 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
   const [laImporting, setLaImporting] = useState(false);
   const [excelImporting, setExcelImporting] = useState(false);
 
+  // Progress update: manual o alimentar con Excel
+  const [progressMode, setProgressMode] = useState<'choice' | 'manual' | 'excel'>('choice');
+  const [progressEdits, setProgressEdits] = useState<Record<string, number>>({});
+  const [progressSaving, setProgressSaving] = useState(false);
+  const [progressSearch, setProgressSearch] = useState('');
+
   // Sub-tabs styling
   const subTabs = [
     { key: 'gantt', label: t('schedules.ganttChart'), icon: CalendarDays },
+    { key: 'progress', label: t('schedules.progressTab'), icon: TrendingUp },
     { key: 'lookahead', label: t('schedules.twoWeekLookahead'), icon: Clock },
     { key: 'compare', label: t('schedules.fragnetCompareTab'), icon: GitCompare },
     { key: 'versions', label: t('schedules.versionHistory'), icon: FileSpreadsheet },
@@ -334,6 +341,10 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!window.confirm(t('schedules.progressExcelConfirm'))) {
+      e.target.value = '';
+      return;
+    }
     setExcelImporting(true);
     try {
       const fd = new FormData();
@@ -354,6 +365,42 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
     } finally {
       setExcelImporting(false);
       e.target.value = '';
+    }
+  };
+
+  // ── Progress: guardar ediciones manuales ─────────────────
+  const saveProgressEdits = async () => {
+    if (!activeSchedule) return;
+    const entries = Object.entries(progressEdits);
+    if (entries.length === 0) { toast.info(t('schedules.noProgressChanges')); return; }
+    setProgressSaving(true);
+    let saved = 0;
+    let failed = 0;
+    for (const [actDbId, pct] of entries) {
+      const act = activeSchedule.activities.find(a => a.id === actDbId);
+      if (!act) continue;
+      try {
+        const res = await fetch(`/api/schedules/${activeSchedule.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activityDbId: actDbId,
+            percentComplete: pct,
+            originalDuration: act.originalDuration,
+            status: pct >= 100 ? 'done' : pct > 0 ? 'ip' : act.status,
+          }),
+        });
+        if (res.ok) saved++;
+        else failed++;
+      } catch { failed++; }
+    }
+    setProgressSaving(false);
+    if (failed === 0) {
+      toast.success(t('schedules.progressSaved', { count: saved }));
+      setProgressEdits({});
+      window.location.reload();
+    } else {
+      toast.error(t('schedules.progressSaveError', { failed }));
     }
   };
 
@@ -394,6 +441,169 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       {/* ── GANTT VIEW ── */}
       {view === 'gantt' && activeSchedule && (
         <ScheduleGantt schedule={activeSchedule} projectId={projectId} approvedCORs={approvedCORs} />
+      )}
+
+      {/* ── PROGRESS UPDATE ── */}
+      {view === 'progress' && (
+        <div className="bg-card rounded-xl border border-border">
+          <div className="p-4 border-b border-border">
+            <h3 className="font-semibold flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#C9A96E]" /> {t('schedules.progressTab')}
+              {activeSchedule && <span className="text-xs text-muted-foreground font-normal">— {activeSchedule.revision} · Data Date {fmtDate(activeSchedule.dataDate)}</span>}
+            </h3>
+          </div>
+
+          {progressMode === 'choice' && (
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={() => setProgressMode('manual')}
+                className="flex items-center gap-4 p-5 rounded-xl border-2 border-border hover:border-[#C9A96E] transition-all text-left group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                  <Pencil className="w-6 h-6 text-blue-700" />
+                </div>
+                <div>
+                  <p className="font-semibold">{t('schedules.progressManual')}</p>
+                  <p className="text-xs text-muted-foreground">{t('schedules.progressManualDesc')}</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setProgressMode('excel')}
+                className="flex items-center gap-4 p-5 rounded-xl border-2 border-border hover:border-[#C9A96E] transition-all text-left group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-6 h-6 text-green-700" />
+                </div>
+                <div>
+                  <p className="font-semibold">{t('schedules.progressExcel')}</p>
+                  <p className="text-xs text-muted-foreground">{t('schedules.progressExcelDesc')}</p>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {progressMode === 'manual' && activeSchedule && (() => {
+            const q = progressSearch.toLowerCase();
+            const rows = activeSchedule.activities
+              .filter(a => !a.activityType.startsWith('group_') && !a.isLookAhead)
+              .filter(a => !q || a.activityName.toLowerCase().includes(q) || a.activityId.toLowerCase().includes(q));
+            const editedCount = Object.keys(progressEdits).length;
+            return (
+              <div className="p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={() => { setProgressMode('choice'); setProgressEdits({}); }} className="text-xs text-muted-foreground hover:text-foreground">
+                    ← {t('schedules.progressBack')}
+                  </button>
+                  <input
+                    value={progressSearch}
+                    onChange={(e) => setProgressSearch(e.target.value)}
+                    placeholder={t('schedules.progressSearch')}
+                    className="ml-auto px-3 py-1.5 border border-border rounded-md text-xs w-56 outline-none focus:border-[#C9A96E]"
+                  />
+                  <button
+                    onClick={saveProgressEdits}
+                    disabled={progressSaving || editedCount === 0}
+                    className="px-3 py-1.5 bg-[#0F1B33] text-[#C9A96E] rounded-md text-xs font-medium flex items-center gap-1 disabled:opacity-50 hover:bg-[#0a1225]"
+                  >
+                    {progressSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                    {t('schedules.progressSave')} {editedCount > 0 ? `(${editedCount})` : ''}
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">{t('schedules.progressHint')}</p>
+                <div className="overflow-x-auto max-h-[520px] overflow-y-auto border border-border rounded-md">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-[#0F1B33] text-white z-10">
+                      <tr>
+                        <th className="px-2 py-2 text-left font-medium w-24">ID</th>
+                        <th className="px-2 py-2 text-left font-medium">{t('schedules.colActivity')}</th>
+                        <th className="px-2 py-2 text-right font-medium w-12">{t('schedules.colOD')}</th>
+                        <th className="px-2 py-2 text-right font-medium w-12">{t('schedules.colRD')}</th>
+                        <th className="px-2 py-2 text-right font-medium w-28 bg-[#C9A96E]/20">%</th>
+                        <th className="px-2 py-2 w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {rows.map(a => {
+                        const pct = progressEdits[a.id] ?? a.percentComplete;
+                        const rd = Math.round(a.originalDuration * (1 - pct / 100));
+                        const dirty = progressEdits[a.id] !== undefined;
+                        return (
+                          <tr key={a.id} className={dirty ? 'bg-[#C9A96E]/10' : 'hover:bg-muted/30'}>
+                            <td className="px-2 py-1.5 font-mono text-[10px]">{a.activityId || '—'}</td>
+                            <td className="px-2 py-1.5 max-w-[360px] truncate" title={a.activityName}>
+                              {a.isMilestone ? '◆ ' : ''}{a.activityName}
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-mono">{a.originalDuration}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{rd}</td>
+                            <td className="px-2 py-1.5 bg-[#FFFFF0]">
+                              <div className="flex items-center justify-end gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="any"
+                                  value={pct}
+                                  onChange={(e) => {
+                                    const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                                    setProgressEdits((prev) => ({ ...prev, [a.id]: v }));
+                                  }}
+                                  className="w-16 px-1 py-0.5 text-right border border-[#C9A96E]/30 rounded bg-[#FFFFF0] font-mono"
+                                />
+                                <span className="text-muted-foreground">%</span>
+                              </div>
+                            </td>
+                            <td className="px-2 py-1.5 text-center">
+                              {pct < 100 && (
+                                <button
+                                  onClick={() => setProgressEdits((prev) => ({ ...prev, [a.id]: 100 }))}
+                                  className="px-1.5 py-0.5 text-[10px] border border-border rounded hover:border-[#C9A96E] hover:text-[#C9A96E]"
+                                  title={t('schedules.set100')}
+                                >
+                                  100%
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {rows.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">{t('schedules.progressNoResults')}</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+          {progressMode === 'excel' && (
+            <div className="p-6 space-y-3">
+              <button onClick={() => setProgressMode('choice')} className="text-xs text-muted-foreground hover:text-foreground">
+                ← {t('schedules.progressBack')}
+              </button>
+              <div className="p-4 bg-gradient-to-r from-[#0F1B33]/5 to-[#C9A96E]/10 border border-[#C9A96E]/30 rounded-lg space-y-3">
+                <p className="text-xs font-semibold text-[#0F1B33] flex items-center gap-1">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#C9A96E]" /> {t('schedules.progressExcel')}
+                </p>
+                <p className="text-[10px] text-muted-foreground">{t('schedules.progressExcelDesc')}</p>
+                <label className="px-3 py-1.5 bg-[#C9A96E] text-white rounded-md text-xs font-medium flex items-center gap-1 cursor-pointer hover:bg-[#B8975D] transition-colors w-fit">
+                  <Upload className="w-3 h-3" /> {t('schedules.selectExcel')}
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleExcelImport}
+                    className="hidden"
+                  />
+                </label>
+                {excelImporting && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" /> {t('schedules.importing')}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── VERSION HISTORY ── */}
