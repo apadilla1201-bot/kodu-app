@@ -12,6 +12,7 @@ import {
   ArrowUpRight, ArrowDownRight, Minus, RefreshCw, Info, Building2,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { ProjectedCashflowSection } from '@/components/projected-cashflow-section';
 
 const OwnerExecutiveDashboard = dynamic(() => import('@/components/owner-executive-dashboard'), { ssr: false });
 
@@ -165,7 +166,7 @@ export default function ProjectAnalytics({ projectId }: { projectId: string }) {
   const [cfData, setCfData] = useState<CashflowPoint[]>([]);
   const [cfSummary, setCfSummary] = useState<CashflowSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeChart, setActiveChart] = useState<'owner-executive' | 'earned-value' | 'cashflow'>('owner-executive');
+  const [activeChart, setActiveChart] = useState<'owner-executive' | 'earned-value' | 'cashflow' | 'projected'>('owner-executive');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -272,6 +273,7 @@ export default function ProjectAnalytics({ projectId }: { projectId: string }) {
             { key: 'owner-executive' as const, label: 'Executive Cashflow', icon: Building2 },
             { key: 'earned-value' as const, label: 'S-Curve / Earned Value', icon: TrendingUp },
             { key: 'cashflow' as const, label: 'Technical Cashflow', icon: DollarSign },
+            { key: 'projected' as const, label: 'Projected Cash Flow', icon: Calendar },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -288,6 +290,11 @@ export default function ProjectAnalytics({ projectId }: { projectId: string }) {
         </div>
 
         <div className="p-5">
+          {/* ── Projected Cash Flow (CPM o % propio) ─────────── */}
+          {activeChart === 'projected' && (
+            <ProjectedCashflowSection key={projectId} fixedProjectId={projectId} />
+          )}
+
           {/* ── Earned Value S-Curve ─────────────────────────── */}
           {activeChart === 'earned-value' && (
             noEVData ? (
