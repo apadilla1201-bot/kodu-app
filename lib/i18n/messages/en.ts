@@ -880,6 +880,8 @@ export const enMessages = {
     cfNoCpm: 'this project has no active CPM',
     cfCpmSource: 'CPM {revision} · {costed}/{total} activities with cost loaded · remaining cost {amount}, distributed by activity dates',
     cfCpmDiff: 'Note: the CPM has {cpm} of remaining loaded cost, but the real remaining to execute is {real}. Review the schedule cost loading.',
+    cfCpmStale: 'CPM {revision} has a data date of {date} ({days} days ago). Update progress (Schedule > Progress tab) so the projection reflects the actual job.',
+    cfCpmFresh: 'CPM data date is {days} days old.',
   },
   pdf: {
     fieldReport: {

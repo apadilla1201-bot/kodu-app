@@ -882,6 +882,8 @@ export const esMessages: Messages = {
     cfNoCpm: 'este proyecto no tiene CPM activo',
     cfCpmSource: 'CPM {revision} · {costed}/{total} actividades con costo cargado · costo remanente {amount}, distribuido por fecha de actividad',
     cfCpmDiff: 'Ojo: el CPM tiene {cpm} de costo remanente cargado, pero el faltante real por ejecutar es {real}. Revise la carga de costos del cronograma.',
+    cfCpmStale: 'El CPM {revision} tiene data date del {date} (hace {days} días). Actualice el progreso (tab Progress del Schedule) para que la proyección refleje la obra real.',
+    cfCpmFresh: 'Data date del CPM actualizado hace {days} días.',
   },
   pdf: {
     fieldReport: {

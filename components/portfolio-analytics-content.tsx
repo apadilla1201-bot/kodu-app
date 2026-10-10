@@ -166,6 +166,11 @@ export function PortfolioAnalyticsContent() {
 
   useEffect(() => { load(); }, []);
 
+  const cpmAgeDays =
+    cfData?.cpm?.dataDate != null
+      ? Math.floor((Date.now() - new Date(cfData.cpm.dataDate).getTime()) / 86400000)
+      : null;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24 text-muted-foreground">
@@ -306,6 +311,21 @@ export function PortfolioAnalyticsContent() {
                 })}
               </p>
             )}
+
+            {cfMode === 'cpm' && cfData.cpm?.available && cpmAgeDays !== null &&
+              (cpmAgeDays > 14 ? (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  {t('analytics.cfCpmStale', {
+                    revision: cfData.cpm.revision,
+                    days: cpmAgeDays,
+                    date: new Date(cfData.cpm.dataDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                  })}
+                </p>
+              ) : (
+                <p className="text-xs text-green-700">
+                  {t('analytics.cfCpmFresh', { days: cpmAgeDays })}
+                </p>
+              ))}
 
             {cfMode === 'manual' && (cfProjection.leftAtEnd > 1 ? (
               <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
