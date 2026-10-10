@@ -111,6 +111,30 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
     { key: 'versions', label: t('schedules.versionHistory'), icon: FileSpreadsheet },
   ] as const;
 
+  // Refrescar schedules en caliente tras import/clone/progress (evita reload que
+  // podia redirigir al dashboard por re-render del server component)
+  const refreshSchedules = async (): Promise<boolean> => {
+    try {
+      const listRes = await fetch(`/api/schedules?projectId=${projectId}`, { credentials: 'include' });
+      if (!listRes.ok) return false;
+      const list = await listRes.json();
+      const full = await Promise.all(
+        (list as any[]).map(async (s: any) => {
+          const r = await fetch(`/api/schedules/${s.id}`, { credentials: 'include' });
+          return r.ok ? await r.json() : null;
+        })
+      );
+      const valid = full.filter(Boolean);
+      if (valid.length > 0) {
+        setAllSchedules(valid as ScheduleData[]);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   // ── Compare ────────────────────────────────────────
   const runComparison = async () => {
     if (!baseId || !compareId) { toast.error(t('schedules.selectTwoVersions')); return; }
@@ -142,13 +166,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       if (!res.ok) throw new Error();
       toast.success(t('schedules.revisionCreated', { name: cloneRevision }));
       setCloneRevision('');
-      // Refresh schedules
-      const listRes = await fetch(`/api/schedules?projectId=${projectId}`);
-      if (listRes.ok) {
-        const list = await listRes.json();
-        // Need to fetch full data with activities for each
-        window.location.reload();
-      }
+      if (!(await refreshSchedules())) window.location.reload();
     } catch { toast.error(t('schedules.cloneError')); }
     finally { setCloning(false); }
   };
@@ -358,8 +376,9 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       }
       const data = await res.json();
       toast.success(data.message || t('schedules.cpmImportSuccess'));
-      // Reload page to refresh schedule list
-      window.location.reload();
+      // Refrescar la lista en caliente; solo si falla, reload de fallback
+      setProgressMode('choice');
+      if (!(await refreshSchedules())) window.location.reload();
     } catch (err: any) {
       toast.error(err.message || t('schedules.cpmImportError'));
     } finally {
@@ -398,7 +417,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
     if (failed === 0) {
       toast.success(t('schedules.progressSaved', { count: saved }));
       setProgressEdits({});
-      window.location.reload();
+      await refreshSchedules();
     } else {
       toast.error(t('schedules.progressSaveError', { failed }));
     }
