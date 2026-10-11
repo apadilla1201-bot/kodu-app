@@ -17,6 +17,15 @@ export async function GET(request: Request) {
     const where: any = { project: { companyId } };
     if (projectId) where.projectId = projectId;
 
+    // Self-heal: dataDates corruptas de imports viejos (JS parseaba '9-30' como año 2001)
+    const badDates = await prisma.schedule.findMany({
+      where: { dataDate: { lt: new Date('2020-01-01') }, project: { companyId } },
+      select: { id: true, updatedAt: true },
+    });
+    for (const b of badDates) {
+      await prisma.schedule.update({ where: { id: b.id }, data: { dataDate: b.updatedAt } });
+    }
+
     const schedules = await prisma.schedule.findMany({
       where,
       include: {

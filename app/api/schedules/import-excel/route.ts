@@ -19,6 +19,37 @@ function excelToDate(serial: number | string | null | undefined): Date | null {
   return d;
 }
 
+/* ── Parse fechas de metadata (Data Date / TCO) sin caer en el bug del año 2001 ──
+   Acepta: '9/30/2026', '2026-09-30', '30-Sep-26', serial de Excel (45868),
+   y '9-30' / '9/30' sin año (asume el año actual — una data date siempre es reciente).
+   Rechaza años fuera de [2020, 2100] (ej. Date('9-30') → 2001). */
+function parseMetaDate(raw: string | null | undefined): Date | null {
+  if (!raw) return null;
+  const token = String(raw).trim();
+  if (!token) return null;
+  // Serial de Excel puro
+  if (/^\d{5}$/.test(token)) return excelToDate(token);
+  // Sin año: M-D, M/D, D-M, D/M → año actual
+  const noYear = token.match(/^(\d{1,2})[-/](\d{1,2})$/);
+  if (noYear) {
+    const a = parseInt(noYear[1], 10);
+    const b = parseInt(noYear[2], 10);
+    const now = new Date();
+    // Heurística: si el primer número > 12 es día; si el segundo > 12 es día
+    const day = a > 12 ? a : b;
+    const month = a > 12 ? b : a;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return new Date(now.getFullYear(), month - 1, day, 12, 0, 0, 0);
+    }
+    return null;
+  }
+  const d = new Date(token);
+  if (isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  if (y < 2020 || y > 2100) return null;
+  return d;
+}
+
 /* ── Detect group type from row context ──────────────────── */
 function detectGroupType(name: string): string | null {
   const lower = name.toLowerCase().trim();
@@ -90,17 +121,11 @@ function parseCPMSheet(ws: XLSX.WorkSheet) {
     const revMatch = text.match(/Rev\.?\s*(\d+\.?\d*)/i);
     if (revMatch) revision = `Rev.${revMatch[1]}`;
     // Data Date
-    const ddMatch = text.match(/Data\s*Date[:\s]+([\w\d-]+)/i);
-    if (ddMatch) {
-      const parsed = new Date(ddMatch[1]);
-      if (!isNaN(parsed.getTime())) dataDate = parsed;
-    }
+    const ddMatch = text.match(/Data\s*Date[:\s]+([\w\d/.-]+)/i);
+    if (ddMatch) dataDate = parseMetaDate(ddMatch[1]);
     // TCO Target
-    const tcoMatch = text.match(/TCO\s*(?:Target)?[:\s]+([\w\d-]+)/i);
-    if (tcoMatch) {
-      const parsed = new Date(tcoMatch[1]);
-      if (!isNaN(parsed.getTime())) tcoDate = parsed;
-    }
+    const tcoMatch = text.match(/TCO\s*(?:Target)?[:\s]+([\w\d/.-]+)/i);
+    if (tcoMatch) tcoDate = parseMetaDate(tcoMatch[1]);
   }
 
   // Parse activities

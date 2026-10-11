@@ -23,6 +23,15 @@ export async function GET(req: NextRequest) {
   const project = await prisma.project.findFirst({ where: { id: projectId, companyId } });
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
 
+  // Self-heal: dataDate corrupta de imports viejos ('9-30' parseaba como 2001)
+  const badDate = await prisma.schedule.findFirst({
+    where: { projectId, dataDate: { lt: new Date('2020-01-01') } },
+    select: { id: true, updatedAt: true },
+  });
+  if (badDate) {
+    await prisma.schedule.update({ where: { id: badDate.id }, data: { dataDate: badDate.updatedAt } });
+  }
+
   const latestPa = await prisma.payApplication.findFirst({
     where: { projectId },
     orderBy: { applicationNumber: 'desc' },
