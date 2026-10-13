@@ -896,6 +896,7 @@ export const enMessages = {
     cfCpmFresh: 'CPM data date is {days} days old.',
     cfCpmFallback: 'CPM {revision} has no costs loaded on its activities. The real remaining to execute ({amount}) was distributed evenly according to the remaining time of pending activities. For real per-activity costs, include the amount in parentheses in the activity name in the Excel (e.g. "Drywall ($45,000)") or load costs from the Progress tab.',
     cfCpmMatch: 'CPM loaded cost matches the real remaining to execute ({amount}).',
+    cfExportPdf: 'Export PDF (Owner)',
   },
   pdf: {
     fieldReport: {

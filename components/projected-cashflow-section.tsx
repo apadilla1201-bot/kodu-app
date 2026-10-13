@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Download, Loader2 } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 
 const fmtMoney = (v: number) =>
@@ -35,6 +35,7 @@ export function ProjectedCashflowSection({ fixedProjectId, projects }: Props) {
   const [cfLoading, setCfLoading] = useState(false);
   const [cfDivPcts, setCfDivPcts] = useState<Record<string, string>>({});
   const [cfMode, setCfMode] = useState<'manual' | 'cpm'>('manual');
+  const [cfExporting, setCfExporting] = useState(false);
 
   const generateCf = async () => {
     if (!projectId) return;
@@ -57,6 +58,36 @@ export function ProjectedCashflowSection({ fixedProjectId, projects }: Props) {
       setCfData(null);
     } finally {
       setCfLoading(false);
+    }
+  };
+
+  const exportPdf = async () => {
+    if (!projectId || !cfData) return;
+    setCfExporting(true);
+    try {
+      const rows =
+        cfMode === 'cpm' && cfData.cpm?.available
+          ? (() => { let c = 0; return (cfData.cpm.months ?? []).map((m: any) => { c += m.amount; return { label: m.label, amount: m.amount, cum: c }; }); })()
+          : (cfProjection?.rows ?? []);
+      const res = await fetch(`/api/projects/${projectId}/projected-cashflow-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: cfMode, rows, manualPct: cfPct }),
+      });
+      if (!res.ok) throw new Error('PDF failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Projected_CashFlow_Owner.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      /* noop */
+    } finally {
+      setCfExporting(false);
     }
   };
 
@@ -148,6 +179,16 @@ export function ProjectedCashflowSection({ fixedProjectId, projects }: Props) {
         >
           {cfLoading ? '…' : t('analytics.cfGenerate')}
         </button>
+        {cfData?.hasData && (
+          <button
+            onClick={exportPdf}
+            disabled={cfExporting}
+            className="px-4 py-2 border border-[#C9A96E]/40 text-[#C9A96E] rounded-lg text-sm font-medium hover:bg-[#C9A96E]/10 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {cfExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            {t('analytics.cfExportPdf')}
+          </button>
+        )}
       </div>
 
       {cfData && (
