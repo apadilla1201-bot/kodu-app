@@ -882,6 +882,7 @@ export const enMessages = {
     cfCpmDiff: 'Note: the CPM has {cpm} of remaining loaded cost, but the real remaining to execute is {real}. Review the schedule cost loading.',
     cfCpmStale: 'CPM {revision} has a data date of {date} ({days} days ago). Update progress (Schedule > Progress tab) so the projection reflects the actual job.',
     cfCpmFresh: 'CPM data date is {days} days old.',
+    cfCpmFallback: 'CPM {revision} has no costs loaded on its activities. The real remaining to execute ({amount}) was distributed evenly according to the remaining time of pending activities. For real per-activity costs, include the amount in parentheses in the activity name in the Excel (e.g. "Drywall ($45,000)") or load costs from the Progress tab.',
   },
   pdf: {
     fieldReport: {

@@ -122,16 +122,42 @@ export async function GET(req: NextRequest) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const costed = schedule.activities.filter((a) => (a.costLoaded || 0) > 0 && a.finishDate);
-    const remainingCost = costed.reduce(
+    let remainingCost = costed.reduce(
       (s, a) => s + (a.costLoaded || 0) * (1 - (a.percentComplete || 0) / 100),
       0
     );
+
+    // Fallback: si el CPM no trae costos cargados en las actividades, distribuir el
+    // faltante REAL del proyecto (totals.remaining) de forma equitativa entre las
+    // tareas pendientes, y esparcirlo por meses segun su duracion restante.
+    let fallbackDistributed = false;
+    let activeCosted = costed;
+    if (remainingCost < 1000 && totals.remaining > 1000) {
+      const pendingTasks = schedule.activities.filter(
+        (a) =>
+          a.activityType === 'task' &&
+          !a.isLookAhead &&
+          !a.isMilestone &&
+          a.finishDate &&
+          a.finishDate > today &&
+          (a.percentComplete || 0) < 100
+      );
+      if (pendingTasks.length > 0) {
+        const perTask = totals.remaining / pendingTasks.length;
+        activeCosted = pendingTasks.map((a) => ({ ...a, costLoaded: perTask, percentComplete: 0 }));
+        remainingCost = totals.remaining;
+        fallbackDistributed = true;
+      }
+    }
+
     const finish =
       schedule.projectFinish ??
-      costed.reduce((max, a) => (a.finishDate! > max ? a.finishDate! : max), today);
+      (activeCosted.length > 0
+        ? activeCosted.reduce((max, a) => (a.finishDate! > max ? a.finishDate! : max), today)
+        : today);
 
     const monthMap = new Map<string, number>();
-    for (const a of costed) {
+    for (const a of activeCosted) {
       const ws = a.startDate && a.startDate > today ? a.startDate : today;
       const we = a.finishDate!;
       if (we <= today) continue;
@@ -172,8 +198,10 @@ export async function GET(req: NextRequest) {
       dataDate: schedule.dataDate,
       months,
       remainingCost,
-      costedActivities: costed.length,
+      costedActivities: activeCosted.length,
       totalActivities: schedule.activities.length,
+      fallbackDistributed,
+      distributedAmount: fallbackDistributed ? totals.remaining : remainingCost,
     };
   }
 

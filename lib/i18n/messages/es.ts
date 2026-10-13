@@ -884,6 +884,7 @@ export const esMessages: Messages = {
     cfCpmDiff: 'Ojo: el CPM tiene {cpm} de costo remanente cargado, pero el faltante real por ejecutar es {real}. Revise la carga de costos del cronograma.',
     cfCpmStale: 'El CPM {revision} tiene data date del {date} (hace {days} días). Actualice el progreso (tab Progress del Schedule) para que la proyección refleje la obra real.',
     cfCpmFresh: 'Data date del CPM actualizado hace {days} días.',
+    cfCpmFallback: 'El CPM {revision} no trae costos cargados en las actividades. Se distribuyó el faltante real por ejecutar ({amount}) de forma equitativa según el tiempo restante de las actividades pendientes. Para costos reales por actividad, incluya el monto entre paréntesis en el nombre de la actividad del Excel (ej. "Drywall ($45,000)") o cargue los costos desde el tab Progress.',
   },
   pdf: {
     fieldReport: {

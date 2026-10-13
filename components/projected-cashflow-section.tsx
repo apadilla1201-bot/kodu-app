@@ -204,6 +204,15 @@ export function ProjectedCashflowSection({ fixedProjectId, projects }: Props) {
             )}
           </p>
 
+          {cfMode === 'cpm' && cfData.cpm?.available && cfData.cpm.fallbackDistributed && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              {t('analytics.cfCpmFallback', {
+                revision: cfData.cpm.revision,
+                amount: fmtMoney(cfData.cpm.distributedAmount ?? cfData.cpm.remainingCost),
+              })}
+            </p>
+          )}
+
           {cfMode === 'cpm' && cfData.cpm?.available && cfData.cpm.remainingCost > 0 &&
             Math.abs(cfData.cpm.remainingCost - cfData.totals.remaining) > Math.max(1000, cfData.totals.remaining * 0.02) && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
