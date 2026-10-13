@@ -604,6 +604,13 @@ export const esMessages: Messages = {
     colOD: 'OD',
     colRD: 'RD',
     set100: 'Marcar 100%',
+    colCost: 'Costo',
+    deleteVersion: 'Eliminar revisión',
+    deleteVersionConfirm: '¿Eliminar la revisión {revision}? Se borrarán todas sus actividades. Esta acción no se puede deshacer.',
+    versionDeleted: 'Revisión {revision} eliminada',
+    versionDeleteError: 'No se pudo eliminar la revisión',
+    deleteActiveBlocked: 'No se puede eliminar la revisión activa mientras existan otras revisiones.',
+
     ganttChart: 'Gantt Chart',
     twoWeekLookahead: '2-Week Look-Ahead',
     fragnetCompareTab: 'Fragnet / Compare',

@@ -127,6 +127,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (fields.notes !== undefined) updateData.notes = fields.notes;
     if (fields.isCritical !== undefined) updateData.isCritical = fields.isCritical;
     if (fields.resourceName !== undefined) updateData.resourceName = fields.resourceName;
+    if (fields.costLoaded !== undefined) updateData.costLoaded = fields.costLoaded;
 
     // Auto-calc remaining duration based on % and original
     if (fields.percentComplete !== undefined && fields.originalDuration !== undefined) {
@@ -148,5 +149,42 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   } catch (error: any) {
     console.error('PUT /api/schedules/[id] error:', error);
     return NextResponse.json({ error: 'Failed to update activity' }, { status: 500 });
+  }
+}
+
+// Delete a schedule revision (no se permite borrar la Activa si hay otras revisiones)
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const companyId = (session?.user as any)?.companyId ?? '';
+
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: params.id, project: { companyId } },
+      include: { project: { select: { id: true } } },
+    });
+    if (!schedule) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    if (schedule.status === 'Active') {
+      const others = await prisma.schedule.count({
+        where: { projectId: schedule.project.id, id: { not: params.id } },
+      });
+      if (others > 0) {
+        return NextResponse.json(
+          { error: 'Cannot delete the active revision while other revisions exist' },
+          { status: 400 }
+        );
+      }
+    }
+
+    await prisma.scheduleActivity.deleteMany({ where: { scheduleId: params.id } });
+    await prisma.schedule.delete({ where: { id: params.id } });
+
+    return NextResponse.json({ ok: true });
+  } catch (error: any) {
+    console.error('DELETE /api/schedules/[id] error:', error);
+    return NextResponse.json({ error: 'Failed to delete schedule' }, { status: 500 });
   }
 }

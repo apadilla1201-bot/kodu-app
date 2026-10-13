@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import {
   CalendarDays, GitCompare, Clock, Plus, ChevronDown, ChevronRight,
   Loader2, FileSpreadsheet, Download, Upload, ArrowLeftRight,
-  Check, X, AlertTriangle, ArrowRight, Minus, TrendingUp, Pencil,
+  Check, X, AlertTriangle, ArrowRight, Minus, TrendingUp, Pencil, Trash2,
 } from 'lucide-react';
 import { useI18n } from '@/hooks/use-i18n';
 
@@ -99,6 +99,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
   // Progress update: manual o alimentar con Excel
   const [progressMode, setProgressMode] = useState<'choice' | 'manual' | 'excel'>('choice');
   const [progressEdits, setProgressEdits] = useState<Record<string, number>>({});
+  const [costEdits, setCostEdits] = useState<Record<string, number>>({});
   const [progressSaving, setProgressSaving] = useState(false);
   const [progressSearch, setProgressSearch] = useState('');
 
@@ -387,26 +388,33 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
     }
   };
 
-  // ── Progress: guardar ediciones manuales ─────────────────
+  // ── Progress: guardar ediciones manuales (% y costo) ─────────────────
   const saveProgressEdits = async () => {
     if (!activeSchedule) return;
-    const entries = Object.entries(progressEdits);
-    if (entries.length === 0) { toast.info(t('schedules.noProgressChanges')); return; }
+    const pctEntries = Object.entries(progressEdits);
+    const costEntries = Object.entries(costEdits);
+    if (pctEntries.length === 0 && costEntries.length === 0) { toast.info(t('schedules.noProgressChanges')); return; }
     setProgressSaving(true);
     let saved = 0;
     let failed = 0;
-    for (const [actDbId, pct] of entries) {
+    const allIds = [...new Set([...pctEntries.map(([id]) => id), ...costEntries.map(([id]) => id)])];
+    for (const actDbId of allIds) {
       const act = activeSchedule.activities.find(a => a.id === actDbId);
       if (!act) continue;
+      const pct = progressEdits[actDbId];
+      const cost = costEdits[actDbId];
       try {
         const res = await fetch(`/api/schedules/${activeSchedule.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             activityDbId: actDbId,
-            percentComplete: pct,
-            originalDuration: act.originalDuration,
-            status: pct >= 100 ? 'done' : pct > 0 ? 'ip' : act.status,
+            ...(pct !== undefined ? {
+              percentComplete: pct,
+              originalDuration: act.originalDuration,
+              status: pct >= 100 ? 'done' : pct > 0 ? 'ip' : act.status,
+            } : {}),
+            ...(cost !== undefined ? { costLoaded: cost } : {}),
           }),
         });
         if (res.ok) saved++;
@@ -417,9 +425,35 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
     if (failed === 0) {
       toast.success(t('schedules.progressSaved', { count: saved }));
       setProgressEdits({});
+      setCostEdits({});
       await refreshSchedules();
     } else {
       toast.error(t('schedules.progressSaveError', { failed }));
+    }
+  };
+
+  // ── Versions: eliminar revisión antigua ─────────────────
+  const [deletingId, setDeletingId] = useState('');
+  const handleDeleteSchedule = async (s: ScheduleData) => {
+    if (s.status === 'Active' && allSchedules.length > 1) {
+      toast.error(t('schedules.deleteActiveBlocked'));
+      return;
+    }
+    if (!window.confirm(t('schedules.deleteVersionConfirm', { revision: s.revision }))) return;
+    setDeletingId(s.id);
+    try {
+      const res = await fetch(`/api/schedules/${s.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success(t('schedules.versionDeleted', { revision: s.revision }));
+        await refreshSchedules();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || t('schedules.versionDeleteError'));
+      }
+    } catch {
+      toast.error(t('schedules.versionDeleteError'));
+    } finally {
+      setDeletingId('');
     }
   };
 
@@ -506,11 +540,11 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
             const rows = activeSchedule.activities
               .filter(a => !a.activityType.startsWith('group_') && !a.isLookAhead)
               .filter(a => !q || a.activityName.toLowerCase().includes(q) || a.activityId.toLowerCase().includes(q));
-            const editedCount = Object.keys(progressEdits).length;
+            const editedCount = Object.keys(progressEdits).length + Object.keys(costEdits).length;
             return (
               <div className="p-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => { setProgressMode('choice'); setProgressEdits({}); }} className="text-xs text-muted-foreground hover:text-foreground">
+                  <button onClick={() => { setProgressMode('choice'); setProgressEdits({}); setCostEdits({}); }} className="text-xs text-muted-foreground hover:text-foreground">
                     ← {t('schedules.progressBack')}
                   </button>
                   <input
@@ -538,6 +572,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                         <th className="px-2 py-2 text-right font-medium w-12">{t('schedules.colOD')}</th>
                         <th className="px-2 py-2 text-right font-medium w-12">{t('schedules.colRD')}</th>
                         <th className="px-2 py-2 text-right font-medium w-28 bg-[#C9A96E]/20">%</th>
+                        <th className="px-2 py-2 text-right font-medium w-28">{t('schedules.colCost')}</th>
                         <th className="px-2 py-2 w-16"></th>
                       </tr>
                     </thead>
@@ -545,7 +580,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                       {rows.map(a => {
                         const pct = progressEdits[a.id] ?? a.percentComplete;
                         const rd = Math.round(a.originalDuration * (1 - pct / 100));
-                        const dirty = progressEdits[a.id] !== undefined;
+                        const dirty = progressEdits[a.id] !== undefined || costEdits[a.id] !== undefined;
                         return (
                           <tr key={a.id} className={dirty ? 'bg-[#C9A96E]/10' : 'hover:bg-muted/30'}>
                             <td className="px-2 py-1.5 font-mono text-[10px]">{a.activityId || '—'}</td>
@@ -571,6 +606,22 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                                 <span className="text-muted-foreground">%</span>
                               </div>
                             </td>
+                            <td className="px-2 py-1.5 bg-[#FFFFF0]">
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-muted-foreground">$</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="any"
+                                  value={costEdits[a.id] ?? a.costLoaded ?? 0}
+                                  onChange={(e) => {
+                                    const v = Math.max(0, parseFloat(e.target.value) || 0);
+                                    setCostEdits((prev) => ({ ...prev, [a.id]: v }));
+                                  }}
+                                  className="w-20 px-1 py-0.5 text-right border border-[#C9A96E]/30 rounded bg-[#FFFFF0] font-mono"
+                                />
+                              </div>
+                            </td>
                             <td className="px-2 py-1.5 text-center">
                               {pct < 100 && (
                                 <button
@@ -586,7 +637,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                         );
                       })}
                       {rows.length === 0 && (
-                        <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">{t('schedules.progressNoResults')}</td></tr>
+                        <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">{t('schedules.progressNoResults')}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -712,6 +763,14 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     {s.tcoDate && <span className="text-muted-foreground">TCO: {fmtDate(s.tcoDate)}</span>}
+                    <button
+                      onClick={() => handleDeleteSchedule(s)}
+                      disabled={deletingId === s.id}
+                      title={t('schedules.deleteVersion')}
+                      className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                    >
+                      {deletingId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
               );

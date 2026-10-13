@@ -602,6 +602,13 @@ export const enMessages = {
     colOD: 'OD',
     colRD: 'RD',
     set100: 'Mark 100%',
+    colCost: 'Cost',
+    deleteVersion: 'Delete revision',
+    deleteVersionConfirm: 'Delete revision {revision}? All its activities will be removed. This cannot be undone.',
+    versionDeleted: 'Revision {revision} deleted',
+    versionDeleteError: 'Failed to delete the revision',
+    deleteActiveBlocked: 'Cannot delete the active revision while other revisions exist.',
+
     ganttChart: 'Gantt Chart',
     twoWeekLookahead: '2-Week Look-Ahead',
     fragnetCompareTab: 'Fragnet / Compare',
