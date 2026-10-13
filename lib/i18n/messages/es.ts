@@ -610,6 +610,11 @@ export const esMessages: Messages = {
     versionDeleted: 'Revisión {revision} eliminada',
     versionDeleteError: 'No se pudo eliminar la revisión',
     deleteActiveBlocked: 'No se puede eliminar la revisión activa mientras existan otras revisiones.',
+    costLoadedTotal: 'Costo cargado en el CPM',
+    costCpmRemaining: 'Remanente del CPM (sin ejecutar)',
+    costRealRemaining: 'Faltante real por ejecutar',
+    costDiff: 'Diferencia CPM vs. real',
+    costMismatch: 'El costo del CPM no cuadra con el presupuesto ejecutado. Ajuste los costos de las actividades hasta que la diferencia sea cero.',
 
     ganttChart: 'Gantt Chart',
     twoWeekLookahead: '2-Week Look-Ahead',

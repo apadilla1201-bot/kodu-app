@@ -608,6 +608,11 @@ export const enMessages = {
     versionDeleted: 'Revision {revision} deleted',
     versionDeleteError: 'Failed to delete the revision',
     deleteActiveBlocked: 'Cannot delete the active revision while other revisions exist.',
+    costLoadedTotal: 'Cost loaded on CPM',
+    costCpmRemaining: 'CPM remaining (not yet executed)',
+    costRealRemaining: 'Real remaining to execute',
+    costDiff: 'CPM vs. real difference',
+    costMismatch: 'CPM cost does not match the executed budget. Adjust activity costs until the difference is zero.',
 
     ganttChart: 'Gantt Chart',
     twoWeekLookahead: '2-Week Look-Ahead',

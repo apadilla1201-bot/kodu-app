@@ -102,6 +102,20 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
   const [costEdits, setCostEdits] = useState<Record<string, number>>({});
   const [progressSaving, setProgressSaving] = useState(false);
   const [progressSearch, setProgressSearch] = useState('');
+  const [realRemaining, setRealRemaining] = useState<number | null>(null);
+
+  // Faltante real por ejecutar (PA/Budget/CORs) para comparar con el costo del CPM
+  const loadRealRemaining = () => {
+    if (!projectId) return;
+    fetch(`/api/analytics/projected-cashflow?projectId=${projectId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => { if (data?.totals) setRealRemaining(data.totals.remaining ?? null); })
+      .catch(() => {});
+  };
+  useEffect(() => {
+    if (view !== 'progress') return;
+    loadRealRemaining();
+  }, [view, projectId]);
 
   // Sub-tabs styling
   const subTabs = [
@@ -427,6 +441,7 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
       setProgressEdits({});
       setCostEdits({});
       await refreshSchedules();
+      loadRealRemaining();
     } else {
       toast.error(t('schedules.progressSaveError', { failed }));
     }
@@ -505,6 +520,46 @@ export default function ScheduleManager({ schedules, projectId, approvedCORs = [
               {activeSchedule && <span className="text-xs text-muted-foreground font-normal">— {activeSchedule.revision} · Data Date {fmtDate(activeSchedule.dataDate)}</span>}
             </h3>
           </div>
+
+          {activeSchedule && (() => {
+            const acts = activeSchedule.activities;
+            const costTotal = acts.reduce((s, a) => s + (costEdits[a.id] ?? a.costLoaded ?? 0), 0);
+            const cpmRem = acts.reduce((s, a) => {
+              const c = costEdits[a.id] ?? a.costLoaded ?? 0;
+              const p = progressEdits[a.id] ?? a.percentComplete ?? 0;
+              return s + c * (1 - p / 100);
+            }, 0);
+            const diff = realRemaining !== null ? cpmRem - realRemaining : null;
+            const mismatch = diff !== null && Math.abs(diff) > Math.max(1000, (realRemaining || 0) * 0.02);
+            const fmtM = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
+            return (
+              <div className="px-4 pt-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="rounded-md border border-border p-2">
+                    <p className="text-[10px] text-muted-foreground">{t('schedules.costLoadedTotal')}</p>
+                    <p className="font-mono text-sm font-semibold">{fmtM(costTotal)}</p>
+                  </div>
+                  <div className="rounded-md border border-border p-2">
+                    <p className="text-[10px] text-muted-foreground">{t('schedules.costCpmRemaining')}</p>
+                    <p className="font-mono text-sm font-semibold">{fmtM(cpmRem)}</p>
+                  </div>
+                  <div className="rounded-md border border-border p-2">
+                    <p className="text-[10px] text-muted-foreground">{t('schedules.costRealRemaining')}</p>
+                    <p className="font-mono text-sm font-semibold">{realRemaining !== null ? fmtM(realRemaining) : '—'}</p>
+                  </div>
+                  <div className={`rounded-md border p-2 ${mismatch ? 'border-amber-300 bg-amber-50' : 'border-green-200 bg-green-50'}`}>
+                    <p className="text-[10px] text-muted-foreground">{t('schedules.costDiff')}</p>
+                    <p className={`font-mono text-sm font-semibold ${mismatch ? 'text-amber-800' : 'text-green-800'}`}>
+                      {diff === null ? '—' : `${diff > 0 ? '+' : ''}${fmtM(diff)}`}
+                    </p>
+                  </div>
+                </div>
+                {mismatch && (
+                  <p className="text-[11px] text-amber-800 mt-1.5">{t('schedules.costMismatch')}</p>
+                )}
+              </div>
+            );
+          })()}
 
           {progressMode === 'choice' && (
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
