@@ -223,6 +223,14 @@ export function ProjectedCashflowSection({ fixedProjectId, projects }: Props) {
             </p>
           )}
 
+          {cfMode === 'cpm' && cfData.cpm?.available && !cfData.cpm.fallbackDistributed &&
+            cfData.cpm.remainingCost > 0 &&
+            Math.abs(cfData.cpm.remainingCost - cfData.totals.remaining) <= Math.max(1000, cfData.totals.remaining * 0.02) && (
+            <p className="text-xs text-green-700">
+              {t('analytics.cfCpmMatch', { amount: fmtMoney(cfData.cpm.remainingCost) })}
+            </p>
+          )}
+
           {cfMode === 'cpm' && cfData.cpm?.available && cpmAgeDays !== null &&
             (cpmAgeDays > 14 ? (
               <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
